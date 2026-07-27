@@ -1,0 +1,573 @@
+import React, { useState, useMemo, useEffect } from 'react';
+import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, stagesFor, eventsFor, punyaKlasifikasi, punyaSyarat, rolesFor, syaratLabel, getJadwal, STAGES, KLASIFIKASI, BIDANG, KP_TEMA, HARI, bidangLabel, todayISO, parseISO, daysBetween, BULAN, formatTanggal, kondisi, isAktif, indexTahap, hitungBeban, hitungBebanProgram, hitungBebanRinci, SEMUA, filterByPeriode, daftarPeriode, buatId, ADMIN_PASSWORD, DOSEN_PASSWORD, PERIODE_AKTIF, TOPIK, VERIFIKASI, statusVerif, tambahHari, LABEL_PENDAFTARAN, ringkasPendaftaran, RUANG, menitJam, rentangJadwal, jamTampil, beririsan, dosenTerlibat, kumpulkanEvent, cariBentrok, pesanNotifikasi, waLink, mailtoLink, waMahasiswa, TEMPLATE_SURAT, tokenSurat, renderSurat, PEJABAT, KOP_SURAT, evKeyDok, dokTA, DURASI_EVENT, JAM_KERJA, durasiEvent, jamTambah, dalamJamKerja, tahapBerikut, eventAktif, BERKAS_SYARAT, berkasSyarat, bolehAjukanJadwal } from '../utils/helpers.js';
+import { DOSEN_AWAL, plusHari, RAW_MAHASISWA, MAHASISWA_AWAL, AKUN_AWAL, PERIODE_BUKA_AWAL } from '../data/seed.js';
+import { csvEscape, triggerDownload, downloadCSV, downloadDoc, cetakSuratPDF, cetakSuratPDFHtml, loadXLSX } from '../utils/exportUtils.js';
+import { Badge, StageBar, Field, Modal, Empty, ExportMenu } from '../components/ui.jsx';
+
+// ===================== Mahasiswa.js =====================
+// Mahasiswa.js — daftar + cari + filter + tambah/edit (multi-program)
+
+const STATUS_FILTER = [
+  { key: 'all', label: 'Semua status' },
+  { key: 'aktif', label: 'Aktif' },
+  { key: 'mendekati', label: 'Mendekati deadline' },
+  { key: 'lewat', label: 'Lewat batas' },
+  { key: 'lulus', label: 'Lulus' },
+  { key: 'batal', label: 'Dibatalkan' },
+];
+
+export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeList, onSave, onDelete }) {
+  const [q, setQ] = useState('');
+  const [fProgram, setFProgram] = useState('');
+  const [fAngkatan, setFAngkatan] = useState('');
+  const [fBidang, setFBidang] = useState('');
+  const [fStatus, setFStatus] = useState('all');
+  const [fVerif, setFVerif] = useState('');
+  const [fDosen, setFDosen] = useState('');
+  const [editing, setEditing] = useState(null);
+  const [open, setOpen] = useState(false);
+  const [sortBy, setSortBy] = useState('nama'); // nama | tahap | deadline
+  const [sortDir, setSortDir] = useState('asc');
+  function ubahSort(key) {
+    if (sortBy === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else { setSortBy(key); setSortDir('asc'); }
+  }
+  const panah = (key) => (sortBy === key ? (sortDir === 'asc' ? ' \u25B2' : ' \u25BC') : '');
+
+  const angkatanList = useMemo(
+    () => Array.from(new Set(mahasiswa.map((m) => m.angkatan))).sort((a, b) => b - a),
+    [mahasiswa]
+  );
+
+  const rows = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    return mahasiswa
+      .map((m) => ({ m, k: kondisi(m) }))
+      .filter(({ m, k }) => {
+        if (term && !(`${m.nama} ${m.nim} ${m.judul}`.toLowerCase().includes(term))) return false;
+        if (fProgram && programOf(m) !== fProgram) return false;
+        if (fAngkatan && String(m.angkatan) !== fAngkatan) return false;
+        if (fBidang && m.bidang !== fBidang) return false;
+        if (fDosen && ![m.pembimbing1, m.pembimbing2, m.penguji1, m.penguji2].includes(fDosen)) return false;
+        if (fVerif && statusVerif(m).key !== fVerif) return false;
+        if (fStatus === 'aktif' && (k.key === 'lulus' || k.key === 'batal')) return false;
+        if (fStatus !== 'all' && fStatus !== 'aktif' && k.key !== fStatus) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        const arah = sortDir === 'asc' ? 1 : -1;
+        const val = (m) => sortBy === 'tahap' ? m.tahap
+          : sortBy === 'deadline' ? (m.batasAkhir || '')
+          : m.nama;
+        return String(val(a.m)).localeCompare(String(val(b.m)), 'id') * arah;
+      });
+  }, [mahasiswa, q, fProgram, fAngkatan, fBidang, fStatus, fVerif, fDosen, sortBy, sortDir]);
+
+  const notif = useMemo(() => {
+    let baru = 0, perluJadwal = 0, perluHasil = 0, bentrok = 0, kelompok = 0;
+    mahasiswa.forEach((m) => {
+      if (statusVerif(m).key === 'baru') baru++;
+      const evA = eventAktif(m);
+      if (evA) {
+        const j = (m.jadwal || {})[evA] || {};
+        if (j.tanggal && !j.dikonfirmasi) perluJadwal++;
+        if (j.dikonfirmasi && !j.hasil) perluHasil++;
+      }
+      const cb = cariBentrok(mahasiswa, m);
+      if (cb.bentrok.length) bentrok++;
+      if (cb.kelompok.length) kelompok++;
+    });
+    return { baru, perluJadwal, perluHasil, bentrok, kelompok };
+  }, [mahasiswa]);
+
+  function tambah() { setEditing(null); setOpen(true); }
+  function edit(m) { setEditing(m); setOpen(true); }
+  function simpan(m) { onSave(m); setOpen(false); }
+  function hapus(m) { if (window.confirm(`Hapus data ${m.nama}?`)) onDelete(m.id); }
+
+  const coreHeaders = ['Program', 'Nama', 'NIM', 'Angkatan', 'Judul', 'Periode', 'Klasifikasi', 'Bidang', 'Pembimbing 1', 'Pembimbing 2', 'Penguji 1', 'Penguji 2', 'Tahap', 'Status', 'Tanggal Mulai', 'Batas Akhir', 'Catatan'];
+  const coreRow = (m) => {
+    const k = kondisi(m);
+    return [
+      programLabel(programOf(m)), m.nama, m.nim, m.angkatan, m.judul, m.periode,
+      punyaKlasifikasi(programOf(m)) ? (m.klasifikasi || '') : '', bidangLabel(m.bidang),
+      m.pembimbing1 || '', m.pembimbing2 || '', m.penguji1 || '', m.penguji2 || '',
+      m.tahap, k.label, m.tanggalMulai || '', m.batasAkhir || '', m.catatan || '',
+    ];
+  };
+  const ringkasJadwal = (m) =>
+    eventsFor(programOf(m)).map((ev) => {
+      const j = getJadwal(m, ev);
+      if (!(j.tanggal || jamTampil(j) || j.ruang || j.printBA || j.syarat)) return null;
+      const info = [j.tanggal ? formatTanggal(j.tanggal) : '', jamTampil(j), j.ruang].filter(Boolean).join(' ');
+      return `${ev}: ${info} (BA: ${j.printBA ? 'Ya' : 'Tidak'}, ${j.syarat ? 'Syarat: Ya' : 'Syarat: Tidak'})`;
+    }).filter(Boolean).join(' | ');
+
+  function eksporCSV(list) {
+    downloadCSV('mahasiswa.csv', [...coreHeaders, 'Jadwal'], list.map((m) => [...coreRow(m), ringkasJadwal(m)]));
+  }
+  async function ekspor(format) {
+    const list = rows.map((x) => x.m);
+    if (format === 'csv') { eksporCSV(list); return; }
+    const jadwalHeaders = ['Nama', 'NIM', 'Program', 'Event', 'Tanggal', 'Jam', 'Ruang', 'Print BA', 'Syarat'];
+    const jadwalRows = [];
+    list.forEach((m) => eventsFor(programOf(m)).forEach((ev) => {
+      const j = getJadwal(m, ev);
+      if (j.tanggal || jamTampil(j) || j.ruang || j.printBA || j.syarat) {
+        jadwalRows.push([m.nama, m.nim, programLabel(programOf(m)), ev, j.tanggal || '', jamTampil(j), j.ruang || '', j.printBA ? 'Ya' : 'Tidak', j.syarat ? 'Ya' : 'Tidak']);
+      }
+    }));
+    try {
+      await downloadXLSX('mahasiswa.xlsx', [
+        { name: 'Mahasiswa', headers: coreHeaders, rows: list.map(coreRow) },
+        { name: 'Jadwal', headers: jadwalHeaders, rows: jadwalRows },
+      ]);
+    } catch (e) {
+      window.alert('Gagal membuat Excel (CDN mungkin diblokir). Mengunduh CSV sebagai gantinya.');
+      eksporCSV(list);
+    }
+  }
+
+  return (
+    <div>
+      <div className="toolbar">
+        <input className="search" placeholder="Cari nama, NIM, atau judul…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <select value={fProgram} onChange={(e) => setFProgram(e.target.value)}>
+          <option value="">Semua program</option>
+          {PROGRAM_KEYS.map((p) => <option key={p} value={p}>{programLabel(p)}</option>)}
+        </select>
+        <select value={fStatus} onChange={(e) => setFStatus(e.target.value)}>
+          {STATUS_FILTER.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+        </select>
+        <select value={fAngkatan} onChange={(e) => setFAngkatan(e.target.value)}>
+          <option value="">Semua angkatan</option>
+          {angkatanList.map((a) => <option key={a} value={a}>Angkatan {a}</option>)}
+        </select>
+        <select value={fBidang} onChange={(e) => setFBidang(e.target.value)}>
+          <option value="">Semua bidang</option>
+          {BIDANG.map((b) => <option key={b.kode} value={b.kode}>{b.label}</option>)}
+        </select>
+        <select value={fVerif} onChange={(e) => setFVerif(e.target.value)}>
+          <option value="">Semua verifikasi</option>
+          <option value="baru">Menunggu verifikasi</option>
+          <option value="terverifikasi">Terverifikasi</option>
+          <option value="perbaikan">Perlu perbaikan</option>
+        </select>
+        <select value={fDosen} onChange={(e) => setFDosen(e.target.value)}>
+          <option value="">Semua dosen</option>
+          {allDosen.map((d) => <option key={d.kode} value={d.kode}>{d.kode}</option>)}
+        </select>
+        <ExportMenu label="Ekspor" onXLSX={() => ekspor('xlsx')} onCSV={() => ekspor('csv')} />
+        <button className="btn btn-primary" onClick={tambah}>+ Tambah</button>
+      </div>
+
+      {(notif.baru + notif.perluJadwal + notif.perluHasil + notif.bentrok + notif.kelompok) > 0 && (
+        <div className="callout" style={{ marginBottom: 12 }}>
+          🔔 {notif.baru > 0 && <span><strong>{notif.baru}</strong> pendaftaran baru perlu diperiksa &amp; pembimbing. </span>}
+          {notif.perluJadwal > 0 && <span><strong>{notif.perluJadwal}</strong> usulan jadwal perlu diverifikasi. </span>}
+          {notif.perluHasil > 0 && <span><strong>{notif.perluHasil}</strong> menunggu hasil (lulus/tidak lulus). </span>}
+          {notif.bentrok > 0 && <span>⚠ <strong>{notif.bentrok}</strong> jadwal berpotensi bentrok (tidak mengunci). </span>}
+          {notif.kelompok > 0 && <span>👥 <strong>{notif.kelompok}</strong> jadwal terindikasi sidang kelompok. </span>}
+        </div>
+      )}
+      <div className="table-wrap card">
+        <table className="tbl">
+          <thead>
+            <tr>
+              <th className="th-sort" onClick={() => ubahSort('nama')}>Mahasiswa{panah('nama')}</th>
+              <th>Judul</th>
+              <th className="th-sort" onClick={() => ubahSort('tahap')}>Tahap &amp; jadwal{panah('tahap')}</th>
+              <th>Pembimbing</th>
+              <th>Penguji</th>
+              <th className="th-sort" onClick={() => ubahSort('deadline')}>Deadline{panah('deadline')}</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(({ m, k }) => (
+              <tr key={m.id}>
+                <td>
+                  <div className="cell-name">{m.nama}</div>
+                  <div className="cell-sub">
+                    {m.nim} · {bidangLabel(m.bidang)} · {programLabel(programOf(m))}
+                    {m.klasifikasi && punyaKlasifikasi(programOf(m)) ? ` · ${m.klasifikasi}` : ''}
+                  </div>
+                  <div style={{ marginTop: 4 }}><Badge tone={statusVerif(m).tone}>{statusVerif(m).label}</Badge></div>
+                </td>
+                <td className="cell-judul">{m.judul || <span className="muted">—</span>}</td>
+                <td style={{ minWidth: 180 }}>
+                  <StageBar program={programOf(m)} tahap={m.tahap} />
+                  <JadwalMini m={m} />
+                </td>
+                <td>{m.pembimbing1 || '-'}{m.pembimbing2 ? ` / ${m.pembimbing2}` : ''}</td>
+                <td>{m.penguji1 || '-'}{m.penguji2 ? ` / ${m.penguji2}` : ''}</td>
+                <td>
+                  <Badge tone={k.tone}>{k.label}</Badge>
+                  <div className="cell-sub">{formatTanggal(m.batasAkhir)}</div>
+                </td>
+                <td className="cell-actions">
+                  <button className="link-btn" onClick={() => edit(m)}>Edit</button>
+                  <button className="link-btn danger" onClick={() => hapus(m)}>Hapus</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {rows.length === 0 && <Empty>Tidak ada data yang cocok.</Empty>}
+      </div>
+
+      {open && (
+        <FormMahasiswa
+          awal={editing}
+          allDosen={allDosen}
+          allMahasiswa={allMahasiswa || mahasiswa}
+          periode={periode}
+          periodeList={periodeList}
+          onCancel={() => setOpen(false)}
+          onSave={simpan}
+        />
+      )}
+    </div>
+  );
+}
+
+// Tampilan ringkas jadwal di tabel, hanya bila tahap saat ini adalah event terjadwal.
+function JadwalMini({ m }) {
+  const ev = m.tahap;
+  if (!eventsFor(programOf(m)).includes(ev)) return null;
+  const j = getJadwal(m, ev);
+  const adaInfo = j.tanggal || j.ruang || jamTampil(j);
+  return (
+    <div className="jadwal-mini">
+      {adaInfo && (
+        <span className="cell-sub">
+          {[j.tanggal ? formatTanggal(j.tanggal) : null, j.ruang, jamTampil(j)].filter(Boolean).join(' · ')}
+        </span>
+      )}
+      <div className="chips">
+        <span className={'chip' + (j.printBA ? ' chip-on' : '')}>BA</span>
+        <span className={'chip' + (j.syarat ? ' chip-on' : '')}>Syarat</span>
+      </div>
+    </div>
+  );
+}
+
+function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, periodeList, onCancel, onSave }) {
+  const baru = !awal;
+  const [err, setErr] = useState('');
+  const [m, setM] = useState(() => {
+    const base = awal || {
+      id: buatId(),
+      program: 'TA',
+      nama: '', nim: '', judul: '',
+      periode: periode && periode !== SEMUA ? periode : (periodeList[periodeList.length - 1] || ''),
+      angkatan: '', klasifikasi: 'Penelitian', bidang: 'U',
+      pembimbing1: '', pembimbing2: '', penguji1: '', penguji2: '',
+      tahap: 'Pendaftaran',
+      tanggalMulai: todayISO(), batasAkhir: '',
+      dibatalkan: false, catatan: '',
+      jadwal: {}, verifikasi: 'terverifikasi', pendaftaran: {},
+    };
+    return { ...base, program: PROGRAMS[base.program] ? base.program : 'TA', jadwal: base.jadwal || {} };
+  });
+
+  const set = (k, v) => setM((prev) => ({ ...prev, [k]: v }));
+  const setPP = (k, v) => setM((prev) => ({ ...prev, perpanjangan: { ...(prev.perpanjangan || {}), [k]: v } }));
+  const dosenByKode = useMemo(() => Object.fromEntries((allDosen || []).map((d) => [d.kode, d])), [allDosen]);
+  const bentrokLive = useMemo(() => cariBentrok(allMahasiswa, m), [allMahasiswa, m]);
+  const [pesanWA, setPesanWA] = useState(() => pesanNotifikasi(m));
+  const setJadwal = (ev, key, val) =>
+    setM((prev) => ({
+      ...prev,
+      jadwal: { ...(prev.jadwal || {}), [ev]: { ...((prev.jadwal || {})[ev] || {}), [key]: val } },
+    }));
+
+  function gantiProgram(p) {
+    setM((prev) => {
+      const stages = stagesFor(p);
+      const tahap = stages.includes(prev.tahap) ? prev.tahap : stages[0];
+      const r = rolesFor(p);
+      const next = { ...prev, program: p, tahap };
+      if (r.pembimbing < 2) next.pembimbing2 = '';
+      if (r.pembimbing < 1) next.pembimbing1 = '';
+      if (r.penguji < 1) next.penguji1 = '';
+      if (r.penguji < 2) next.penguji2 = '';
+      return next;
+    });
+  }
+
+  function submit() {
+    if (!m.nama.trim()) { setErr('Nama wajib diisi.'); return; }
+    const calon = { ...m, angkatan: Number(m.angkatan) || m.angkatan };
+    const masalah = [];
+    // Validasi tanggal jadwal: dalam rentang & berurutan sesuai tahapan.
+    const evs = eventsFor(programOf(calon));
+    let prevEv = null;
+    evs.forEach((ev) => {
+      const t = ((calon.jadwal || {})[ev] || {}).tanggal;
+      if (!t) return;
+      if (calon.tanggalMulai && t < calon.tanggalMulai) masalah.push(`Tanggal ${ev} mendahului tanggal mulai (${formatTanggal(calon.tanggalMulai)}).`);
+      if (calon.batasAkhir && t > calon.batasAkhir) masalah.push(`Tanggal ${ev} melewati batas akhir (${formatTanggal(calon.batasAkhir)}).`);
+      if (prevEv && t < ((calon.jadwal || {})[prevEv] || {}).tanggal) masalah.push(`Tanggal ${ev} mendahului ${prevEv} — urutan harus ${evs.join(' → ')}.`);
+      prevEv = ev;
+    });
+    const cb = cariBentrok(allMahasiswa, calon);
+    // Bentrok jadwal HANYA peringatan, tidak mengunci (boleh jadwal bersamaan).
+    if (masalah.length) { setErr('Tidak bisa menyimpan:\n• ' + masalah.join('\n• ')); return; }
+    if (cb.bentrok.length && !window.confirm('Ada bentrok jadwal:\n• ' + cb.bentrok.join('\n• ') + '\n\nTetap simpan?')) return;
+    setErr('');
+    onSave(calon);
+  }
+
+  const dosenOpts = (
+    <>
+      <option value="">—</option>
+      {allDosen.map((d) => <option key={d.kode} value={d.kode}>{d.kode} — {d.nama}</option>)}
+    </>
+  );
+
+  const stages = stagesFor(m.program);
+  const events = eventsFor(m.program);
+  const roles = rolesFor(m.program);
+  const pembimbing1Label = roles.pembimbing === 1 ? (roles.pembimbingLabel || 'Pembimbing') : 'Pembimbing 1';
+  const penguji1Label = roles.penguji === 1 ? 'Penguji' : 'Penguji 1';
+  const p = m.pendaftaran || {};
+
+  return (
+    <Modal
+      title={baru ? 'Tambah mahasiswa' : 'Edit mahasiswa'}
+      onClose={onCancel}
+      footer={
+        <>
+          <button className="btn" onClick={onCancel}>Batal</button>
+          <button className="btn btn-primary" onClick={submit}>Simpan</button>
+        </>
+      }
+    >
+      <div className="form-grid">
+        <div className="sched field-full">
+          <div className="sched-title">Verifikasi pendaftaran</div>
+          {(ringkasPendaftaran(p).length > 0 || p.berkasLink) ? (
+            <div className="verif-info">
+              {ringkasPendaftaran(p).map((r) => (
+                <div key={r.label}>{r.label}: <strong>{r.nilai}</strong></div>
+              ))}
+              {p.berkasLink
+                ? <div>Berkas: <a href={p.berkasLink} target="_blank" rel="noreferrer">buka link</a></div>
+                : <div className="muted">Berkas belum dilampirkan.</div>}
+            </div>
+          ) : <div className="hint">Data dibuat manual oleh admin (tanpa pengajuan mahasiswa).</div>}
+          <div className="sched-grid" style={{ marginTop: 10 }}>
+            <Field label="Status verifikasi">
+              <select value={m.verifikasi || 'terverifikasi'} onChange={(e) => set('verifikasi', e.target.value)}>
+                <option value="baru">Menunggu verifikasi</option>
+                <option value="terverifikasi">Terverifikasi</option>
+                <option value="perbaikan">Perlu perbaikan</option>
+              </select>
+            </Field>
+          </div>
+        </div>
+
+        <Field label="Program">
+          <select value={m.program} onChange={(e) => gantiProgram(e.target.value)}>
+            {PROGRAM_KEYS.map((p) => <option key={p} value={p}>{programLabel(p)}</option>)}
+          </select>
+        </Field>
+        <Field label="Periode">
+          <input value={m.periode} onChange={(e) => set('periode', e.target.value)} placeholder="mis. 2021 Ganjil" list="periode-list" />
+          <datalist id="periode-list">
+            {periodeList.map((p) => <option key={p} value={p} />)}
+          </datalist>
+        </Field>
+
+        <Field label="Nama" full><input value={m.nama} onChange={(e) => set('nama', e.target.value)} /></Field>
+        <Field label="NIM"><input value={m.nim} onChange={(e) => set('nim', e.target.value)} /></Field>
+        <Field label="Angkatan"><input value={m.angkatan} onChange={(e) => set('angkatan', e.target.value)} placeholder="mis. 18" /></Field>
+        <Field label="Judul" full><textarea rows={2} value={m.judul} onChange={(e) => set('judul', e.target.value)} /></Field>
+
+        {punyaKlasifikasi(m.program) && (
+          <Field label="Klasifikasi">
+            <select value={m.klasifikasi} onChange={(e) => set('klasifikasi', e.target.value)}>
+              {KLASIFIKASI.map((k) => <option key={k} value={k}>{k}</option>)}
+            </select>
+          </Field>
+        )}
+        <Field label="Bidang">
+          <select value={m.bidang} onChange={(e) => set('bidang', e.target.value)}>
+            {BIDANG.map((b) => <option key={b.kode} value={b.kode}>{b.label}</option>)}
+          </select>
+        </Field>
+
+        <Field label={pembimbing1Label}><select value={m.pembimbing1} onChange={(e) => set('pembimbing1', e.target.value)}>{dosenOpts}</select></Field>
+        {roles.pembimbing >= 2 && (
+          <Field label="Pembimbing 2"><select value={m.pembimbing2} onChange={(e) => set('pembimbing2', e.target.value)}>{dosenOpts}</select></Field>
+        )}
+        {roles.penguji >= 1 && (
+          <Field label={penguji1Label}><select value={m.penguji1} onChange={(e) => set('penguji1', e.target.value)}>{dosenOpts}</select></Field>
+        )}
+        {roles.penguji >= 2 && (
+          <Field label="Penguji 2"><select value={m.penguji2} onChange={(e) => set('penguji2', e.target.value)}>{dosenOpts}</select></Field>
+        )}
+
+        <Field label="Tahap saat ini">
+          <select value={m.tahap} onChange={(e) => set('tahap', e.target.value)}>
+            {stages.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </Field>
+        <Field label="Tanggal mulai"><input type="date" value={m.tanggalMulai} onChange={(e) => set('tanggalMulai', e.target.value)} /></Field>
+        <Field label="Batas akhir"><input type="date" value={m.batasAkhir} onChange={(e) => set('batasAkhir', e.target.value)} /></Field>
+        {m.tahap === 'Lulus' && (
+          <Field label="Tanggal lulus"><input type="date" value={m.tanggalLulus || ''} onChange={(e) => set('tanggalLulus', e.target.value)} /></Field>
+        )}
+
+        {(() => {
+          const next = tahapBerikut(programOf(m), m.tahap);
+          const evA = eventAktif(m);
+          const jA = evA ? ((m.jadwal || {})[evA] || {}) : {};
+          const luluskan = () => setM((prev) => {
+            const nx = tahapBerikut(programOf(prev), prev.tahap);
+            const upd = { ...prev, tahap: nx };
+            if (evA) upd.jadwal = { ...(prev.jadwal || {}), [evA]: { ...((prev.jadwal || {})[evA] || {}), hasil: 'lulus' } };
+            if (nx === 'Lulus') upd.tanggalLulus = prev.tanggalLulus || todayISO();
+            return upd;
+          });
+          const tidakLulus = () => setM((prev) => ({ ...prev, jadwal: { ...(prev.jadwal || {}), [evA]: { ...((prev.jadwal || {})[evA] || {}), hasil: 'tidak', dikonfirmasi: false } } }));
+          return (
+            <div className="sched field-full">
+              <div className="sched-title">Alur tahap</div>
+              <div className="cell-sub">Tahap saat ini: <strong>{m.tahap}</strong>{next ? ` → berikutnya: ${next}` : ' (tahap akhir)'}</div>
+              {evA && (
+                <div className="verif-info" style={{ marginTop: 8 }}>
+                  <div>Jadwal {evA}: {jA.tanggal ? formatTanggal(jA.tanggal) : '—'} {jamTampil(jA)} {jA.ruang || ''}</div>
+                  {jA.berkasLink ? <div>Berkas: <a href={jA.berkasLink} target="_blank" rel="noreferrer">buka link</a></div> : <div className="muted">Berkas belum dilampirkan mahasiswa.</div>}
+                  <div>Status: {jA.dikonfirmasi ? 'jadwal final' : (jA.tanggal ? 'perkiraan / menunggu verifikasi' : 'belum ada jadwal')}{jA.hasil ? ` · hasil terakhir: ${jA.hasil}` : ''}</div>
+                </div>
+              )}
+              <div className="notif-actions" style={{ marginTop: 8 }}>
+                {next && (
+                  <button type="button" className="btn btn-primary" onClick={luluskan}>
+                    Lanjut ke Tahap Berikutnya{next ? ` (${next})` : ''}</button>
+                )}
+                {evA && <button type="button" className="btn" onClick={tidakLulus}>Tandai tidak lulus (ulang)</button>}
+                {!next && <span className="hint">Sudah pada tahap akhir (Lulus).</span>}
+              </div>
+              <div className="hint">Perubahan tahap baru tersimpan saat klik "Simpan".</div>
+            </div>
+          );
+        })()}
+
+        {events.map((ev) => {
+          const j = (m.jadwal || {})[ev] || {};
+          return (
+            <div className="sched field-full" key={ev}>
+              <div className="sched-title">Jadwal {ev}</div>
+              <div className="sched-grid">
+                <Field label="Nomor Surat Tugas"><input value={j.nomorST || ''} onChange={(e) => setJadwal(ev, 'nomorST', e.target.value)} placeholder="mis. 123 A/UN7..." /></Field>
+                <Field label="Tanggal"><input type="date" value={j.tanggal || ''} onChange={(e) => setJadwal(ev, 'tanggal', e.target.value)} /></Field>
+                {(m.program === 'KP' || ev.includes('KP')) && (
+                  <Field label="Hari">
+                    <select value={j.hari || ''} onChange={(e) => setJadwal(ev, 'hari', e.target.value)}>
+                      <option value="">—</option>
+                      {HARI.map((h) => <option key={h} value={h}>{h}</option>)}
+                    </select>
+                  </Field>
+                )}
+                <Field label="Jam mulai"><input type="time" value={j.jamMulai || ''} onChange={(e) => setJadwal(ev, 'jamMulai', e.target.value)} /></Field>
+                <Field label="Jam selesai"><input type="time" value={j.jamSelesai || ''} onChange={(e) => setJadwal(ev, 'jamSelesai', e.target.value)} /></Field>
+                <Field label="Ruang">
+                  <select value={j.ruang || ''} onChange={(e) => setJadwal(ev, 'ruang', e.target.value)}>
+                    <option value="">— pilih ruang —</option>
+                    {RUANG.map((r) => <option key={r} value={r}>{r}</option>)}
+                    {j.ruang && !RUANG.includes(j.ruang) && <option value={j.ruang}>{j.ruang}</option>}
+                  </select>
+                </Field>
+              </div>
+              <div className="sched-checks">
+                <label className="check"><input type="checkbox" checked={!!j.printBA} onChange={(e) => setJadwal(ev, 'printBA', e.target.checked)} /><span>Print Berita Acara</span></label>
+                <label className="check"><input type="checkbox" checked={!!j.syarat} onChange={(e) => setJadwal(ev, 'syarat', e.target.checked)} /><span>{syaratLabel(ev)}</span></label>
+                <label className="check"><input type="checkbox" checked={!!j.dikonfirmasi} onChange={(e) => setJadwal(ev, 'dikonfirmasi', e.target.checked)} /><span>Jadwal final (dikonfirmasi)</span></label>
+                <button type="button" className="btn" style={{ marginLeft: 'auto' }}
+                  onClick={() => (m.program === 'TA'
+                    ? cetakSuratPDF(`Surat Tugas & Berita Acara ${ev} - ${m.nama || m.nim}`, dokTA('ba', m, dosenByKode, ev))
+                    : cetakSuratPDF(`Surat Tugas ${ev} - ${m.nama || m.nim}`, renderSurat(ev, tokenSurat(m, ev, dosenByKode))))}>
+                  Surat Tugas + Berita Acara (PDF)
+                </button>
+                <button type="button" className="btn ghost"
+                  onClick={() => downloadDoc(`Surat Tugas - ${ev} - ${m.nama || m.nim}.doc`, m.program === 'TA' ? dokTA('ba', m, dosenByKode, ev) : renderSurat(ev, tokenSurat(m, ev, dosenByKode)))}>
+                  .doc
+                </button>
+              </div>
+              <div className="sched-grid" style={{ marginTop: 8 }}>
+                <Field label="Link berkas persyaratan" full><input value={j.berkasLink || ''} onChange={(e) => setJadwal(ev, 'berkasLink', e.target.value)} placeholder="https://drive.google.com/..." /></Field>
+                {ev.includes('Sidang') && (
+                  <>
+                    <Field label="Link Turnitin" full><input value={j.turnitinLink || ''} onChange={(e) => setJadwal(ev, 'turnitinLink', e.target.value)} placeholder="https://drive.google.com/..." /></Field>
+                    <Field label="Link folder sidang" full><input value={j.folderLink || ''} onChange={(e) => setJadwal(ev, 'folderLink', e.target.value)} placeholder="https://drive.google.com/..." /></Field>
+                  </>
+                )}
+              </div>
+              <div className="hint">Dokumen yang diharapkan: {berkasSyarat(ev)}</div>
+            </div>
+          );
+        })}
+
+        <Field label="Catatan / pesan untuk mahasiswa" full><textarea rows={2} value={m.catatan} onChange={(e) => set('catatan', e.target.value)} /></Field>
+        <label className="check field-full">
+          <input type="checkbox" checked={!!m.dibatalkan} onChange={(e) => set('dibatalkan', e.target.checked)} />
+          <span>Dibatalkan (tidak dihitung sebagai aktif &amp; beban dosen)</span>
+        </label>
+
+        {['TA', 'KP', 'MG'].includes(m.program) && (
+          <div className="sched field-full">
+            <div className="sched-title">Perpanjangan {programLabel(m.program)}</div>
+            {(m.perpanjangan && m.perpanjangan.diminta)
+              ? <div className="verif-info"><div>Alasan mahasiswa: <strong>{m.perpanjangan.alasan || '—'}</strong>{m.perpanjangan.tanggalDiminta ? ` · ${formatTanggal(m.perpanjangan.tanggalDiminta)}` : ''}</div></div>
+              : <div className="hint">Belum ada pengajuan perpanjangan dari mahasiswa.</div>}
+            <Field label="Link surat perpanjangan (dari admin)" full>
+              <input value={(m.perpanjangan || {}).suratAdminLink || ''} onChange={(e) => setPP('suratAdminLink', e.target.value)} placeholder="https://drive.google.com/..." />
+            </Field>
+            {(m.perpanjangan || {}).suratFinalLink
+              ? <div className="callout callout-green">Surat final (ditandatangani) dari mahasiswa: <a href={m.perpanjangan.suratFinalLink} target="_blank" rel="noreferrer">buka</a></div>
+              : <div className="hint">Surat final dari mahasiswa belum diunggah.</div>}
+            {m.program === 'TA' && (
+              <div className="notif-actions" style={{ marginTop: 8 }}>
+                <button type="button" className="btn" onClick={() => cetakSuratPDF(`Perpanjangan TA - ${m.nama}`, dokTA('perpanjangan', m, dosenByKode))}>Cetak surat perpanjangan (PDF)</button>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="sched field-full">
+          <div className="sched-title">Notifikasi</div>
+          <textarea className="notif-msg" rows={3} value={pesanWA} onChange={(e) => setPesanWA(e.target.value)} />
+          <div className="notif-actions">
+            <button type="button" className="btn ghost" onClick={() => setPesanWA(pesanNotifikasi(m))}>Perbarui dari data tahap</button>
+            {waMahasiswa(m)
+              ? <a className="btn" href={waLink(waMahasiswa(m), pesanWA)} target="_blank" rel="noreferrer">WA mahasiswa</a>
+              : <span className="hint">Nomor WA mahasiswa belum ada.</span>}
+            {dosenTerlibat(m).map((k) => allDosen.find((d) => d.kode === k)).filter(Boolean).map((d) => (
+              <span key={d.kode} className="notif-dsn">
+                {d.wa && <a className="btn" href={waLink(d.wa, pesanWA)} target="_blank" rel="noreferrer">WA {d.kode}</a>}
+                {d.email && <a className="btn" href={mailtoLink(d.email, 'Notifikasi ' + programLabel(programOf(m)), pesanWA)} target="_blank" rel="noreferrer">Email {d.kode}</a>}
+              </span>
+            ))}
+          </div>
+          <div className="hint">Pesan bisa diedit langsung di sini sebelum dikirim. Push otomatis tetap memerlukan backend.</div>
+        </div>
+
+        {bentrokLive.bentrok.length > 0 && (
+          <div className="callout callout-amber field-full" style={{ whiteSpace: 'pre-wrap' }}>
+            ⚠ Peringatan bentrok jadwal (boleh tetap disimpan):{'\n• ' + bentrokLive.bentrok.join('\n• ')}
+          </div>
+        )}
+        {bentrokLive.kelompok.length > 0 && (
+          <div className="callout field-full" style={{ whiteSpace: 'pre-wrap', backgroundColor: '#e0f7fa' }}>
+            👥 Sidang kelompok terdeteksi:{'\n• ' + bentrokLive.kelompok.join('\n• ')}
+          </div>
+        )}
+        {err && <div className="login-err field-full" style={{ whiteSpace: 'pre-wrap' }}>{err}</div>}
+      </div>
+    </Modal>
+  );
+}
+
