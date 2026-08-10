@@ -5,8 +5,8 @@ import { Dosen } from './pages/Dosen.jsx';
 import { Login } from './pages/Login.jsx';
 import { Portal, DosenPortal } from './pages/Portal.jsx';
 import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, stagesFor, eventsFor, punyaKlasifikasi, punyaSyarat, rolesFor, syaratLabel, getJadwal, STAGES, KLASIFIKASI, BIDANG, KP_TEMA, HARI, bidangLabel, todayISO, parseISO, daysBetween, BULAN, formatTanggal, kondisi, isAktif, indexTahap, hitungBeban, hitungBebanProgram, hitungBebanRinci, SEMUA, filterByPeriode, daftarPeriode, buatId, ADMIN_PASSWORD, DOSEN_PASSWORD, PERIODE_AKTIF, TOPIK, VERIFIKASI, statusVerif, tambahHari, LABEL_PENDAFTARAN, ringkasPendaftaran, RUANG, menitJam, rentangJadwal, jamTampil, beririsan, dosenTerlibat, kumpulkanEvent, cariBentrok, pesanNotifikasi, waLink, mailtoLink, waMahasiswa, TEMPLATE_SURAT, tokenSurat, renderSurat, PEJABAT, KOP_SURAT, evKeyDok, dokTA, DURASI_EVENT, JAM_KERJA, durasiEvent, jamTambah, dalamJamKerja, tahapBerikut, eventAktif, BERKAS_SYARAT, berkasSyarat, bolehAjukanJadwal } from './utils/helpers.js';
-import { DOSEN_AWAL, plusHari, RAW_MAHASISWA, MAHASISWA_AWAL, AKUN_AWAL, PERIODE_BUKA_AWAL } from './data/seed.js';
-import { Badge, StageBar, Field, Modal, Empty, ExportMenu } from './components/ui.jsx';
+import { DOSEN_AWAL, plusHari, RAW_MAHASISWA, MAHASISWA_AWAL, AKUN_AWAL, PERIODE_BUKA_AWAL, PENGUMUMAN_AWAL } from './data/seed.js';
+import { Badge, StageBar, Field, Modal, Empty, ExportMenu, TextSizeToggle, ThemeToggle } from './components/ui.jsx';
 import { db } from './utils/firebase.js';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 
@@ -21,10 +21,10 @@ function load() {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const p = JSON.parse(raw);
-      if (p && p.dosen && p.mahasiswa) return { akun: AKUN_AWAL, periodeBuka: PERIODE_BUKA_AWAL, ...p };
+      if (p && p.dosen && p.mahasiswa) return { akun: AKUN_AWAL, periodeBuka: PERIODE_BUKA_AWAL, pengumuman: PENGUMUMAN_AWAL, ...p };
     }
   } catch (e) { /* abaikan */ }
-  return { dosen: DOSEN_AWAL, mahasiswa: MAHASISWA_AWAL, akun: AKUN_AWAL, periodeBuka: PERIODE_BUKA_AWAL };
+  return { dosen: DOSEN_AWAL, mahasiswa: MAHASISWA_AWAL, akun: AKUN_AWAL, periodeBuka: PERIODE_BUKA_AWAL, pengumuman: PENGUMUMAN_AWAL };
 }
 
 function loadSesi() {
@@ -40,6 +40,7 @@ export default function App() {
   const [sesi, setSesi] = useState(loadSesi);
   const [tab, setTab] = useState('dashboard');
   const [showPeriode, setShowPeriode] = useState(false);
+  const [showPengumuman, setShowPengumuman] = useState(false);
 
   useEffect(() => { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {} }, [data]);
   useEffect(() => {
@@ -90,6 +91,18 @@ export default function App() {
     });
   }
   function hapusMahasiswa(id) { updateData((d) => ({ ...d, mahasiswa: d.mahasiswa.filter((x) => x.id !== id) })); }
+  // Dosen hanya boleh mengubah nilai/hasil pada event yang mereka tangani sendiri —
+  // jangan pakai simpanMahasiswa (itu menimpa seluruh record, termasuk field admin).
+  function simpanNilaiKP(id, ev, hasil) {
+    updateData((d) => ({
+      ...d,
+      mahasiswa: d.mahasiswa.map((x) =>
+        x.id === id
+          ? { ...x, jadwal: { ...(x.jadwal || {}), [ev]: { ...((x.jadwal || {})[ev] || {}), hasil } } }
+          : x
+      ),
+    }));
+  }
   function simpanDosen(ds) {
     updateData((d) => {
       const ada = d.dosen.some((x) => x.kode === ds.kode);
@@ -111,26 +124,31 @@ export default function App() {
   function tutupPeriode(p) {
     updateData((d) => ({ ...d, periodeBuka: (d.periodeBuka || []).filter((x) => x !== p) }));
   }
+  function simpanPengumuman(list) {
+    updateData((d) => ({ ...d, pengumuman: list }));
+  }
   function resetData() {
     if (window.confirm('Kembalikan ke data contoh? Semua perubahan akan hilang.')) {
-      updateData({ dosen: DOSEN_AWAL, mahasiswa: MAHASISWA_AWAL, akun: AKUN_AWAL, periodeBuka: PERIODE_BUKA_AWAL });
+      updateData({ dosen: DOSEN_AWAL, mahasiswa: MAHASISWA_AWAL, akun: AKUN_AWAL, periodeBuka: PERIODE_BUKA_AWAL, pengumuman: PENGUMUMAN_AWAL });
     }
   }
 
   // ----- Belum login -----
   if (!sesi) {
-    return <Login akun={data.akun || []} dosen={data.dosen} onLogin={setSesi} onRegister={daftarAkun} />;
+    return <Login akun={data.akun || []} dosen={data.dosen} pengumuman={data.pengumuman || PENGUMUMAN_AWAL} onLogin={setSesi} onRegister={daftarAkun} />;
   }
 
   // ----- Login sebagai dosen -----
   if (sesi.peran === 'dosen') {
     const ds = data.dosen.find((x) => x.kode === sesi.kode);
-    if (!ds) return <Login akun={data.akun || []} dosen={data.dosen} onLogin={setSesi} onRegister={daftarAkun} />;
+    if (!ds) return <Login akun={data.akun || []} dosen={data.dosen} pengumuman={data.pengumuman || PENGUMUMAN_AWAL} onLogin={setSesi} onRegister={daftarAkun} />;
     return (
       <DosenPortal
         dosen={ds}
+        allDosen={data.dosen}
         mahasiswa={data.mahasiswa}
         periodeList={periodeList}
+        onGradeSave={simpanNilaiKP}
         onLogout={() => setSesi(null)}
       />
     );
@@ -167,6 +185,8 @@ export default function App() {
           <span className="brand-name">SIMANTAP</span>
         </div>
         <div className="topbar-right">
+          <ThemeToggle />
+          <TextSizeToggle />
           <label className="periode-pick">
             <span>Periode</span>
             <select value={periode} onChange={(e) => setPeriode(e.target.value)}>
@@ -175,7 +195,8 @@ export default function App() {
             </select>
           </label>
           <button className="btn ghost" onClick={() => setShowPeriode(true)}>Kelola periode</button>
-          <button className="btn ghost" onClick={resetData} title="Kembalikan data contoh">Reset</button>
+          <button className="btn ghost" onClick={() => setShowPengumuman(true)}>Kelola pengumuman</button>
+          {/* <button className="btn ghost" onClick={resetData} title="Kembalikan data contoh">Reset</button> */}
           <button className="btn ghost" onClick={() => setSesi(null)}>Keluar</button>
         </div>
       </header>
@@ -186,6 +207,14 @@ export default function App() {
           onBuka={bukaPeriode}
           onTutup={tutupPeriode}
           onClose={() => setShowPeriode(false)}
+        />
+      )}
+
+      {showPengumuman && (
+        <KelolaPengumuman
+          daftar={data.pengumuman || PENGUMUMAN_AWAL}
+          onSimpan={simpanPengumuman}
+          onClose={() => setShowPengumuman(false)}
         />
       )}
 
@@ -246,6 +275,67 @@ function KelolaPeriode({ dibuka, onBuka, onTutup, onClose }) {
               <li key={p} className="periode-item">
                 <span>{p}</span>
                 <button className="link-btn danger" onClick={() => onTutup(p)}>Tutup</button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+function KelolaPengumuman({ daftar, onSimpan, onClose }) {
+  const [tanggal, setTanggal] = useState('');
+  const [judul, setJudul] = useState('');
+  const [isi, setIsi] = useState('');
+  const [editId, setEditId] = useState(null);
+
+  function kosongkan() { setTanggal(''); setJudul(''); setIsi(''); setEditId(null); }
+
+  function simpan() {
+    if (!tanggal.trim() || !judul.trim()) return;
+    if (editId) {
+      onSimpan(daftar.map((p) => (p.id === editId ? { ...p, tanggal: tanggal.trim(), judul: judul.trim(), isi: isi.trim() } : p)));
+    } else {
+      onSimpan([{ id: buatId(), tanggal: tanggal.trim(), judul: judul.trim(), isi: isi.trim() }, ...daftar]);
+    }
+    kosongkan();
+  }
+
+  function edit(p) { setEditId(p.id); setTanggal(p.tanggal); setJudul(p.judul); setIsi(p.isi); }
+  function hapus(id) { if (window.confirm('Hapus pengumuman ini?')) onSimpan(daftar.filter((p) => p.id !== id)); if (editId === id) kosongkan(); }
+
+  return (
+    <Modal
+      title="Kelola pengumuman"
+      onClose={onClose}
+      footer={<button className="btn btn-primary" onClick={onClose}>Selesai</button>}
+    >
+      <p className="hint" style={{ marginTop: 0 }}>
+        Pengumuman ini tampil di halaman login, terbaru di atas.
+      </p>
+      <div className="form-grid">
+        <Field label="Tanggal" full><input value={tanggal} onChange={(e) => setTanggal(e.target.value)} placeholder="mis. 17 Juli 2026" /></Field>
+        <Field label="Judul" full><input value={judul} onChange={(e) => setJudul(e.target.value)} /></Field>
+        <Field label="Isi" full><textarea rows={3} value={isi} onChange={(e) => setIsi(e.target.value)} /></Field>
+      </div>
+      <div className="modal-foot" style={{ paddingLeft: 0, paddingRight: 0 }}>
+        {editId && <button className="btn" onClick={kosongkan}>Batal edit</button>}
+        <button className="btn btn-primary" onClick={simpan}>{editId ? 'Simpan perubahan' : 'Tambah pengumuman'}</button>
+      </div>
+      <div className="sched" style={{ marginTop: 12 }}>
+        <div className="sched-title">Pengumuman saat ini</div>
+        {daftar.length === 0 ? (
+          <Empty>Belum ada pengumuman.</Empty>
+        ) : (
+          <ul className="periode-list">
+            {daftar.map((p) => (
+              <li key={p.id} className="periode-item">
+                <span>{p.tanggal} — {p.judul}</span>
+                <span style={{ display: 'flex', gap: 8 }}>
+                  <button className="link-btn" onClick={() => edit(p)}>Edit</button>
+                  <button className="link-btn danger" onClick={() => hapus(p.id)}>Hapus</button>
+                </span>
               </li>
             ))}
           </ul>

@@ -1,8 +1,12 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, stagesFor, eventsFor, punyaKlasifikasi, punyaSyarat, rolesFor, syaratLabel, getJadwal, STAGES, KLASIFIKASI, BIDANG, KP_TEMA, HARI, bidangLabel, todayISO, parseISO, daysBetween, BULAN, formatTanggal, kondisi, isAktif, indexTahap, hitungBeban, hitungBebanProgram, hitungBebanRinci, SEMUA, filterByPeriode, daftarPeriode, buatId, ADMIN_PASSWORD, DOSEN_PASSWORD, PERIODE_AKTIF, TOPIK, VERIFIKASI, statusVerif, tambahHari, LABEL_PENDAFTARAN, ringkasPendaftaran, RUANG, menitJam, rentangJadwal, jamTampil, beririsan, dosenTerlibat, kumpulkanEvent, cariBentrok, pesanNotifikasi, waLink, mailtoLink, waMahasiswa, TEMPLATE_SURAT, tokenSurat, renderSurat, PEJABAT, KOP_SURAT, evKeyDok, dokTA, DURASI_EVENT, JAM_KERJA, durasiEvent, jamTambah, dalamJamKerja, tahapBerikut, eventAktif, BERKAS_SYARAT, berkasSyarat, bolehAjukanJadwal } from '../utils/helpers.js';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, stagesFor, eventsFor, punyaKlasifikasi, punyaSyarat, rolesFor, syaratLabel, getJadwal, STAGES, KLASIFIKASI, BIDANG, KP_TEMA, HARI, bidangLabel, todayISO, parseISO, daysBetween, BULAN, formatTanggal, kondisi, isAktif, indexTahap, hitungBeban, hitungBebanProgram, hitungBebanRinci, SEMUA, filterByPeriode, daftarPeriode, buatId, ADMIN_PASSWORD, DOSEN_PASSWORD, PERIODE_AKTIF, TOPIK, VERIFIKASI, statusVerif, tambahHari, LABEL_PENDAFTARAN, ringkasPendaftaran, RUANG, menitJam, rentangJadwal, jamTampil, beririsan, dosenTerlibat, kumpulkanEvent, cariBentrok, pesanNotifikasi, waLink, mailtoLink, waMahasiswa, TEMPLATE_SURAT, tokenSurat, renderSurat, PEJABAT, KOP_SURAT, evKeyDok, dokTA, DURASI_EVENT, JAM_KERJA, durasiEvent, jamTambah, dalamJamKerja, tahapBerikut, eventAktif, BERKAS_SYARAT, berkasSyarat, bolehAjukanJadwal, KP_DOKUMEN, catatAktivitas, tanggalDibuat, aktivitasTerakhir, AKTIVITAS_LABEL, formatWaktu } from '../utils/helpers.js';
 import { DOSEN_AWAL, plusHari, RAW_MAHASISWA, MAHASISWA_AWAL, AKUN_AWAL, PERIODE_BUKA_AWAL } from '../data/seed.js';
 import { csvEscape, triggerDownload, downloadCSV, downloadDoc, cetakSuratPDF, cetakSuratPDFHtml, loadXLSX } from '../utils/exportUtils.js';
-import { Badge, StageBar, Field, Modal, Empty, ExportMenu } from '../components/ui.jsx';
+import { Badge, StageBar, Field, Modal, Empty, ExportMenu, ColResizeHandle, TextSizeToggle, ThemeToggle } from '../components/ui.jsx';
+import { KpDocumentPanel } from '../components/kpDocuments.jsx';
+import { generateDocument, getTemplateConfig } from '../utils/documentGenerator.js';
+import { readFileForUpload } from '../utils/fileUpload.js';
+import { useColumnWidths } from '../utils/useColumnWidths.js';
 
 // ===================== Portal.jsx =====================
 // Portal.jsx — tampilan untuk mahasiswa (Rute A)
@@ -12,6 +16,18 @@ export function Portal({ nim, nama, mahasiswa, allDosen, periodeBuka = [], onSav
   const [view, setView] = useState({ mode: 'list' });
 
   function simpan(rec) { onSave(rec); setView({ mode: 'list' }); }
+
+  async function uploadDokumenKP(m, key, file) {
+    const hasil = await readFileForUpload(file);
+    const label = (KP_DOKUMEN.find((d) => d.key === key) || {}).label || key;
+    let rec = { ...m, dokumenKP: { ...(m.dokumenKP || {}), [key]: hasil } };
+    rec = catatAktivitas(rec, 'unggah', label);
+    if (key === 'suratBalasan' && m.tahap === 'Pendaftaran') {
+      rec = { ...rec, tahap: 'Bimbingan' };
+      rec = catatAktivitas(rec, 'tahapBimbingan');
+    }
+    onSave(rec);
+  }
 
   const editing = view.id ? mine.find((m) => m.id === view.id) : null;
 
@@ -23,6 +39,8 @@ export function Portal({ nim, nama, mahasiswa, allDosen, periodeBuka = [], onSav
           <span className="brand-name">SIMANTAP</span>
         </div>
         <div className="topbar-right">
+          <ThemeToggle />
+          <TextSizeToggle />
           <span className="hint">{nama} · {nim}</span>
           <button className="btn ghost" onClick={onLogout}>Keluar</button>
         </div>
@@ -43,7 +61,8 @@ export function Portal({ nim, nama, mahasiswa, allDosen, periodeBuka = [], onSav
                   <KartuPengajuan key={m.id} m={m} allDosen={allDosen}
                     onEdit={() => setView({ mode: 'edit', id: m.id })}
                     onJadwal={(ev) => setView({ mode: 'jadwal', id: m.id, ev })}
-                    onPerpanjangan={(mode) => setView({ mode: 'pp-' + mode, id: m.id })} />
+                    onPerpanjangan={(mode) => setView({ mode: 'pp-' + mode, id: m.id })}
+                    onUploadDokumenKP={(key, file) => uploadDokumenKP(m, key, file)} />
                 ))}
               </div>
             )}
@@ -74,11 +93,15 @@ export function Portal({ nim, nama, mahasiswa, allDosen, periodeBuka = [], onSav
   );
 }
 
-function KartuPengajuan({ m, allDosen = [], onEdit, onJadwal, onPerpanjangan }) {
+function KartuPengajuan({ m, allDosen = [], onEdit, onJadwal, onPerpanjangan, onUploadDokumenKP }) {
   const v = statusVerif(m);
   const k = kondisi(m);
   const terverifikasi = v.key === 'terverifikasi';
-  const evA = eventAktif(m);                 // kegiatan yang dijadwalkan dari tahap ini
+  const isKP = programOf(m) === 'KP';
+  // KP: begitu Persetujuan SMKP diunggah, mahasiswa sudah boleh mengajukan jadwal Seminar
+  // KP meski admin belum memindahkan tahap dari "Bimbingan" ke "Seminar KP" secara resmi.
+  const bolehUsulSeminarKPAwal = isKP && m.tahap === 'Bimbingan' && !!((m.dokumenKP || {}).persetujuanSmkp);
+  const evA = eventAktif(m) || (bolehUsulSeminarKPAwal ? 'Seminar KP' : null); // kegiatan yang dijadwalkan dari tahap ini
   const jEv = evA ? ((m.jadwal || {})[evA] || {}) : {};
   const dikonfirmasi = !!jEv.dikonfirmasi;
   const adaUsulan = !!(jEv.tanggal || jEv.berkasLink || jEv.jamMulai);
@@ -91,13 +114,6 @@ function KartuPengajuan({ m, allDosen = [], onEdit, onJadwal, onPerpanjangan }) 
   const jadwalTeks = [jEv.tanggal ? formatTanggal(jEv.tanggal) : null, jamTampil(jEv), jEv.ruang].filter(Boolean).join(' · ');
   const dosenByKode = Object.fromEntries(allDosen.map((d) => [d.kode, d]));
   const isTA = programOf(m) === 'TA';
-  const suratList = [];
-  if (pemb.length) suratList.push({ label: 'Surat Tugas Pembimbing', isHtml: false, teks: () => (isTA ? dokTA('pembimbing', m, dosenByKode) : renderSurat('Penentuan Pembimbing', tokenSurat(m, 'Penentuan Pembimbing', dosenByKode))) });
-  eventsFor(programOf(m)).forEach((ev) => {
-    const j = (m.jadwal || {})[ev] || {};
-    if (j.dikonfirmasi && j.tanggal) suratList.push({ label: `Surat Tugas ${ev}`, isHtml: (isTA && ev === 'Sidang'), teks: () => (isTA ? dokTA(ev === 'Sidang' ? 'stHTML' : 'st', m, dosenByKode, ev) : renderSurat(ev, tokenSurat(m, ev, dosenByKode))) });
-  });
-  if (isTA && k.key === 'lulus') suratList.push({ label: 'Halaman Pengesahan', teks: () => dokTA('pengesahan', m, dosenByKode) });
 
   return (
     <div className="card kartu">
@@ -156,16 +172,9 @@ function KartuPengajuan({ m, allDosen = [], onEdit, onJadwal, onPerpanjangan }) 
         <div className="callout callout-green"><strong>Lulus.</strong>{m.tanggalLulus ? ` Tanggal lulus: ${formatTanggal(m.tanggalLulus)}` : ''}</div>
       )}
 
-      {/* Surat tugas (PDF) yang sudah bisa diunduh */}
-      {suratList.length > 0 && (
-        <div className="notif-actions" style={{ marginTop: 8 }}>
-          {suratList.map((s) => (
-            <button key={s.label} type="button" className="btn"
-              onClick={() => s.isHtml ? cetakSuratPDFHtml(`${s.label} - ${m.nama}`, s.teks()) : cetakSuratPDF(`${s.label} - ${m.nama}`, s.teks())}>
-              {s.label} (PDF)
-            </button>
-          ))}
-        </div>
+    {/* Dokumen KP per tahap: unduh (.docx) & unggah berkas ditandatangani/dinilai */}
+      {isKP && (
+        <KpDocumentPanel m={m} dosenByKode={dosenByKode} canUpload onUpload={onUploadDokumenKP} />
       )}
 
       {/* Perpanjangan (KP / TA / Magang) */}
@@ -189,7 +198,7 @@ function KartuPengajuan({ m, allDosen = [], onEdit, onJadwal, onPerpanjangan }) 
       })()}
 
       <div className="kartu-aksi">
-        {!terverifikasi && <button className="btn" onClick={onEdit}>Edit pendaftaran</button>}
+        <button className="btn" onClick={onEdit}>Edit pendaftaran</button>
         {terverifikasi && evA && bolehAjukan && sidang && (
           <button className="btn btn-primary" onClick={() => onJadwal(evA)}>
             {jEv.berkasLink ? 'Perbarui draft & berkas sidang' : 'Unggah draft & berkas sidang'}
@@ -246,7 +255,8 @@ function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], onCancel
     if (!m.judul.trim()) { setErr('Judul wajib diisi.'); return; }
     if (!m.periode) { setErr('Pilih periode pendaftaran terlebih dahulu.'); return; }
     setErr('');
-    onSave({ ...m, angkatan: Number(m.angkatan) || m.angkatan, verifikasi: 'baru' });
+    const rec = { ...m, angkatan: Number(m.angkatan) || m.angkatan, verifikasi: 'baru' };
+    onSave(catatAktivitas(rec, baru ? 'daftar' : 'perbaikan'));
   }
 
   return (
@@ -288,7 +298,8 @@ function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], onCancel
             <Field label="Instansi (Kota / Provinsi)"><input value={p.instansi || ''} onChange={(e) => setP('instansi', e.target.value)} placeholder="mis. Semarang, Jawa Tengah" /></Field>
             <Field label={isKP ? 'Mulai KP' : 'Mulai Magang'}><input type="date" value={m.tanggalMulai || ''} onChange={(e) => set('tanggalMulai', e.target.value)} /></Field>
             <Field label={isKP ? 'Berakhir KP' : 'Berakhir Magang'}><input type="date" value={m.batasAkhir || ''} onChange={(e) => set('batasAkhir', e.target.value)} /></Field>
-            <Field label="Alamat lengkap & No WA" full><textarea rows={2} value={p.alamatWA || ''} onChange={(e) => setP('alamatWA', e.target.value)} /></Field>
+            <Field label="Alamat lengkap" full><textarea rows={2} value={p.alamatWA || ''} onChange={(e) => setP('alamatWA', e.target.value)} /></Field>
+            <Field label="Nomor WA"><input value={p.nomorWA || ''} onChange={(e) => setP('nomorWA', e.target.value)} placeholder="08xxxxxxxxxx" /></Field>
             <Field label={`Link berkas (${isKP ? 'Surat Kelayakan, Transkrip, IRS, KTM, Profil Perusahaan, Proposal KP' : 'Surat penerimaan, Transkrip, IRS, KTM, Proposal Magang'}) — Google Drive, opsional`} full>
               <input value={p.berkasLink || ''} onChange={(e) => setP('berkasLink', e.target.value)} placeholder="https://drive.google.com/..." />
             </Field>
@@ -352,6 +363,10 @@ function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], onCancel
 function FormJadwalMhs({ awal, ev, onCancel, onSave }) {
   const isSidang = ev.includes('Sidang');
   const isKP = programOf(awal) === 'KP' || ev.includes('KP');
+  // Seminar KP tidak dibatasi rentang mulai/akhir KP: durasi KP terikat kerja
+  // lapangan mahasiswa, bukan jadwal seminar — begitu berkas siap, mahasiswa
+  // boleh mengajukan seminar meski tanggalnya melewati batasAkhir KP.
+  const bebasRentangKP = ev === 'Seminar KP';
   const durasi = durasiEvent(ev);
   const [j, setJ] = useState(() => ({ ...(awal.jadwal && awal.jadwal[ev] ? awal.jadwal[ev] : {}) }));
   const [err, setErr] = useState('');
@@ -360,7 +375,7 @@ function FormJadwalMhs({ awal, ev, onCancel, onSave }) {
 
   function submit() {
     if (!isSidang) {
-      if (j.tanggal) {
+      if (j.tanggal && !bebasRentangKP) {
         if (awal.tanggalMulai && j.tanggal < awal.tanggalMulai) { setErr(`Tanggal harus pada/setelah ${formatTanggal(awal.tanggalMulai)} (tanggal mulai).`); return; }
         if (awal.batasAkhir && j.tanggal > awal.batasAkhir) { setErr(`Tanggal harus pada/sebelum ${formatTanggal(awal.batasAkhir)} (batas akhir).`); return; }
       }
@@ -372,9 +387,11 @@ function FormJadwalMhs({ awal, ev, onCancel, onSave }) {
     if (isSidang) {
       // Sidang: mahasiswa hanya mengunggah berkas; jadwal (tanggal/jam/ruang) & status ditetapkan admin.
       const lama = (awal.jadwal || {})[ev] || {};
-      onSave({ ...awal, jadwal: { ...(awal.jadwal || {}), [ev]: { ...lama, berkasLink: j.berkasLink || '', turnitinLink: j.turnitinLink || '', folderLink: j.folderLink || '' } } });
+      const rec = { ...awal, jadwal: { ...(awal.jadwal || {}), [ev]: { ...lama, berkasLink: j.berkasLink || '', turnitinLink: j.turnitinLink || '', folderLink: j.folderLink || '' } } };
+      onSave(catatAktivitas(rec, 'jadwal', ev));
     } else {
-      onSave({ ...awal, jadwal: { ...(awal.jadwal || {}), [ev]: { ...j, jamSelesai: j.jamMulai ? jamTambah(j.jamMulai, durasi) : j.jamSelesai, dikonfirmasi: false, hasil: '' } } });
+      const rec = { ...awal, jadwal: { ...(awal.jadwal || {}), [ev]: { ...j, jamSelesai: j.jamMulai ? jamTambah(j.jamMulai, durasi) : j.jamSelesai, dikonfirmasi: false, hasil: '' } } };
+      onSave(catatAktivitas(rec, 'jadwal', ev));
     }
   }
 
@@ -390,7 +407,7 @@ function FormJadwalMhs({ awal, ev, onCancel, onSave }) {
       <div className="form-grid">
         {!isSidang && (
           <>
-            <Field label="Rencana tanggal"><input type="date" value={j.tanggal || ''} min={awal.tanggalMulai || undefined} max={awal.batasAkhir || undefined} onChange={(e) => set('tanggal', e.target.value)} /></Field>
+            <Field label="Rencana tanggal"><input type="date" value={j.tanggal || ''} min={bebasRentangKP ? undefined : (awal.tanggalMulai || undefined)} max={bebasRentangKP ? undefined : (awal.batasAkhir || undefined)} onChange={(e) => set('tanggal', e.target.value)} /></Field>
             {isKP && (
               <Field label="Hari seminar">
                 <select value={j.hari || ''} onChange={(e) => set('hari', e.target.value)}>
@@ -436,9 +453,11 @@ function FormPerpanjangan({ awal, mode, onCancel, onSave }) {
   const minta = mode === 'minta';
   function submit() {
     if (minta) {
-      onSave({ ...awal, perpanjangan: { ...pp, diminta: true, alasan, tanggalDiminta: todayISO() } });
+      const rec = { ...awal, perpanjangan: { ...pp, diminta: true, alasan, tanggalDiminta: todayISO() } };
+      onSave(catatAktivitas(rec, 'perpanjanganMinta'));
     } else {
-      onSave({ ...awal, perpanjangan: { ...pp, suratFinalLink: link } });
+      const rec = { ...awal, perpanjangan: { ...pp, suratFinalLink: link } };
+      onSave(catatAktivitas(rec, 'perpanjanganFinal'));
     }
   }
   return (
@@ -470,12 +489,36 @@ function peranDosen(m, kode) {
   return r.join(' & ');
 }
 
-export function DosenPortal({ dosen, mahasiswa, periodeList = [], onLogout }) {
+export function DosenPortal({ dosen, allDosen, mahasiswa, periodeList = [], onGradeSave, onLogout }) {
   const [periode, setPeriode] = useState(SEMUA);
   const [semua, setSemua] = useState(true); // termasuk lulus
+  const dosenByKode = useMemo(
+    () => Object.fromEntries((allDosen && allDosen.length ? allDosen : [dosen]).map((d) => [d.kode, d])),
+    [allDosen, dosen]
+  );
 
   const scoped = useMemo(() => filterByPeriode(mahasiswa, periode), [mahasiswa, periode]);
   const beban = useMemo(() => hitungBebanRinci(scoped, dosen.kode, { semua }), [scoped, dosen.kode, semua]);
+
+  const [sortBy, setSortBy] = useState('nama'); // nama | tahap | aktivitas
+  const [sortDir, setSortDir] = useState('asc');
+  function ubahSort(key) {
+    if (sortBy === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else { setSortBy(key); setSortDir(key === 'aktivitas' ? 'desc' : 'asc'); }
+  }
+  const panah = (key) => (sortBy === key ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '');
+
+  const COLS = [
+    { key: 'mahasiswa', width: 220 },
+    { key: 'program', width: 130 },
+    { key: 'peran', width: 110 },
+    { key: 'tahap', width: 180 },
+    { key: 'status', width: 130 },
+    { key: 'aktivitas', width: 170 },
+    { key: 'suratNilai', width: 220, flex: true, minWidth: 180 },
+  ];
+  const tableWrapRef = useRef(null);
+  const [colWidths, startResize] = useColumnWidths('simantap-col-dosen', COLS, tableWrapRef);
 
   const terkait = useMemo(
     () =>
@@ -483,8 +526,14 @@ export function DosenPortal({ dosen, mahasiswa, periodeList = [], onLogout }) {
         .filter((m) => !m.dibatalkan && (semua || m.tahap !== 'Lulus'))
         .filter((m) => [m.pembimbing1, m.pembimbing2, m.penguji1, m.penguji2].includes(dosen.kode))
         .map((m) => ({ m, peran: peranDosen(m, dosen.kode) }))
-        .sort((a, b) => a.m.nama.localeCompare(b.m.nama)),
-    [scoped, dosen.kode, semua]
+        .sort((a, b) => {
+          const arah = sortDir === 'asc' ? 1 : -1;
+          const val = (x) => sortBy === 'tahap' ? x.m.tahap
+            : sortBy === 'aktivitas' ? ((aktivitasTerakhir(x.m) || {}).at || tanggalDibuat(x.m))
+            : x.m.nama;
+          return String(val(a)).localeCompare(String(val(b)), 'id') * arah;
+        }),
+    [scoped, dosen.kode, semua, sortBy, sortDir]
   );
 
   const metrik = [
@@ -506,6 +555,8 @@ export function DosenPortal({ dosen, mahasiswa, periodeList = [], onLogout }) {
           <span className="brand-name">SIMANTAP</span>
         </div>
         <div className="topbar-right">
+          <ThemeToggle />
+          <TextSizeToggle />
           <label className="periode-pick">
             <span>Periode</span>
             <select value={periode} onChange={(e) => setPeriode(e.target.value)}>
@@ -536,15 +587,22 @@ export function DosenPortal({ dosen, mahasiswa, periodeList = [], onLogout }) {
           {terkait.length === 0 ? (
             <Empty>Belum ada mahasiswa pada filter ini.</Empty>
           ) : (
-            <div className="table-wrap">
-              <table className="tbl">
+            <div className="table-wrap" ref={tableWrapRef}>
+              <table className="tbl tbl-resizable">
+                <colgroup>
+                  {COLS.map((c, i) => (
+                    <col key={c.key} style={i === COLS.length - 1 ? undefined : { width: colWidths[i] }} />
+                  ))}
+                </colgroup>
                 <thead>
                   <tr>
-                    <th>Mahasiswa</th>
-                    <th>Program</th>
-                    <th>Peran</th>
-                    <th>Tahap</th>
-                    <th>Status</th>
+                    <th className="th-sort" onClick={() => ubahSort('nama')}>Mahasiswa{panah('nama')}<ColResizeHandle onMouseDown={(e) => startResize(0, e)} /></th>
+                    <th>Program<ColResizeHandle onMouseDown={(e) => startResize(1, e)} /></th>
+                    <th>Peran<ColResizeHandle onMouseDown={(e) => startResize(2, e)} /></th>
+                    <th className="th-sort" onClick={() => ubahSort('tahap')}>Tahap{panah('tahap')}<ColResizeHandle onMouseDown={(e) => startResize(3, e)} /></th>
+                    <th>Status<ColResizeHandle onMouseDown={(e) => startResize(4, e)} /></th>
+                    <th className="th-sort" onClick={() => ubahSort('aktivitas')}>Aktivitas{panah('aktivitas')}<ColResizeHandle onMouseDown={(e) => startResize(5, e)} /></th>
+                    <th>Surat Tugas &amp; Nilai KP</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -560,6 +618,21 @@ export function DosenPortal({ dosen, mahasiswa, periodeList = [], onLogout }) {
                         <td><Badge tone={peran.includes('Pembimbing') ? 'blue' : 'amber'}>{peran || '—'}</Badge></td>
                         <td style={{ minWidth: 160 }}><StageBar program={programOf(m)} tahap={m.tahap} /></td>
                         <td><Badge tone={k.tone}>{k.label}</Badge></td>
+                        <td>
+                          {(() => {
+                            const terakhir = aktivitasTerakhir(m);
+                            return terakhir
+                              ? <span className="cell-sub">{formatWaktu(terakhir.at)} · {AKTIVITAS_LABEL[terakhir.tipe] || terakhir.tipe}</span>
+                              : <span className="cell-sub">Daftar: {formatWaktu(tanggalDibuat(m))}</span>;
+                          })()}
+                        </td>
+                        <td>
+                          {programOf(m) === 'KP' ? (
+                            <KpDosenActions m={m} dosenByKode={dosenByKode} onGradeSave={onGradeSave} />
+                          ) : (
+                            <span className="hint">—</span>
+                          )}
+                        </td>
                       </tr>
                     );
                   })}
@@ -571,6 +644,37 @@ export function DosenPortal({ dosen, mahasiswa, periodeList = [], onLogout }) {
       </main>
 
       <footer className="foot">SIMANTAP © 2026 Universitas Diponegoro</footer>
+    </div>
+  );
+}
+
+// Tampilan terbatas dosen untuk KP: unduh Surat Tugas pembimbingan + isi nilai
+// hasil Seminar KP. Dosen tidak bisa mengubah field lain milik mahasiswa.
+function KpDosenActions({ m, dosenByKode, onGradeSave }) {
+  const j = getJadwal(m, 'Seminar KP');
+  const bisaNilai = !!(j.dikonfirmasi && j.tanggal);
+
+  function unduhSuratTugas() {
+    const config = getTemplateConfig('ST Pembimbing KP', m, dosenByKode, getJadwal(m, 'Seminar KP'));
+    if (config) generateDocument(config.template, config.filename, config.data);
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
+      <button type="button" className="btn" onClick={unduhSuratTugas}>Unduh Surat Tugas (.docx)</button>
+      <label className="field" style={{ margin: 0 }}>
+        <span className="field-label">Nilai Seminar KP</span>
+        <select
+          value={j.hasil || ''}
+          disabled={!bisaNilai}
+          onChange={(e) => onGradeSave && onGradeSave(m.id, 'Seminar KP', e.target.value)}
+        >
+          <option value="">— belum dinilai —</option>
+          <option value="lulus">Lulus</option>
+          <option value="tidak">Tidak lulus</option>
+        </select>
+      </label>
+      {!bisaNilai && <span className="hint">Menunggu jadwal Seminar KP dikonfirmasi admin.</span>}
     </div>
   );
 }

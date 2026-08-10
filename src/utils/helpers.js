@@ -17,7 +17,7 @@ export const PROGRAMS = {
   },
   KP: {
     label: 'Kerja Praktik',
-    stages: ['Pendaftaran', 'Seminar KP', 'Lulus'],
+    stages: ['Pendaftaran', 'Bimbingan', 'Seminar KP', 'Lulus'],
     events: ['Seminar KP'],
     klasifikasi: false,
     pembimbing: 1,
@@ -123,7 +123,7 @@ export function daysBetween(fromISO, toISO) {
   return Math.round((b - a) / 86400000);
 }
 
-export const BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+export const BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 export function formatTanggal(s) {
   const d = parseISO(s);
   if (!d) return '-';
@@ -252,7 +252,7 @@ export const LABEL_PENDAFTARAN = {
   namaPersetujuanDosen: 'Persetujuan projek dosen',
   semester: 'Semester',
   sksIpk: 'Jumlah SKS / IPK',
-  alamatWA: 'Alamat lengkap & No WA',
+  alamatWA: 'Alamat lengkap',
   tempatKP: 'Tempat/Perusahaan KP',
   instansi: 'Instansi (Kota/Provinsi)',
   nomorWA: 'Nomor WA',
@@ -402,7 +402,7 @@ export function mailtoLink(email, subjek, teks) {
   return `mailto:${email || ''}?subject=${encodeURIComponent(subjek || '')}&body=${encodeURIComponent(teks || '')}`;
 }
 
-// Ambil nomor WA mahasiswa dari data pendaftaran (TA/Cap: nomorWA; KP/MG: alamatWA).
+// Ambil nomor WA mahasiswa dari data pendaftaran (field nomorWA; alamatWA dipakai sbg fallback utk data lama).
 export function waMahasiswa(m) {
   const p = m.pendaftaran || {};
   const kandidat = p.nomorWA || p.alamatWA || '';
@@ -703,11 +703,24 @@ export function dalamJamKerja(jamMulai, jamSelesai) {
   return jamMulai >= JAM_KERJA.mulai && jamSelesai <= JAM_KERJA.selesai && jamSelesai > jamMulai;
 }
 
+// Indeks urutan tahap dalam suatu program (-1 bila tak ditemukan).
+export function tahapIndex(program, tahap) {
+  return stagesFor(program).indexOf(tahap);
+}
+
 // Tahap berikutnya sesuai urutan program.
 export function tahapBerikut(program, tahap) {
   const s = stagesFor(program);
   const i = s.indexOf(tahap);
   return i >= 0 && i < s.length - 1 ? s[i + 1] : null;
+}
+
+// Tahap sebelumnya (kebalikan tahapBerikut) — admin punya wewenang penuh untuk
+// mengembalikan/rollback tahap mahasiswa kapan pun, termasuk dari "Lulus".
+export function tahapSebelumnya(program, tahap) {
+  const s = stagesFor(program);
+  const i = s.indexOf(tahap);
+  return i > 0 ? s[i - 1] : null;
 }
 
 // Kegiatan yang sedang berlangsung pada tahap saat ini
@@ -730,5 +743,104 @@ export function berkasSyarat(ev) { return BERKAS_SYARAT[ev] || 'Dokumen persyara
 // Apakah mahasiswa boleh mengajukan jadwal (terverifikasi & sudah ada pembimbing).
 export function bolehAjukanJadwal(m) {
   return statusVerif(m).key === 'terverifikasi' && !!(m.pembimbing1 || m.pembimbing2);
+}
+
+// ===================== Dokumen KP per-tahap (generate & unggah) =====================
+// Satu sumber kebenaran dipakai bersama oleh Portal mahasiswa & panel admin, supaya
+// syarat kelayakan tiap dokumen tidak dobel-tulis di beberapa tempat.
+export const KP_DOKUMEN = [
+  {
+    key: 'permohonan', stage: 'Pendaftaran', label: 'Permohonan KP', docType: 'Permohonan KP',
+    syarat: 'Tersedia setelah pendaftaran diverifikasi admin.',
+    eligible: (m) => statusVerif(m).key === 'terverifikasi',
+  },
+  {
+    key: 'stPembimbing', stage: 'Pendaftaran', label: 'ST Pembimbing KP', docType: 'ST Pembimbing KP',
+    syarat: 'Tersedia setelah admin menetapkan dosen pembimbing.',
+    eligible: (m) => statusVerif(m).key === 'terverifikasi' && !!m.pembimbing1,
+  },
+  {
+    key: 'suratBalasan', stage: 'Bimbingan', label: 'Surat Balasan Perusahaan', docType: null,
+    syarat: 'Unggah bukti diterima magang/KP dari perusahaan setelah menerima ST Pembimbing.',
+    eligible: (m) => !!((m.dokumenKP || {}).stPembimbing),
+  },
+  {
+    key: 'persetujuanSmkp', stage: 'Bimbingan', label: 'Persetujuan SMKP', docType: 'Persetujuan SMKP',
+    syarat: 'Tersedia sejak tahap Bimbingan dimulai. Unduh, tanda tangani, lalu unggah kembali.',
+    eligible: (m) => tahapIndex('KP', m.tahap) >= tahapIndex('KP', 'Bimbingan'),
+  },
+  {
+    key: 'baSeminar', stage: 'Seminar KP', label: 'Berita Acara Seminar KP', docType: 'BA Seminar KP',
+    syarat: 'Tersedia setelah jadwal Seminar KP dikonfirmasi admin.',
+    eligible: (m) => { const j = getJadwal(m, 'Seminar KP'); return !!(j.dikonfirmasi && j.tanggal); },
+  },
+];
+
+// Status tiap dokumen KP untuk seorang mahasiswa: kelayakan + berkas yang sudah diunggah.
+export function kpDokumenStatus(m) {
+  return KP_DOKUMEN.map((d) => ({ ...d, eligible: d.eligible(m), upload: (m.dokumenKP || {})[d.key] || null }));
+}
+
+// Kelompokkan status dokumen KP per tahap, urutan sesuai PROGRAMS.KP.stages.
+export function kpDokumenPerTahap(m) {
+  const status = kpDokumenStatus(m);
+  return stagesFor('KP')
+    .map((stage) => ({ stage, dokumen: status.filter((d) => d.stage === stage) }))
+    .filter((g) => g.dokumen.length > 0);
+}
+
+// ===================== Riwayat aktivitas mahasiswa =====================
+// Log ringkas tiap kali mahasiswa melakukan sesuatu yang perlu dilihat/ditindaklanjuti
+// admin (daftar, ajukan jadwal, unggah berkas, ajukan perpanjangan, dst). Dipakai untuk
+// urutkan tabel berdasarkan tanggal & tampilkan riwayat "update" per mahasiswa.
+export const AKTIVITAS_LABEL = {
+  dibuat: 'Data dibuat oleh admin',
+  daftar: 'Pendaftaran dikirim',
+  perbaikan: 'Perbaikan pendaftaran dikirim ulang',
+  jadwal: 'Mengajukan/memperbarui jadwal',
+  unggah: 'Mengunggah dokumen',
+  tahapBimbingan: 'Memasuki tahap Bimbingan (surat balasan perusahaan diterima)',
+  perpanjanganMinta: 'Mengajukan perpanjangan',
+  perpanjanganFinal: 'Mengunggah surat perpanjangan final',
+};
+
+export function nowStamp() { return new Date().toISOString(); }
+
+// Format tanggal+jam dari timestamp ISO lengkap (beda dari formatTanggal yang
+// hanya menerima 'YYYY-MM-DD').
+export function formatWaktu(iso) {
+  if (!iso) return '-';
+  // Tanggal polos 'YYYY-MM-DD' (data lama tanpa jam) -> pakai parseISO (lokal,
+  // tanpa pergeseran hari) lalu tampilkan tanpa jam. Timestamp lengkap (log
+  // aktivitas baru) -> new Date() biasa.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+    const d = parseISO(iso);
+    return d ? `${d.getDate()} ${BULAN[d.getMonth()]} ${d.getFullYear()}` : '-';
+  }
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '-';
+  const jam = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  return `${d.getDate()} ${BULAN[d.getMonth()]} ${d.getFullYear()} · ${jam}`;
+}
+
+// Tambahkan satu entri riwayat aktivitas (immutable) — panggil sebelum onSave
+// setiap kali mahasiswa melakukan aksi yang perlu dilihat admin.
+export function catatAktivitas(m, tipe, catatan = '') {
+  const entri = { at: nowStamp(), tipe, catatan };
+  return { ...m, aktivitas: [...(m.aktivitas || []), entri] };
+}
+
+// Tanggal "entri pertama kali dibuat" (order of submission): dari log aktivitas
+// bila ada, jika tidak fallback ke submittedAt/tanggalMulai (data lama tanpa log).
+export function tanggalDibuat(m) {
+  const log = m.aktivitas || [];
+  if (log.length) return log[0].at;
+  return (m.pendaftaran && m.pendaftaran.submittedAt) || m.tanggalMulai || '';
+}
+
+// Entri aktivitas paling baru, atau null bila belum ada log sama sekali.
+export function aktivitasTerakhir(m) {
+  const log = m.aktivitas || [];
+  return log.length ? log[log.length - 1] : null;
 }
 

@@ -1,3 +1,9 @@
+# Build output
+dist/
+
+# Windows Explorer
+desktop.ini
+
 # Logs
 logs
 *.log

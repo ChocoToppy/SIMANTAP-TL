@@ -2,35 +2,33 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, stagesFor, eventsFor, punyaKlasifikasi, punyaSyarat, rolesFor, syaratLabel, getJadwal, STAGES, KLASIFIKASI, BIDANG, KP_TEMA, HARI, bidangLabel, todayISO, parseISO, daysBetween, BULAN, formatTanggal, kondisi, isAktif, indexTahap, hitungBeban, hitungBebanProgram, hitungBebanRinci, SEMUA, filterByPeriode, daftarPeriode, buatId, ADMIN_PASSWORD, DOSEN_PASSWORD, PERIODE_AKTIF, TOPIK, VERIFIKASI, statusVerif, tambahHari, LABEL_PENDAFTARAN, ringkasPendaftaran, RUANG, menitJam, rentangJadwal, jamTampil, beririsan, dosenTerlibat, kumpulkanEvent, cariBentrok, pesanNotifikasi, waLink, mailtoLink, waMahasiswa, TEMPLATE_SURAT, tokenSurat, renderSurat, PEJABAT, KOP_SURAT, evKeyDok, dokTA, DURASI_EVENT, JAM_KERJA, durasiEvent, jamTambah, dalamJamKerja, tahapBerikut, eventAktif, BERKAS_SYARAT, berkasSyarat, bolehAjukanJadwal } from '../utils/helpers.js';
 import { DOSEN_AWAL, plusHari, RAW_MAHASISWA, MAHASISWA_AWAL, AKUN_AWAL, PERIODE_BUKA_AWAL } from '../data/seed.js';
 import { csvEscape, triggerDownload, downloadCSV, downloadDoc, cetakSuratPDF, loadXLSX } from '../utils/exportUtils.js';
-import { Badge, StageBar, Field, Modal, Empty, ExportMenu } from '../components/ui.jsx';
+import { Badge, StageBar, Field, Modal, Empty, ExportMenu, ThemeToggle, TextSizeToggle } from '../components/ui.jsx';
 
 // ===================== Login.jsx =====================
 // Login.jsx — layar masuk: pilih peran, lalu masuk/daftar
 
-export function Login({ akun, dosen = [], onLogin, onRegister }) {
+export function Login({ akun, dosen = [], pengumuman = [], onLogin, onRegister }) {
   const [peran, setPeran] = useState(null); // null | 'mahasiswa' | 'dosen' | 'admin'
 
   return (
     <div className="login-wrap">
+      <div className="login-topbar">
+        <ThemeToggle />
+        <TextSizeToggle />
+      </div>
       <div className="login-container">
         <div className="login-announcements">
           <h3>Pengumuman Akademik</h3>
           <div className="announcement-list">
-            <div className="announcement-item">
-              <span className="announcement-date">17 Juli 2026</span>
-              <h4>Batas Akhir Pendaftaran Sidang Gelombang II</h4>
-              <p>Diberitahukan kepada seluruh mahasiswa tingkat akhir bahwa pendaftaran sidang Gelombang II akan ditutup pada tanggal 25 Juli 2026.</p>
-            </div>
-            <div className="announcement-item">
-              <span className="announcement-date">10 Juli 2026</span>
-              <h4>Pengumpulan Berkas Syarat Ujian</h4>
-              <p>Berkas fisik persyaratan ujian wajib diserahkan ke ruang admin paling lambat H-3 sebelum pelaksanaan ujian.</p>
-            </div>
-            <div className="announcement-item">
-              <span className="announcement-date">1 Juli 2026</span>
-              <h4>Peluncuran Sistem SIMANTAP</h4>
-              <p>Sistem Informasi Manajemen Tugas Akhir dan Praktik (SIMANTAP) kini telah resmi digunakan secara penuh.</p>
-            </div>
+            {pengumuman.length === 0 ? (
+              <p className="hint">Belum ada pengumuman.</p>
+            ) : pengumuman.map((p) => (
+              <div className="announcement-item" key={p.id}>
+                <span className="announcement-date">{p.tanggal}</span>
+                <h4>{p.judul}</h4>
+                <p>{p.isi}</p>
+              </div>
+            ))}
           </div>
         </div>
         <div className="login-card">

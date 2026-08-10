@@ -4,28 +4,24 @@
 // (nama fiktif) supaya dashboard langsung "hidup". Hapus/ganti sesuka Anda.
 
 export const DOSEN_AWAL = [
-  { kode: 'ASN', nama: 'Dr. Ir. Anik Sarminingsih, M.T.', nip: '19670401 199903 2 001', kompetensi: 'Air Bersih - Plambing dan Drainase', status: 'AA - S3', wa: '081234567001', email: 'anik@undip.ac.id' },
-  { kode: 'ARG', nama: 'Arya Rezagama, S.T., M.T.', nip: '19880225 201212 1 003', kompetensi: 'Air Bersih - Plambing dan Drainase', status: 'L - S2' },
-  { kode: 'BDZ', nama: 'Dr. Badrus Zaman, S.T., M.T.', nip: '19720830 200003 1 001', kompetensi: 'Air Limbah dan Udara', status: 'LK - S3' },
-  { kode: 'BPS', nama: 'Dr. Budi P Samadikun, S.T., M.Si.', nip: '19780514 200501 1 001', kompetensi: 'Drainase dan Sampah', status: 'L - S3' },
-  { kode: 'DSH', nama: 'Ir. Dwi Siwi Handayani, M.Si.', nip: '19641202 199903 2 001', kompetensi: 'Sampah dan Air Bersih - Plambing', status: 'AA - S2' },
-  { kode: 'EST', nama: 'Ir. Endro Sutrisno, M.S.', nip: '19570831 198602 1 002', kompetensi: 'Air Bersih - Plambing dan Drainase', status: 'L - S2' },
-  { kode: 'GSM', nama: 'Ganjar Samudro, S.T., M.T.', nip: '19820120 200801 1 005', kompetensi: 'Air Bersih - Sampah', status: '-' },
-  { kode: 'HSH', nama: 'Dr. Haryono Setiyo Huboyo, S.T., M.T.', nip: '19740214 199903 1 002', kompetensi: 'Sampah dan Udara', status: 'L - S3' },
-  { kode: 'IBP', nama: 'Ika Bagus Priyambada, S.T., M.Eng.Sc.', nip: '19710301 199803 1 001', kompetensi: 'Sampah dan Udara', status: 'AA - S2' },
-  { kode: 'IWW', nama: 'Ir. Irawan Wisnu Wardana, M.S.', nip: '19560601 198602 1 001', kompetensi: 'Air Bersih - Plambing dan Udara', status: 'AA - S2' },
-  { kode: 'JND', nama: 'Junaidi, S.T., M.T.', nip: '19660901 199802 1 001', kompetensi: 'Air Bersih - Plambing dan Air Limbah', status: 'L - S2' },
-  { kode: 'MAB', nama: 'M. Arief Budihardjo, S.T., M.Eng.Sc., Ph.D.', nip: '19740930 200112 1 002', kompetensi: 'Sampah dan Udara', status: 'LK - S3', wa: '081234567002', email: 'arief@undip.ac.id' },
-  { kode: 'MHW', nama: 'Ir. Mochtar Hadiwidodo, M.Si.', nip: '19580807 198703 1 001', kompetensi: 'Air Bersih - Plambing dan Drainase', status: 'LK - S2' },
-  { kode: 'NDH', nama: 'Nurandani Hardyanti, S.T., M.T.', nip: '19730130 200003 2 001', kompetensi: 'Air Limbah dan Udara', status: 'LK - S2' },
-  { kode: 'PTA', nama: 'Pertiwi Andarani, S.T., M.T., M.Eng.', nip: '19870420 201401 2 001', kompetensi: 'Air Limbah dan Udara', status: '-' },
-  { kode: 'SSY', nama: 'Dr. Ling. Sri Sumiyati, S.T., M.Si.', nip: '19710330 199802 2 001', kompetensi: 'Sampah dan Air Limbah', status: 'L - S3' },
-  { kode: 'SDN', nama: 'Dr.-Ing. Sudarno, S.T., M.Sc.', nip: '19740131 199903 1 003', kompetensi: 'Air Limbah dan Drainase', status: 'L - S3' },
-  { kode: 'SYF', nama: 'Prof. Dr. Ir. Syafrudin, C.E.S., M.T.', nip: '19581107 198803 1 001', kompetensi: 'Air Limbah dan Sampah', status: 'P' },
-  { kode: 'TIK', nama: 'Titik Istirokhatun, S.T., M.Sc.', nip: '19780303 201012 2 001', kompetensi: 'Air Bersih - Plambing dan Air Limbah', status: '-' },
-  { kode: 'WHO', nama: 'Wiharyanto Oktiawan, S.T., M.T.', nip: '19731024 200003 1 001', kompetensi: 'Air Bersih - Plambing dan Air Limbah', status: 'L - S2' },
-  { kode: 'WDN', nama: 'Ir. Winardi Dwi Nugraha, M.Si.', nip: '19670919 199903 1 003', kompetensi: 'Air Limbah dan Drainase', status: 'AA - S2' },
-  { kode: 'BSR', nama: 'Bimastyaji Surya Ramadan, S.T., M.T.', nip: '19920324 201903 1 016', kompetensi: 'Udara dan Sampah', status: 'AA - S2' },
+  { kode: 'ASN', nama: 'Dr. Ir. Anik Sarminingsih, M.T., IPU., ASEAN Eng', nip: '196704011999032001', kompetensi: 'Air Bersih - Plumbing dan Drainase', status: 'AA - S3', wa: '081234567001', email: 'anik@undip.ac.id' },
+  { kode: 'ARG', nama: 'Dr. Ir. Arya Rezagama, S.T., M.T., IPP', nip: '198802252012121003', kompetensi: 'Air Bersih - Plambing dan Drainase', status: 'L - S2' },
+  { kode: 'BDZ', nama: 'Prof. Dr. Ir. Badrus Zaman, S.T., M.T., IPU., ASEAN Eng', nip: '197208302000031001', kompetensi: 'Air Limbah dan Udara', status: 'LK - S3' },
+  { kode: 'BSR', nama: 'Dr. Eng. Ir. Bimastyaji Surya Ramadan, S.T., M.T., IPM', nip: '199203242019031016', kompetensi: 'Udara dan Sampah', status: 'AA - S2' },
+  { kode: 'BPS', nama: 'Dr. Ir. Budi Prasetyo Samadikun, S.T., M.Si., IPU., ASEAN Eng', nip: '197805142005011001', kompetensi: 'Drainase dan Sampah', status: 'L - S3' },
+  { kode: 'GSM', nama: 'Ir. Ganjar Samudro, S.T., M.T., Ph.D., IPM', nip: '198201202008011005', kompetensi: 'Air Bersih - Sampah', status: '-' },
+  { kode: 'HSH', nama: 'Dr. Ir. Haryono Setiyo Huboyo, S.T., M.T., IPU., ASEAN Eng.', nip: '197402141999031002', kompetensi: 'Sampah dan Udara', status: 'L - S3' },
+  { kode: 'IBP', nama: 'Dr. Ir. Ika Bagus Priyambada, S.T, M.Eng', nip: '197103011998031001', kompetensi: 'Sampah dan Udara', status: 'AA - S2' },
+  { kode: 'JND', nama: 'Junaidi, S.T, M.T', nip: '196609011998021001', kompetensi: 'Air Bersih - Plambing dan Air Limbah', status: 'L - S2' },
+  { kode: 'MAB', nama: 'Prof. Ir. Mochamad Arief Budihardjo, S.T, M.Eng.Sc, Env.Eng., Ph.D., IPU., ASEAN Eng', nip: '197409302001121002', kompetensi: 'Sampah dan Udara', status: 'LK - S3', wa: '081234567002', email: 'arief@undip.ac.id' },
+  { kode: 'NDH', nama: 'Dr. Ir. Nurandani Hardyanti, S.T, M.T., IPU., ASEAN Eng', nip: '197301302000032001', kompetensi: 'Air Limbah dan Udara', status: 'LK - S2' },
+  { kode: 'PTA', nama: 'Ir. Pertiwi Andarani, S.T, M.T, M.Eng., Ph.D., IPM.', nip: '198704202014012001', kompetensi: 'Air Limbah dan Udara', status: '-' },
+  { kode: 'SSY', nama: 'Dr. Ling. Ir. Sri Sumiyati, S.T, M.Si., IPU.,ASEAN Eng', nip: '197103301998022001', kompetensi: 'Sampah dan Air Limbah', status: 'L - S3' },
+  { kode: 'SDN', nama: 'Dr. Ing. Ir. Sudarno, S.T, M.Sc., IPU', nip: '197401311999031003', kompetensi: 'Air Limbah dan Drainase', status: 'L - S3' },
+  { kode: 'SYF', nama: 'Prof. Dr. Ir. Syafrudin, CES, M.T., IPU., ASEAN Eng', nip: '195811071988031001', kompetensi: 'Air Limbah dan Sampah', status: 'P' },
+  { kode: 'TIK', nama: 'Ir. Titik Istirokhatun, S.T., M.Sc., Ph.D., IPU', nip: '197803032010122001', kompetensi: 'Air Bersih - Plambing dan Air Limbah', status: '-' },
+  { kode: 'WHO', nama: 'Ir. Wiharyanto Oktiawan, S.T., M.T., IPU', nip: '197310242000031001', kompetensi: 'Air Bersih - Plambing dan Air Limbah', status: 'L - S2' },
+  { kode: 'WDN', nama: 'Dr. Ir. Winardi Dwi Nugraha, M.Si.', nip: '196709191999031003', kompetensi: 'Air Limbah dan Drainase', status: 'AA - S2' },
 ];
 
 // Batas akhir & jadwal dibuat relatif terhadap HARI INI supaya status deadline
@@ -107,4 +103,12 @@ export const AKUN_AWAL = [
 
 // Periode pendaftaran yang dibuka admin (muncul di dropdown mahasiswa).
 export const PERIODE_BUKA_AWAL = ['2021 Ganjil'];
+
+// Pengumuman akademik yang tampil di halaman login. Bisa diedit lewat panel
+// admin ("Kelola pengumuman") — daftar ini hanya dipakai sebagai data awal.
+export const PENGUMUMAN_AWAL = [
+  { id: 'pg1', tanggal: '17 Juli 2026', judul: 'Batas Akhir Pendaftaran Sidang Gelombang II', isi: 'Diberitahukan kepada seluruh mahasiswa tingkat akhir bahwa pendaftaran sidang Gelombang II akan ditutup pada tanggal 25 Juli 2026.' },
+  { id: 'pg2', tanggal: '10 Juli 2026', judul: 'Pengumpulan Berkas Syarat Ujian', isi: 'Berkas fisik persyaratan ujian wajib diserahkan ke ruang admin paling lambat H-3 sebelum pelaksanaan ujian.' },
+  { id: 'pg3', tanggal: '1 Juli 2026', judul: 'Peluncuran Sistem SIMANTAP', isi: 'Sistem Informasi Manajemen Tugas Akhir dan Praktik (SIMANTAP) kini telah resmi digunakan secara penuh.' },
+];
 

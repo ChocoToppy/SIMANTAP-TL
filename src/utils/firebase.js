@@ -5,13 +5,13 @@ import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 
 export const firebaseConfig = {
-  apiKey: "AIzaSyBsORQOnAro7ELYhQ8UOUycC1BmZsEpAHM",
-  authDomain: "sistem-ta-undip.firebaseapp.com",
-  projectId: "sistem-ta-undip",
-  storageBucket: "sistem-ta-undip.firebasestorage.app",
-  messagingSenderId: "90759526136",
-  appId: "1:90759526136:web:f96954b27b775d9f7bad0d",
-  measurementId: "G-BVB071ECC8"
+  apiKey: "AIzaSyAZp8-zyIr6nE6ydgzaWY9dtFPwBgwJjig",
+  authDomain: "simantap-tl.firebaseapp.com",
+  projectId: "simantap-tl",
+  storageBucket: "simantap-tl.firebasestorage.app",
+  messagingSenderId: "493633903702",
+  appId: "1:493633903702:web:e778bff3853fda729ceff7",
+  measurementId: "G-FQ5FWBDQ10"
 };
 
 // Inisialisasi Firebase
