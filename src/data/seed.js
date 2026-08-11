@@ -104,6 +104,14 @@ export const AKUN_AWAL = [
 // Periode pendaftaran yang dibuka admin (muncul di dropdown mahasiswa).
 export const PERIODE_BUKA_AWAL = ['2021 Ganjil'];
 
+// Periode "aktif" yang ditampilkan sebagai notifikasi di halaman login (mis. "Genap 2026").
+// Terpisah dari daftar periode yang dibuka untuk pendaftaran.
+export const PERIODE_AKTIF_AWAL = '';
+
+// Daftar unduhan panduan (Panduan KP, Panduan TA, dst.) yang tampil di Portal
+// mahasiswa — dikelola admin lewat "Kelola panduan", tautan ke Google Drive dsb.
+export const PANDUAN_AWAL = [];
+
 // Pengumuman akademik yang tampil di halaman login. Bisa diedit lewat panel
 // admin ("Kelola pengumuman") — daftar ini hanya dipakai sebagai data awal.
 export const PENGUMUMAN_AWAL = [

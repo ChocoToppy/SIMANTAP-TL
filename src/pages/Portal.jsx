@@ -11,7 +11,7 @@ import { useColumnWidths } from '../utils/useColumnWidths.js';
 // ===================== Portal.jsx =====================
 // Portal.jsx — tampilan untuk mahasiswa (Rute A)
 
-export function Portal({ nim, nama, mahasiswa, allDosen, periodeBuka = [], onSave, onLogout }) {
+export function Portal({ nim, nama, mahasiswa, allDosen, periodeBuka = [], panduan = [], onSave, onLogout }) {
   const mine = mahasiswa.filter((m) => m.owner === nim);
   const [view, setView] = useState({ mode: 'list' });
 
@@ -49,6 +49,19 @@ export function Portal({ nim, nama, mahasiswa, allDosen, periodeBuka = [], onSav
       <main className="content">
         {view.mode === 'list' && (
           <div className="portal">
+            {panduan.length > 0 && (
+              <div className="card" style={{ marginBottom: 16 }}>
+                <h3 className="card-title">Unduh Panduan</h3>
+                <ul className="periode-list">
+                  {panduan.map((p) => (
+                    <li key={p.id} className="periode-item">
+                      <span>{p.label}</span>
+                      <a className="link-btn" href={p.url} target="_blank" rel="noreferrer">Baca Panduan</a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <div className="toolbar">
               <h2 className="page-title">Pengajuan saya</h2>
               <button className="btn btn-primary push" onClick={() => setView({ mode: 'daftar' })}>+ Ajukan pendaftaran</button>
@@ -278,6 +291,12 @@ function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], onCancel
         <Field label="Angkatan"><input value={m.angkatan} onChange={(e) => set('angkatan', e.target.value)} placeholder="mis. 20" /></Field>
         <Field label={isKPStyle ? (isKP ? 'Judul Kerja Praktik (sementara)' : 'Judul Magang (sementara)') : 'Judul'} full>
           <textarea rows={2} value={m.judul} onChange={(e) => set('judul', e.target.value)} placeholder="Jangan pakai huruf kapital semua" />
+        </Field>
+        <Field label="Dosen Wali">
+          <select value={m.dosenWali || ''} onChange={(e) => set('dosenWali', e.target.value)}>
+            <option value="">—</option>
+            {allDosen.map((d) => <option key={d.kode} value={d.kode}>{d.kode} — {d.nama}</option>)}
+          </select>
         </Field>
 
         {isKPStyle ? (

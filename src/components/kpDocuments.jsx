@@ -6,7 +6,7 @@ import { generateDocument, getTemplateConfig } from '../utils/documentGenerator.
 // Panel dokumen KP per tahap — dipakai bersama oleh Portal mahasiswa (dengan
 // unggah berkas tanda tangan/nilai) dan panel admin (lihat semua, tanpa unggah).
 
-export function KpDocumentPanel({ m, dosenByKode = {}, canUpload = false, onUpload, collapsible = true, title = 'Dokumen KP' }) {
+export function KpDocumentPanel({ m, dosenByKode = {}, canUpload = false, role = 'student', onUpload, collapsible = true, title = 'Dokumen KP' }) {
   const [expanded, setExpanded] = useState(!collapsible);
   const grup = kpDokumenPerTahap(m);
   if (grup.length === 0) return null;
@@ -27,7 +27,7 @@ export function KpDocumentPanel({ m, dosenByKode = {}, canUpload = false, onUplo
               <div className="cell-sub" style={{ fontWeight: 600, marginBottom: 4 }}>{stage}</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {dokumen.map((d) => (
-                  <KpDokumenItem key={d.key} d={d} m={m} dosenByKode={dosenByKode} canUpload={canUpload} onUpload={onUpload} />
+                  <KpDokumenItem key={d.key} d={d} m={m} dosenByKode={dosenByKode} canUpload={canUpload} role={role} onUpload={onUpload} />
                 ))}
               </div>
             </div>
@@ -38,9 +38,12 @@ export function KpDocumentPanel({ m, dosenByKode = {}, canUpload = false, onUplo
   );
 }
 
-function KpDokumenItem({ d, m, dosenByKode, canUpload, onUpload }) {
+function KpDokumenItem({ d, m, dosenByKode, canUpload, role, onUpload }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const bolehUnggahDiSini = canUpload && (
+    role === 'admin' ? !!d.adminUpload : d.studentUpload !== false
+  );
 
   function unduh() {
     const config = getTemplateConfig(d.docType, m, dosenByKode, getJadwal(m, 'Seminar KP'));
@@ -81,10 +84,10 @@ function KpDokumenItem({ d, m, dosenByKode, canUpload, onUpload }) {
           {d.upload.uploadedAt ? ` · ${formatTanggal(d.upload.uploadedAt)}` : ''}
         </div>
       ) : (
-        canUpload && d.eligible && <div className="hint" style={{ marginTop: 4 }}>Belum ada berkas yang ditandatangani/dinilai diunggah.</div>
+        bolehUnggahDiSini && d.eligible && <div className="hint" style={{ marginTop: 4 }}>Belum ada berkas yang ditandatangani/dinilai diunggah.</div>
       )}
 
-      {canUpload && d.eligible && (
+      {bolehUnggahDiSini && d.eligible && (
         <div style={{ marginTop: 6 }}>
           <label className="btn" style={{ display: 'inline-block', cursor: 'pointer' }}>
             {busy ? 'Mengunggah…' : (d.upload ? 'Ganti berkas' : 'Unggah berkas ditandatangani/dinilai')}

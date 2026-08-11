@@ -5,7 +5,7 @@ import { Dosen } from './pages/Dosen.jsx';
 import { Login } from './pages/Login.jsx';
 import { Portal, DosenPortal } from './pages/Portal.jsx';
 import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, stagesFor, eventsFor, punyaKlasifikasi, punyaSyarat, rolesFor, syaratLabel, getJadwal, STAGES, KLASIFIKASI, BIDANG, KP_TEMA, HARI, bidangLabel, todayISO, parseISO, daysBetween, BULAN, formatTanggal, kondisi, isAktif, indexTahap, hitungBeban, hitungBebanProgram, hitungBebanRinci, SEMUA, filterByPeriode, daftarPeriode, buatId, ADMIN_PASSWORD, DOSEN_PASSWORD, PERIODE_AKTIF, TOPIK, VERIFIKASI, statusVerif, tambahHari, LABEL_PENDAFTARAN, ringkasPendaftaran, RUANG, menitJam, rentangJadwal, jamTampil, beririsan, dosenTerlibat, kumpulkanEvent, cariBentrok, pesanNotifikasi, waLink, mailtoLink, waMahasiswa, TEMPLATE_SURAT, tokenSurat, renderSurat, PEJABAT, KOP_SURAT, evKeyDok, dokTA, DURASI_EVENT, JAM_KERJA, durasiEvent, jamTambah, dalamJamKerja, tahapBerikut, eventAktif, BERKAS_SYARAT, berkasSyarat, bolehAjukanJadwal } from './utils/helpers.js';
-import { DOSEN_AWAL, plusHari, RAW_MAHASISWA, MAHASISWA_AWAL, AKUN_AWAL, PERIODE_BUKA_AWAL, PENGUMUMAN_AWAL } from './data/seed.js';
+import { DOSEN_AWAL, plusHari, RAW_MAHASISWA, MAHASISWA_AWAL, AKUN_AWAL, PERIODE_BUKA_AWAL, PENGUMUMAN_AWAL, PERIODE_AKTIF_AWAL, PANDUAN_AWAL } from './data/seed.js';
 import { Badge, StageBar, Field, Modal, Empty, ExportMenu, TextSizeToggle, ThemeToggle } from './components/ui.jsx';
 import { db } from './utils/firebase.js';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
@@ -21,10 +21,10 @@ function load() {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const p = JSON.parse(raw);
-      if (p && p.dosen && p.mahasiswa) return { akun: AKUN_AWAL, periodeBuka: PERIODE_BUKA_AWAL, pengumuman: PENGUMUMAN_AWAL, ...p };
+      if (p && p.dosen && p.mahasiswa) return { akun: AKUN_AWAL, periodeBuka: PERIODE_BUKA_AWAL, pengumuman: PENGUMUMAN_AWAL, periodeAktif: PERIODE_AKTIF_AWAL, panduan: PANDUAN_AWAL, ...p };
     }
   } catch (e) { /* abaikan */ }
-  return { dosen: DOSEN_AWAL, mahasiswa: MAHASISWA_AWAL, akun: AKUN_AWAL, periodeBuka: PERIODE_BUKA_AWAL, pengumuman: PENGUMUMAN_AWAL };
+  return { dosen: DOSEN_AWAL, mahasiswa: MAHASISWA_AWAL, akun: AKUN_AWAL, periodeBuka: PERIODE_BUKA_AWAL, pengumuman: PENGUMUMAN_AWAL, periodeAktif: PERIODE_AKTIF_AWAL, panduan: PANDUAN_AWAL };
 }
 
 function loadSesi() {
@@ -41,6 +41,7 @@ export default function App() {
   const [tab, setTab] = useState('dashboard');
   const [showPeriode, setShowPeriode] = useState(false);
   const [showPengumuman, setShowPengumuman] = useState(false);
+  const [showPanduan, setShowPanduan] = useState(false);
 
   useEffect(() => { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {} }, [data]);
   useEffect(() => {
@@ -127,21 +128,27 @@ export default function App() {
   function simpanPengumuman(list) {
     updateData((d) => ({ ...d, pengumuman: list }));
   }
+  function setPeriodeAktif(v) {
+    updateData((d) => ({ ...d, periodeAktif: v }));
+  }
+  function simpanPanduan(list) {
+    updateData((d) => ({ ...d, panduan: list }));
+  }
   function resetData() {
     if (window.confirm('Kembalikan ke data contoh? Semua perubahan akan hilang.')) {
-      updateData({ dosen: DOSEN_AWAL, mahasiswa: MAHASISWA_AWAL, akun: AKUN_AWAL, periodeBuka: PERIODE_BUKA_AWAL, pengumuman: PENGUMUMAN_AWAL });
+      updateData({ dosen: DOSEN_AWAL, mahasiswa: MAHASISWA_AWAL, akun: AKUN_AWAL, periodeBuka: PERIODE_BUKA_AWAL, pengumuman: PENGUMUMAN_AWAL, periodeAktif: PERIODE_AKTIF_AWAL, panduan: PANDUAN_AWAL });
     }
   }
 
   // ----- Belum login -----
   if (!sesi) {
-    return <Login akun={data.akun || []} dosen={data.dosen} pengumuman={data.pengumuman || PENGUMUMAN_AWAL} onLogin={setSesi} onRegister={daftarAkun} />;
+    return <Login akun={data.akun || []} dosen={data.dosen} pengumuman={data.pengumuman || PENGUMUMAN_AWAL} periodeAktif={data.periodeAktif || ''} onLogin={setSesi} onRegister={daftarAkun} />;
   }
 
   // ----- Login sebagai dosen -----
   if (sesi.peran === 'dosen') {
     const ds = data.dosen.find((x) => x.kode === sesi.kode);
-    if (!ds) return <Login akun={data.akun || []} dosen={data.dosen} pengumuman={data.pengumuman || PENGUMUMAN_AWAL} onLogin={setSesi} onRegister={daftarAkun} />;
+    if (!ds) return <Login akun={data.akun || []} dosen={data.dosen} pengumuman={data.pengumuman || PENGUMUMAN_AWAL} periodeAktif={data.periodeAktif || ''} onLogin={setSesi} onRegister={daftarAkun} />;
     return (
       <DosenPortal
         dosen={ds}
@@ -164,6 +171,7 @@ export default function App() {
         mahasiswa={data.mahasiswa}
         allDosen={data.dosen}
         periodeBuka={periodeBuka}
+        panduan={data.panduan || []}
         onSave={simpanMahasiswa}
         onLogout={() => setSesi(null)}
       />
@@ -196,6 +204,7 @@ export default function App() {
           </label>
           <button className="btn ghost" onClick={() => setShowPeriode(true)}>Kelola periode</button>
           <button className="btn ghost" onClick={() => setShowPengumuman(true)}>Kelola pengumuman</button>
+          <button className="btn ghost" onClick={() => setShowPanduan(true)}>Kelola panduan</button>
           {/* <button className="btn ghost" onClick={resetData} title="Kembalikan data contoh">Reset</button> */}
           <button className="btn ghost" onClick={() => setSesi(null)}>Keluar</button>
         </div>
@@ -204,8 +213,10 @@ export default function App() {
       {showPeriode && (
         <KelolaPeriode
           dibuka={periodeBuka}
+          periodeAktif={data.periodeAktif || ''}
           onBuka={bukaPeriode}
           onTutup={tutupPeriode}
+          onSetAktif={setPeriodeAktif}
           onClose={() => setShowPeriode(false)}
         />
       )}
@@ -215,6 +226,14 @@ export default function App() {
           daftar={data.pengumuman || PENGUMUMAN_AWAL}
           onSimpan={simpanPengumuman}
           onClose={() => setShowPengumuman(false)}
+        />
+      )}
+
+      {showPanduan && (
+        <KelolaPanduan
+          daftar={data.panduan || []}
+          onSimpan={simpanPanduan}
+          onClose={() => setShowPanduan(false)}
         />
       )}
 
@@ -239,14 +258,16 @@ export default function App() {
   );
 }
 
-function KelolaPeriode({ dibuka, onBuka, onTutup, onClose }) {
+function KelolaPeriode({ dibuka, periodeAktif, onBuka, onTutup, onSetAktif, onClose }) {
   const [nilai, setNilai] = useState('');
+  const [aktif, setAktif] = useState(periodeAktif || '');
   function tambah() {
     const v = nilai.trim();
     if (!v) return;
     onBuka(v);
     setNilai('');
   }
+  function simpanAktif() { onSetAktif(aktif.trim()); }
   return (
     <Modal
       title="Kelola periode pendaftaran"
@@ -257,6 +278,13 @@ function KelolaPeriode({ dibuka, onBuka, onTutup, onClose }) {
         Periode yang dibuka di sini akan muncul sebagai pilihan saat mahasiswa mendaftar.
       </p>
       <div className="form-grid">
+        <Field label="Periode aktif saat ini (ditampilkan di halaman login)" full>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input value={aktif} onChange={(e) => setAktif(e.target.value)} placeholder="mis. Genap 2026"
+              onKeyDown={(e) => { if (e.key === 'Enter') simpanAktif(); }} />
+            <button className="btn" onClick={simpanAktif}>Simpan</button>
+          </div>
+        </Field>
         <Field label="Buka periode baru" full>
           <div style={{ display: 'flex', gap: 8 }}>
             <input value={nilai} onChange={(e) => setNilai(e.target.value)} placeholder="mis. 2025 Ganjil"
@@ -332,6 +360,65 @@ function KelolaPengumuman({ daftar, onSimpan, onClose }) {
             {daftar.map((p) => (
               <li key={p.id} className="periode-item">
                 <span>{p.tanggal} — {p.judul}</span>
+                <span style={{ display: 'flex', gap: 8 }}>
+                  <button className="link-btn" onClick={() => edit(p)}>Edit</button>
+                  <button className="link-btn danger" onClick={() => hapus(p.id)}>Hapus</button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+function KelolaPanduan({ daftar, onSimpan, onClose }) {
+  const [label, setLabel] = useState('');
+  const [url, setUrl] = useState('');
+  const [editId, setEditId] = useState(null);
+
+  function kosongkan() { setLabel(''); setUrl(''); setEditId(null); }
+
+  function simpan() {
+    if (!label.trim() || !url.trim()) return;
+    if (editId) {
+      onSimpan(daftar.map((p) => (p.id === editId ? { ...p, label: label.trim(), url: url.trim() } : p)));
+    } else {
+      onSimpan([...daftar, { id: buatId(), label: label.trim(), url: url.trim() }]);
+    }
+    kosongkan();
+  }
+
+  function edit(p) { setEditId(p.id); setLabel(p.label); setUrl(p.url); }
+  function hapus(id) { if (window.confirm('Hapus tautan panduan ini?')) onSimpan(daftar.filter((p) => p.id !== id)); if (editId === id) kosongkan(); }
+
+  return (
+    <Modal
+      title="Kelola panduan"
+      onClose={onClose}
+      footer={<button className="btn btn-primary" onClick={onClose}>Selesai</button>}
+    >
+      <p className="hint" style={{ marginTop: 0 }}>
+        Daftar unduhan (Panduan KP, Panduan TA, dst.) yang tampil di Portal mahasiswa. Tautkan ke Google Drive atau sumber lain.
+      </p>
+      <div className="form-grid">
+        <Field label="Label" full><input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="mis. Panduan KP" /></Field>
+        <Field label="Tautan" full><input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://drive.google.com/..." /></Field>
+      </div>
+      <div className="modal-foot" style={{ paddingLeft: 0, paddingRight: 0 }}>
+        {editId && <button className="btn" onClick={kosongkan}>Batal edit</button>}
+        <button className="btn btn-primary" onClick={simpan}>{editId ? 'Simpan perubahan' : 'Tambah panduan'}</button>
+      </div>
+      <div className="sched" style={{ marginTop: 12 }}>
+        <div className="sched-title">Panduan saat ini</div>
+        {daftar.length === 0 ? (
+          <Empty>Belum ada panduan.</Empty>
+        ) : (
+          <ul className="periode-list">
+            {daftar.map((p) => (
+              <li key={p.id} className="periode-item">
+                <span>{p.label}</span>
                 <span style={{ display: 'flex', gap: 8 }}>
                   <button className="link-btn" onClick={() => edit(p)}>Edit</button>
                   <button className="link-btn danger" onClick={() => hapus(p.id)}>Hapus</button>

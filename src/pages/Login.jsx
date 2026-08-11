@@ -7,7 +7,7 @@ import { Badge, StageBar, Field, Modal, Empty, ExportMenu, ThemeToggle, TextSize
 // ===================== Login.jsx =====================
 // Login.jsx — layar masuk: pilih peran, lalu masuk/daftar
 
-export function Login({ akun, dosen = [], pengumuman = [], onLogin, onRegister }) {
+export function Login({ akun, dosen = [], pengumuman = [], periodeAktif = '', onLogin, onRegister }) {
   const [peran, setPeran] = useState(null); // null | 'mahasiswa' | 'dosen' | 'admin'
 
   return (
@@ -16,6 +16,9 @@ export function Login({ akun, dosen = [], pengumuman = [], onLogin, onRegister }
         <ThemeToggle />
         <TextSizeToggle />
       </div>
+      {periodeAktif && (
+        <div className="periode-aktif-banner">Periode saat ini: <strong>{periodeAktif}</strong></div>
+      )}
       <div className="login-container">
         <div className="login-announcements">
           <h3>Pengumuman Akademik</h3>

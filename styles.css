@@ -212,6 +212,7 @@ textarea { resize: vertical; }
 .fill-blue { background: linear-gradient(90deg, #6366f1, #818cf8); }
 .fill-amber { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
 .fill-red { background: linear-gradient(90deg, #ef4444, #f87171); }
+.fill-green { background: linear-gradient(90deg, #16a34a, #4ade80); }
 .bar-val { width: 26px; text-align: right; font-size: 0.813rem; font-weight: 600; }
 
 .attn { list-style: none; margin: 0; padding: 0; }
@@ -284,6 +285,11 @@ textarea { resize: vertical; }
 .cell-judul { max-width: 280px; color: var(--text); line-height: 1.4; }
 .muted { color: var(--muted); }
 .cell-actions { white-space: nowrap; text-align: right; }
+.tbl-group-row td {
+  background: var(--surface-2); font-weight: 700; font-size: 0.75rem;
+  text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted);
+  padding: 8px 16px;
+}
 
 /* ---------- Tabel dengan kolom bisa digeser (resizable) ---------- */
 /* width:100% + satu kolom terakhir tanpa lebar tetap (lihat colgroup di JS)
@@ -407,6 +413,11 @@ textarea { resize: vertical; }
 /* ---------- Login ---------- */
 .login-wrap { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 20px; background: linear-gradient(135deg, var(--surface-2) 0%, var(--border) 100%); position: relative; }
 .login-topbar { position: absolute; top: 20px; right: 20px; display: flex; gap: 8px; align-items: center; }
+.periode-aktif-banner {
+  background: var(--blue-bg); border: 1px solid var(--blue-border); color: var(--blue-text);
+  border-radius: var(--radius-sm); padding: 8px 16px; font-size: 0.844rem; font-weight: 600;
+  margin-bottom: 16px; text-align: center;
+}
 .login-container { display: flex; flex-wrap: wrap-reverse; gap: 32px; max-width: 900px; width: 100%; justify-content: center; align-items: center; }
 .login-announcements { flex: 1 1 350px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; box-shadow: var(--shadow-glass); }
 .login-announcements h3 { font-size: 1.25rem; font-weight: 700; margin: 0 0 20px; color: var(--accent); }

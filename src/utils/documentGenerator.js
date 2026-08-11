@@ -50,7 +50,9 @@ export const generateDocument = async (templatePath, outputName, data) => {
 
 export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
   const d1 = dosenByKode[m.pembimbing1] || {};
-  
+  const dw = dosenByKode[m.dosenWali] || {};
+  const wali = { nama_dosen_wali: dw.nama || m.dosenWali || "-", nip_dosen_wali: dw.nip || "-" };
+
   switch (docType) {
     case 'Permohonan KP':
       return {
@@ -63,7 +65,38 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
           sks: (m.pendaftaran?.sksIpk || "").split('/')[0]?.trim() || "-",
           no_telpon: m.pendaftaran?.nomorWA || "-",
           judul_kp: m.judul,
-          tgl_surat_pmkp: formatTanggal(todayISO())
+          tgl_surat_pmkp: formatTanggal(todayISO()),
+          ...wali,
+        }
+      };
+
+    case 'Kelayakan KP':
+      return {
+        template: 'KP/kelayakan-kp.docx',
+        filename: `Kelayakan_KP_${m.nama}.docx`,
+        data: {
+          no_surat: m.nomorSurat || jEv.nomorST || "___/UN7.../2026",
+          nama_mhs: m.nama,
+          nim: m.nim,
+          semester: m.pendaftaran?.semester || "-",
+          sks: (m.pendaftaran?.sksIpk || "").split('/')[0]?.trim() || "-",
+          judul_kp: m.judul,
+          tgl_surat_klkp: formatTanggal(todayISO()),
+          ...wali,
+        }
+      };
+
+    case 'Kelayakan Proposal KP':
+      return {
+        template: 'KP/kelayakan-proposal-kp.docx',
+        filename: `Kelayakan_Proposal_KP_${m.nama}.docx`,
+        data: {
+          no_surat: m.nomorSurat || jEv.nomorST || "___/UN7.../2026",
+          nama_mhs: m.nama,
+          nim: m.nim,
+          judul_kp: m.judul,
+          tgl_surat_klpkp: formatTanggal(todayISO()),
+          ...wali,
         }
       };
 
@@ -72,7 +105,7 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
         template: 'KP/pembimbing-kp-st.docx',
         filename: `ST_Pembimbing_KP_${m.nama}.docx`,
         data: {
-          no_surat: jEv.nomorST || "___/UN7.../2026",
+          no_surat: m.nomorSurat || jEv.nomorST || "___/UN7.../2026",
           nama_dosen1: d1.nama || m.pembimbing1,
           nip1: d1.nip || "-",
           nama_mhs: m.nama,
@@ -80,7 +113,8 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
           judul_kp: m.judul,
           mulai_kp: formatTanggal(m.tanggalMulai) || "-",
           akhir_kp: formatTanggal(m.batasAkhir) || "-",
-          tgl_surat_stkp: formatTanggal(todayISO())
+          tgl_surat_stkp: formatTanggal(todayISO()),
+          ...wali,
         }
       };
 
@@ -89,7 +123,7 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
         template: 'KP/seminar-kp-ba.docx',
         filename: `BA_Seminar_KP_${m.nama}.docx`,
         data: {
-          no_surat: jEv.nomorST || "___/UN7.../2026",
+          no_surat: m.nomorSurat || jEv.nomorST || "___/UN7.../2026",
           nama_mhs: m.nama,
           nim: m.nim,
           judul_kp: m.judul,
@@ -100,7 +134,8 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
           tempat_smkp: jEv.ruang || "-",
           tgl_surat_smkp: formatTanggal(todayISO()),
           nama_dosen1: d1.nama || m.pembimbing1,
-          nip1: d1.nip || "-"
+          nip1: d1.nip || "-",
+          ...wali,
         }
       };
 
@@ -110,7 +145,7 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
         template: 'KP/perpanjangan-kp.docx',
         filename: `Perpanjangan_KP_${m.nama}.docx`,
         data: {
-          no_surat: jEv.nomorST || "___/UN7.../2026",
+          no_surat: m.nomorSurat || jEv.nomorST || "___/UN7.../2026",
           nama_mhs: m.nama,
           nim: m.nim,
           judul_kp: m.judul,
@@ -121,6 +156,7 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
           tgl_surat_ppkp: formatTanggal(pp.tanggalDiminta || todayISO()),
           nama_dosen1: d1.nama || m.pembimbing1,
           nip1: d1.nip || "-",
+          ...wali,
         }
       };
     }
@@ -135,6 +171,7 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
           judul_kp: m.judul,
           nama_dosen1: d1.nama || m.pembimbing1,
           nip1: d1.nip || "-",
+          ...wali,
         }
       };
 

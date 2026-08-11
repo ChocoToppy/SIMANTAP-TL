@@ -1,5 +1,14 @@
 Tags for docxtemplater
 
+NOTE (added): every KP document data payload now also includes {nama_dosen_wali} and
+{nip_dosen_wali} (resolved from the student's "Dosen Wali" field). These tags are not
+yet present in any existing .docx template — add {nama_dosen_wali} / {nip_dosen_wali}
+placeholders into whichever templates below should display the wali dosen.
+
+Also new: "no_surat" is now sourced from a single per-student Nomor Surat (set once by
+admin at first verification) instead of a per-event number, but the tag name in the
+templates stays the same ({no_surat}) — no template changes needed for this part.
+
 permohonan-kp
 
 {nama_mhs}
@@ -9,6 +18,30 @@ permohonan-kp
 {no_telpon}
 {judul_kp}
 {tgl_surat_pmkp}
+{nama_dosen_wali}
+{nip_dosen_wali}
+
+kelayakan-kp  (NEW — template file not yet created, code is wired up)
+
+{no_surat}
+{nama_mhs}
+{nim}
+{semester}
+{sks}
+{judul_kp}
+{tgl_surat_klkp}
+{nama_dosen_wali}
+{nip_dosen_wali}
+
+kelayakan-proposal-kp  (NEW — template file not yet created, code is wired up)
+
+{no_surat}
+{nama_mhs}
+{nim}
+{judul_kp}
+{tgl_surat_klpkp}
+{nama_dosen_wali}
+{nip_dosen_wali}
 
 perpanjangan-kp
 

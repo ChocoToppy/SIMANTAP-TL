@@ -45,6 +45,19 @@ export function Dashboard({ mahasiswa, dosen }) {
 
   const bebanTone = (t) => (t >= 8 ? 'red' : t >= 6 ? 'amber' : 'blue');
 
+  // Lulus per angkatan — dikelompokkan dari daftar `lulus` (sudah ikut filter program).
+  const lulusPerAngkatan = useMemo(() => {
+    const bucket = {};
+    lulus.forEach((m) => {
+      const k = m.angkatan || '—';
+      bucket[k] = (bucket[k] || 0) + 1;
+    });
+    return Object.keys(bucket)
+      .sort((a, b) => String(a).localeCompare(String(b), 'id', { numeric: true }))
+      .map((k) => ({ angkatan: k, jumlah: bucket[k] }));
+  }, [lulus]);
+  const maxLulusAngkatan = lulusPerAngkatan.length ? Math.max(...lulusPerAngkatan.map((x) => x.jumlah)) : 1;
+
   const FILTERS = [
     { key: 'ALL', label: 'Semua' },
     { key: 'TA', label: 'Tugas Akhir' },
@@ -118,6 +131,25 @@ export function Dashboard({ mahasiswa, dosen }) {
           )}
         </section>
       </div>
+
+      <section className="card">
+        <h3 className="card-title">Lulus per Angkatan</h3>
+        {lulusPerAngkatan.length === 0 ? (
+          <Empty>Belum ada mahasiswa lulus pada filter ini.</Empty>
+        ) : (
+          <div className="bars">
+            {lulusPerAngkatan.map((a) => (
+              <div className="bar-row" key={a.angkatan} title={`${a.jumlah} lulus`}>
+                <span className="bar-key">{a.angkatan}</span>
+                <div className="bar-track">
+                  <div className="bar-fill fill-green" style={{ width: `${Math.max(8, (a.jumlah / maxLulusAngkatan) * 100)}%` }} />
+                </div>
+                <span className="bar-val">{a.jumlah}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       <section className="card">
         <h3 className="card-title">Sebaran tahap</h3>

@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, stagesFor, eventsFor, punyaKlasifikasi, punyaSyarat, rolesFor, syaratLabel, getJadwal, STAGES, KLASIFIKASI, BIDANG, KP_TEMA, HARI, bidangLabel, todayISO, parseISO, daysBetween, BULAN, formatTanggal, kondisi, isAktif, indexTahap, hitungBeban, hitungBebanProgram, hitungBebanRinci, SEMUA, filterByPeriode, daftarPeriode, buatId, ADMIN_PASSWORD, DOSEN_PASSWORD, PERIODE_AKTIF, TOPIK, VERIFIKASI, statusVerif, tambahHari, LABEL_PENDAFTARAN, ringkasPendaftaran, RUANG, menitJam, rentangJadwal, jamTampil, beririsan, dosenTerlibat, kumpulkanEvent, cariBentrok, pesanNotifikasi, waLink, mailtoLink, waMahasiswa, TEMPLATE_SURAT, tokenSurat, renderSurat, PEJABAT, KOP_SURAT, evKeyDok, dokTA, DURASI_EVENT, JAM_KERJA, durasiEvent, jamTambah, dalamJamKerja, tahapBerikut, tahapSebelumnya, eventAktif, BERKAS_SYARAT, berkasSyarat, bolehAjukanJadwal, catatAktivitas, tanggalDibuat, aktivitasTerakhir, AKTIVITAS_LABEL, formatWaktu } from '../utils/helpers.js';
+import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, stagesFor, eventsFor, punyaKlasifikasi, punyaSyarat, rolesFor, syaratLabel, getJadwal, STAGES, KLASIFIKASI, BIDANG, KP_TEMA, HARI, bidangLabel, todayISO, parseISO, daysBetween, BULAN, formatTanggal, kondisi, isAktif, indexTahap, hitungBeban, hitungBebanProgram, hitungBebanRinci, SEMUA, filterByPeriode, daftarPeriode, buatId, ADMIN_PASSWORD, DOSEN_PASSWORD, PERIODE_AKTIF, TOPIK, VERIFIKASI, statusVerif, tambahHari, LABEL_PENDAFTARAN, ringkasPendaftaran, RUANG, menitJam, rentangJadwal, jamTampil, beririsan, dosenTerlibat, kumpulkanEvent, cariBentrok, pesanNotifikasi, waLink, mailtoLink, waMahasiswa, TEMPLATE_SURAT, tokenSurat, renderSurat, PEJABAT, KOP_SURAT, evKeyDok, dokTA, DURASI_EVENT, JAM_KERJA, durasiEvent, jamTambah, dalamJamKerja, tahapBerikut, tahapSebelumnya, eventAktif, BERKAS_SYARAT, berkasSyarat, bolehAjukanJadwal, catatAktivitas, tanggalDibuat, aktivitasTerakhir, AKTIVITAS_LABEL, formatWaktu, hitungNomorUrut, nowStamp } from '../utils/helpers.js';
 import { DOSEN_AWAL, plusHari, RAW_MAHASISWA, MAHASISWA_AWAL, AKUN_AWAL, PERIODE_BUKA_AWAL } from '../data/seed.js';
 import { csvEscape, triggerDownload, downloadCSV, downloadDoc, cetakSuratPDF, cetakSuratPDFHtml, loadXLSX } from '../utils/exportUtils.js';
 import { Badge, StageBar, Field, Modal, Empty, ExportMenu, ColResizeHandle } from '../components/ui.jsx';
 import { KpDocumentPanel } from '../components/kpDocuments.jsx';
 import { generateDocument, getTemplateConfig } from '../utils/documentGenerator.js';
+import { readFileForUpload } from '../utils/fileUpload.js';
 import { useColumnWidths } from '../utils/useColumnWidths.js';
 
 // ===================== Mahasiswa.js =====================
@@ -37,7 +38,16 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
   }
   const panah = (key) => (sortBy === key ? (sortDir === 'asc' ? ' \u25B2' : ' \u25BC') : '');
 
+  // Nomor identitas tetap (berdasarkan urutan pendaftaran pertama), dihitung dari
+  // SELURUH data \u2014 tidak berubah walau tabel disortir/difilter.
+  const nomorUrut = useMemo(() => hitungNomorUrut(allMahasiswa || mahasiswa), [allMahasiswa, mahasiswa]);
+  const [groupMode, setGroupMode] = useState(periode === SEMUA ? 'periode' : 'none');
+  useEffect(() => {
+    setGroupMode(periode === SEMUA ? 'periode' : 'none');
+  }, [periode]);
+
   const COLS = [
+    { key: 'no', width: 56 },
     { key: 'mahasiswa', width: 220 },
     { key: 'judul', width: 260 },
     { key: 'tahap', width: 210 },
@@ -97,19 +107,39 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
     return { baru, perluJadwal, perluHasil, bentrok, kelompok };
   }, [mahasiswa]);
 
+  // Kelompokkan baris (yang sudah difilter & disortir) berdasarkan periode/angkatan,
+  // menjaga urutan relatif yang sudah ada — mirip tampilan "group" spreadsheet.
+  const grupRows = useMemo(() => {
+    if (groupMode === 'none') return null;
+    const keyOf = (m) => (groupMode === 'angkatan' ? (m.angkatan || '—') : (m.periode || '—'));
+    const map = new Map();
+    rows.forEach((r) => {
+      const k = keyOf(r.m);
+      if (!map.has(k)) map.set(k, []);
+      map.get(k).push(r);
+    });
+    return Array.from(map.entries()).map(([label, items]) => ({ label, items }));
+  }, [rows, groupMode]);
+
+  function noUntuk(m) {
+    if (groupMode === 'angkatan') return (nomorUrut[m.id] || {}).angkatan ?? '—';
+    return (nomorUrut[m.id] || {}).periode ?? '—';
+  }
+
   function tambah() { setEditing(null); setOpen(true); }
   function edit(m) { setEditing(m); setOpen(true); }
   function simpan(m) { onSave(m); setOpen(false); }
   function hapus(m) { if (window.confirm(`Hapus data ${m.nama}?`)) onDelete(m.id); }
 
-  const coreHeaders = ['Program', 'Nama', 'NIM', 'Angkatan', 'Judul', 'Periode', 'Klasifikasi', 'Bidang', 'Pembimbing 1', 'Pembimbing 2', 'Penguji 1', 'Penguji 2', 'Tahap', 'Status', 'Tanggal Mulai', 'Batas Akhir', 'Catatan'];
+  const coreHeaders = ['No. (Periode)', 'Program', 'Nama', 'NIM', 'Angkatan', 'Judul', 'Periode', 'Klasifikasi', 'Bidang', 'Dosen Wali', 'Pembimbing 1', 'Pembimbing 2', 'Penguji 1', 'Penguji 2', 'Tahap', 'Status', 'Tanggal Mulai', 'Batas Akhir', 'Nomor Surat', 'Nilai Angka', 'Nilai Huruf', 'Catatan'];
   const coreRow = (m) => {
     const k = kondisi(m);
     return [
-      programLabel(programOf(m)), m.nama, m.nim, m.angkatan, m.judul, m.periode,
-      punyaKlasifikasi(programOf(m)) ? (m.klasifikasi || '') : '', bidangLabel(m.bidang),
+      (nomorUrut[m.id] || {}).periode ?? '', programLabel(programOf(m)), m.nama, m.nim, m.angkatan, m.judul, m.periode,
+      punyaKlasifikasi(programOf(m)) ? (m.klasifikasi || '') : '', bidangLabel(m.bidang), m.dosenWali || '',
       m.pembimbing1 || '', m.pembimbing2 || '', m.penguji1 || '', m.penguji2 || '',
-      m.tahap, k.label, m.tanggalMulai || '', m.batasAkhir || '', m.catatan || '',
+      m.tahap, k.label, m.tanggalMulai || '', m.batasAkhir || '', m.nomorSurat || '',
+      (m.nilaiAkhir || {}).angka || '', (m.nilaiAkhir || {}).huruf || '', m.catatan || '',
     ];
   };
   const ringkasJadwal = (m) =>
@@ -174,6 +204,11 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
           <option value="">Semua dosen</option>
           {allDosen.map((d) => <option key={d.kode} value={d.kode}>{d.kode}</option>)}
         </select>
+        <select value={groupMode} onChange={(e) => setGroupMode(e.target.value)} title="Kelompokkan tabel">
+          <option value="none">Tampilan: Normal</option>
+          <option value="periode">Kelompokkan per Periode</option>
+          <option value="angkatan">Kelompokkan per Angkatan</option>
+        </select>
         <ExportMenu label="Ekspor" onXLSX={() => ekspor('xlsx')} onCSV={() => ekspor('csv')} />
         <button className="btn btn-primary" onClick={tambah}>+ Tambah</button>
       </div>
@@ -196,45 +231,60 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
           </colgroup>
           <thead>
             <tr>
-              <th className="th-sort" onClick={() => ubahSort('nama')}>Mahasiswa{panah('nama')}<ColResizeHandle onMouseDown={(e) => startResize(0, e)} /></th>
-              <th>Judul<ColResizeHandle onMouseDown={(e) => startResize(1, e)} /></th>
-              <th className="th-sort" onClick={() => ubahSort('tahap')}>Tahap &amp; jadwal{panah('tahap')}<ColResizeHandle onMouseDown={(e) => startResize(2, e)} /></th>
-              <th>Pembimbing<ColResizeHandle onMouseDown={(e) => startResize(3, e)} /></th>
-              <th>Penguji<ColResizeHandle onMouseDown={(e) => startResize(4, e)} /></th>
-              <th className="th-sort" onClick={() => ubahSort('deadline')}>Deadline{panah('deadline')}<ColResizeHandle onMouseDown={(e) => startResize(5, e)} /></th>
-              <th className="th-sort" onClick={() => ubahSort('dibuat')}>Aktivitas{panah('dibuat')}<ColResizeHandle onMouseDown={(e) => startResize(6, e)} /></th>
+              <th>No.<ColResizeHandle onMouseDown={(e) => startResize(0, e)} /></th>
+              <th className="th-sort" onClick={() => ubahSort('nama')}>Mahasiswa{panah('nama')}<ColResizeHandle onMouseDown={(e) => startResize(1, e)} /></th>
+              <th>Judul<ColResizeHandle onMouseDown={(e) => startResize(2, e)} /></th>
+              <th className="th-sort" onClick={() => ubahSort('tahap')}>Tahap &amp; jadwal{panah('tahap')}<ColResizeHandle onMouseDown={(e) => startResize(3, e)} /></th>
+              <th>Pembimbing<ColResizeHandle onMouseDown={(e) => startResize(4, e)} /></th>
+              <th>Penguji<ColResizeHandle onMouseDown={(e) => startResize(5, e)} /></th>
+              <th className="th-sort" onClick={() => ubahSort('deadline')}>Deadline{panah('deadline')}<ColResizeHandle onMouseDown={(e) => startResize(6, e)} /></th>
+              <th className="th-sort" onClick={() => ubahSort('dibuat')}>Aktivitas{panah('dibuat')}<ColResizeHandle onMouseDown={(e) => startResize(7, e)} /></th>
               <th></th>
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ m, k }) => (
-              <tr key={m.id}>
-                <td>
-                  <div className="cell-name">{m.nama}</div>
-                  <div className="cell-sub">
-                    {m.nim} · {bidangLabel(m.bidang)} · {programLabel(programOf(m))}
-                    {m.klasifikasi && punyaKlasifikasi(programOf(m)) ? ` · ${m.klasifikasi}` : ''}
-                  </div>
-                  <div style={{ marginTop: 4 }}><Badge tone={statusVerif(m).tone}>{statusVerif(m).label}</Badge></div>
-                </td>
-                <td className="cell-judul">{m.judul || <span className="muted">—</span>}</td>
-                <td style={{ minWidth: 180 }}>
-                  <StageBar program={programOf(m)} tahap={m.tahap} />
-                  <JadwalMini m={m} />
-                </td>
-                <td>{m.pembimbing1 || '-'}{m.pembimbing2 ? ` / ${m.pembimbing2}` : ''}</td>
-                <td>{m.penguji1 || '-'}{m.penguji2 ? ` / ${m.penguji2}` : ''}</td>
-                <td>
-                  <Badge tone={k.tone}>{k.label}</Badge>
-                  <div className="cell-sub">{formatTanggal(m.batasAkhir)}</div>
-                </td>
-                <td><AktivitasMini m={m} /></td>
-                <td className="cell-actions">
-                  <button className="link-btn" onClick={() => edit(m)}>Edit</button>
-                  <button className="link-btn danger" onClick={() => hapus(m)}>Hapus</button>
-                </td>
-              </tr>
-            ))}
+            {(() => {
+              const baris = ({ m, k }) => (
+                <tr key={m.id}>
+                  <td className="cell-sub">{noUntuk(m)}</td>
+                  <td>
+                    <div className="cell-name">{m.nama}</div>
+                    <div className="cell-sub">
+                      {m.nim} · {bidangLabel(m.bidang)} · {programLabel(programOf(m))}
+                      {m.klasifikasi && punyaKlasifikasi(programOf(m)) ? ` · ${m.klasifikasi}` : ''}
+                    </div>
+                    <div style={{ marginTop: 4 }}><Badge tone={statusVerif(m).tone}>{statusVerif(m).label}</Badge></div>
+                  </td>
+                  <td className="cell-judul">{m.judul || <span className="muted">—</span>}</td>
+                  <td style={{ minWidth: 180 }}>
+                    <StageBar program={programOf(m)} tahap={m.tahap} />
+                    <JadwalMini m={m} />
+                  </td>
+                  <td>{m.pembimbing1 || '-'}{m.pembimbing2 ? ` / ${m.pembimbing2}` : ''}</td>
+                  <td>{m.penguji1 || '-'}{m.penguji2 ? ` / ${m.penguji2}` : ''}</td>
+                  <td>
+                    <Badge tone={k.tone}>{k.label}</Badge>
+                    <div className="cell-sub">{formatTanggal(m.batasAkhir)}</div>
+                  </td>
+                  <td><AktivitasMini m={m} /></td>
+                  <td className="cell-actions">
+                    <button className="link-btn" onClick={() => edit(m)}>Edit</button>
+                    <button className="link-btn danger" onClick={() => hapus(m)}>Hapus</button>
+                  </td>
+                </tr>
+              );
+              if (grupRows) {
+                return grupRows.map((g) => (
+                  <React.Fragment key={g.label}>
+                    <tr className="tbl-group-row">
+                      <td colSpan={COLS.length}>{groupMode === 'angkatan' ? `Angkatan ${g.label}` : g.label}</td>
+                    </tr>
+                    {g.items.map(baris)}
+                  </React.Fragment>
+                ));
+              }
+              return rows.map(baris);
+            })()}
           </tbody>
         </table>
         {rows.length === 0 && <Empty>Tidak ada data yang cocok.</Empty>}
@@ -355,6 +405,13 @@ function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, periodeList
       jadwal: { ...(prev.jadwal || {}), [ev]: { ...((prev.jadwal || {})[ev] || {}), [key]: val } },
     }));
 
+  // Admin mengunggah berkas KP yang ditandatangani (mis. BA Seminar KP) atas nama
+  // mahasiswa — disimpan ke state lokal, ikut tersimpan saat admin klik "Simpan".
+  async function uploadAdminDokumenKP(key, file) {
+    const hasil = await readFileForUpload(file);
+    setM((prev) => ({ ...prev, dokumenKP: { ...(prev.dokumenKP || {}), [key]: hasil } }));
+  }
+
   function gantiProgram(p) {
     setM((prev) => {
       const stages = stagesFor(p);
@@ -371,7 +428,10 @@ function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, periodeList
 
   function submit() {
     if (!m.nama.trim()) { setErr('Nama wajib diisi.'); return; }
-    const calon = { ...m, angkatan: Number(m.angkatan) || m.angkatan };
+    let calon = { ...m, angkatan: Number(m.angkatan) || m.angkatan };
+    if (awal && awal.judul !== calon.judul) {
+      calon = { ...calon, riwayatJudul: [...(calon.riwayatJudul || []), { judulLama: awal.judul, judulBaru: calon.judul, at: nowStamp() }] };
+    }
     const masalah = [];
     // Validasi tanggal jadwal: dalam rentang & berurutan sesuai tahapan.
     const evs = eventsFor(programOf(calon));
@@ -492,6 +552,9 @@ function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, periodeList
           )}
           {evA && <button type="button" className="btn" onClick={tidakLulus}>Tandai tidak lulus (ulang)</button>}
           {!next && !prevStage && <span className="hint">Satu-satunya tahap pada program ini.</span>}
+          <button type="button" className="btn" onClick={() => cetakSuratPDF(`Perubahan Judul - ${m.nama}`, dokTA('perubahanJudul', m, dosenByKode))}>
+            Cetak surat perubahan judul (PDF)
+          </button>
         </div>
         <div className="hint">Tahap saat ini juga bisa diganti langsung lewat dropdown "Tahap saat ini" di atas. Perubahan tersimpan saat klik "Simpan".</div>
       </div>
@@ -504,7 +567,7 @@ function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, periodeList
       <div className="sched" key={ev}>
         <div className="sched-title">Jadwal {ev}</div>
         <div className="sched-grid">
-          <Field label="Nomor Surat Tugas"><input value={j.nomorST || ''} onChange={(e) => setJadwal(ev, 'nomorST', e.target.value)} placeholder="mis. 123 A/UN7..." /></Field>
+          <Field label="Nomor Surat"><input value={m.nomorSurat || j.nomorST || ''} disabled title="Nomor surat sekarang satu untuk seluruh program — isi di panel Verifikasi pendaftaran" /></Field>
           <Field label="Tanggal"><input type="date" value={j.tanggal || ''} onChange={(e) => setJadwal(ev, 'tanggal', e.target.value)} /></Field>
           {(m.program === 'KP' || ev.includes('KP')) && (
             <Field label="Hari">
@@ -606,6 +669,7 @@ function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, periodeList
           {roles.penguji >= 2 && (
             <Field label="Penguji 2"><select value={m.penguji2} onChange={(e) => set('penguji2', e.target.value)}>{dosenOpts}</select></Field>
           )}
+          <Field label="Dosen Wali"><select value={m.dosenWali || ''} onChange={(e) => set('dosenWali', e.target.value)}>{dosenOpts}</select></Field>
 
           <Field label="Tahap saat ini">
             <select value={m.tahap} onChange={(e) => setTahap(e.target.value)}>
@@ -653,7 +717,11 @@ function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, periodeList
                       <option value="perbaikan">Perlu perbaikan</option>
                     </select>
                   </Field>
+                  <Field label="Nomor Surat">
+                    <input value={m.nomorSurat || ''} onChange={(e) => set('nomorSurat', e.target.value)} placeholder="mis. 123/UN7.../2026" />
+                  </Field>
                 </div>
+                <div className="hint" style={{ marginTop: 6 }}>Nomor surat ini dipakai untuk semua surat program ini — isi saat verifikasi pertama kali.</div>
               </div>
             )}
 
@@ -662,7 +730,18 @@ function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, periodeList
             {tahapTab === 'Lulus' && (
               <div className="sched">
                 <div className="sched-title">Kelulusan</div>
-                <Field label="Tanggal lulus"><input type="date" value={m.tanggalLulus || ''} onChange={(e) => set('tanggalLulus', e.target.value)} /></Field>
+                <div className="sched-grid">
+                  <Field label="Tanggal lulus"><input type="date" value={m.tanggalLulus || ''} onChange={(e) => set('tanggalLulus', e.target.value)} /></Field>
+                  <Field label="Nilai angka (admin, tidak terlihat mahasiswa)">
+                    <input type="number" min="0" max="100" value={(m.nilaiAkhir || {}).angka || ''} onChange={(e) => setM((prev) => ({ ...prev, nilaiAkhir: { ...(prev.nilaiAkhir || {}), angka: e.target.value } }))} />
+                  </Field>
+                  <Field label="Nilai huruf (admin, tidak terlihat mahasiswa)">
+                    <select value={(m.nilaiAkhir || {}).huruf || ''} onChange={(e) => setM((prev) => ({ ...prev, nilaiAkhir: { ...(prev.nilaiAkhir || {}), huruf: e.target.value } }))}>
+                      <option value="">—</option>
+                      {['A', 'AB', 'B', 'BC', 'C', 'D', 'E'].map((h) => <option key={h} value={h}>{h}</option>)}
+                    </select>
+                  </Field>
+                </div>
                 {m.tahap === 'Lulus'
                   ? <div className="callout callout-green" style={{ marginTop: 10 }}>Mahasiswa telah dinyatakan lulus KP.</div>
                   : <div className="hint" style={{ marginTop: 10 }}>Mahasiswa belum mencapai tahap Lulus.</div>}
@@ -672,7 +751,7 @@ function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, periodeList
 
           <div className="modal-kp-side">
             <div className="sched">
-              <KpDocumentPanel m={m} dosenByKode={dosenByKode} canUpload={false} collapsible={false} title="Dokumen KP" />
+              <KpDocumentPanel m={m} dosenByKode={dosenByKode} canUpload role="admin" onUpload={uploadAdminDokumenKP} collapsible={false} title="Dokumen KP" />
             </div>
             <div className="sched">
               <div className="sched-title">Perpanjangan Kerja Praktik</div>
@@ -735,7 +814,11 @@ function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, periodeList
                 <option value="perbaikan">Perlu perbaikan</option>
               </select>
             </Field>
+            <Field label="Nomor Surat">
+              <input value={m.nomorSurat || ''} onChange={(e) => set('nomorSurat', e.target.value)} placeholder="mis. 123/UN7.../2026" />
+            </Field>
           </div>
+          <div className="hint" style={{ marginTop: 6 }}>Nomor surat ini dipakai untuk semua surat program ini — isi saat verifikasi pertama kali.</div>
         </div>
 
         {!baru && <RiwayatAktivitas m={m} />}
@@ -789,6 +872,15 @@ function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, periodeList
         <Field label="Tanggal mulai"><input type="date" value={m.tanggalMulai} onChange={(e) => set('tanggalMulai', e.target.value)} /></Field>
         <Field label="Batas akhir"><input type="date" value={m.batasAkhir} onChange={(e) => set('batasAkhir', e.target.value)} /></Field>
         <Field label="Tanggal lulus"><input type="date" value={m.tanggalLulus || ''} onChange={(e) => set('tanggalLulus', e.target.value)} /></Field>
+        <Field label="Nilai angka (admin, tidak terlihat mahasiswa)">
+          <input type="number" min="0" max="100" value={(m.nilaiAkhir || {}).angka || ''} onChange={(e) => setM((prev) => ({ ...prev, nilaiAkhir: { ...(prev.nilaiAkhir || {}), angka: e.target.value } }))} />
+        </Field>
+        <Field label="Nilai huruf (admin, tidak terlihat mahasiswa)">
+          <select value={(m.nilaiAkhir || {}).huruf || ''} onChange={(e) => setM((prev) => ({ ...prev, nilaiAkhir: { ...(prev.nilaiAkhir || {}), huruf: e.target.value } }))}>
+            <option value="">—</option>
+            {['A', 'AB', 'B', 'BC', 'C', 'D', 'E'].map((h) => <option key={h} value={h}>{h}</option>)}
+          </select>
+        </Field>
 
         {alurTahapBlok}
 
