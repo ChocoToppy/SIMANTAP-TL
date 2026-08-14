@@ -3,6 +3,7 @@
 
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 
 export const firebaseConfig = {
   apiKey: "AIzaSyAZp8-zyIr6nE6ydgzaWY9dtFPwBgwJjig",
@@ -19,3 +20,6 @@ const app = initializeApp(firebaseConfig);
 
 // Ekspor koneksi Database Firestore
 export const db = getFirestore(app);
+
+// Ekspor koneksi Firebase Storage (berkas tanda tangan/nilai mahasiswa)
+export const storage = getStorage(app);

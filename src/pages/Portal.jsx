@@ -99,7 +99,7 @@ export function Portal({ nim, nama, mahasiswa, allDosen, periodeBuka = [], pandu
         )}
 
         {(view.mode === 'pp-minta' || view.mode === 'pp-final') && editing && (
-          <FormPerpanjangan awal={editing} mode={view.mode === 'pp-final' ? 'final' : 'minta'} onCancel={() => setView({ mode: 'list' })} onSave={simpan} />
+          <FormPerpanjangan awal={editing} allDosen={allDosen} mode={view.mode === 'pp-final' ? 'final' : 'minta'} onCancel={() => setView({ mode: 'list' })} onSave={simpan} />
         )}
       </main>
     </div>
@@ -193,16 +193,25 @@ function KartuPengajuan({ m, allDosen = [], onEdit, onJadwal, onPerpanjangan, on
       {/* Perpanjangan (KP / TA / Magang) */}
       {['TA', 'KP', 'MG'].includes(programOf(m)) && terverifikasi && k.key !== 'lulus' && (() => {
         const pp = m.perpanjangan || {};
-        if (!pp.diminta && !pp.suratAdminLink) {
+        const isKPProgram = programOf(m) === 'KP';
+        const suratSiap = isKPProgram ? pp.suratAdminTersedia : pp.suratAdmin;
+        if (!pp.diminta && !suratSiap) {
           return <div style={{ marginTop: 8 }}><button className="btn ghost" onClick={() => onPerpanjangan('minta')}>Ajukan perpanjangan</button></div>;
         }
-        if (!pp.suratAdminLink) {
+        if (!suratSiap) {
           return <div className="callout" style={{ marginTop: 8 }}>Perpanjangan diajukan{pp.tanggalDiminta ? ` (${formatTanggal(pp.tanggalDiminta)})` : ''} — menunggu surat dari admin.</div>;
         }
         if (!pp.suratFinalLink) {
           return (
             <div className="callout" style={{ marginTop: 8 }}>
-              Surat perpanjangan dari admin: <a href={pp.suratAdminLink} target="_blank" rel="noreferrer">buka</a>.{' '}
+              {isKPProgram ? (
+                <button className="btn" onClick={() => {
+                  const config = getTemplateConfig('Perpanjangan KP', m, dosenByKode, {});
+                  if (config) generateDocument(config.template, config.filename, config.data);
+                }}>Unduh surat perpanjangan KP (.docx)</button>
+              ) : (
+                <>Surat perpanjangan dari admin: <a href={pp.suratAdmin.url || pp.suratAdmin.dataUrl} target="_blank" rel="noreferrer">{pp.suratAdmin.fileName}</a>.{' '}</>
+              )}{' '}
               <button className="btn" onClick={() => onPerpanjangan('final')}>Unggah surat final (ditandatangani)</button>
             </div>
           );
@@ -265,6 +274,7 @@ function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], onCancel
   }
 
   function submit() {
+    if (!(m.nama || '').trim()) { setErr('Nama wajib diisi.'); return; }
     if (!m.judul.trim()) { setErr('Judul wajib diisi.'); return; }
     if (!m.periode) { setErr('Pilih periode pendaftaran terlebih dahulu.'); return; }
     setErr('');
@@ -287,7 +297,7 @@ function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], onCancel
             {periodeOpsi.map((pp) => <option key={pp} value={pp}>{pp}</option>)}
           </select>
         </Field>
-        <Field label="Nama"><input value={m.nama || nama} disabled title="Nama terkunci sesuai akun" /></Field>
+        <Field label="Nama"><input value={m.nama ?? nama} onChange={(e) => set('nama', e.target.value)} title="Perbaiki jika ada salah ketik pada nama akun" /></Field>
         <Field label="Angkatan"><input value={m.angkatan} onChange={(e) => set('angkatan', e.target.value)} placeholder="mis. 20" /></Field>
         <Field label={isKPStyle ? (isKP ? 'Judul Kerja Praktik (sementara)' : 'Judul Magang (sementara)') : 'Judul'} full>
           <textarea rows={2} value={m.judul} onChange={(e) => set('judul', e.target.value)} placeholder="Jangan pakai huruf kapital semua" />
@@ -465,8 +475,9 @@ function FormJadwalMhs({ awal, ev, onCancel, onSave }) {
   );
 }
 
-function FormPerpanjangan({ awal, mode, onCancel, onSave }) {
+function FormPerpanjangan({ awal, allDosen = [], mode, onCancel, onSave }) {
   const pp = awal.perpanjangan || {};
+  const dosenByKode = Object.fromEntries(allDosen.map((d) => [d.kode, d]));
   const [alasan, setAlasan] = useState(pp.alasan || '');
   const [link, setLink] = useState(pp.suratFinalLink || '');
   const minta = mode === 'minta';
@@ -487,7 +498,17 @@ function FormPerpanjangan({ awal, mode, onCancel, onSave }) {
           <Field label="Alasan perpanjangan" full><textarea rows={3} value={alasan} onChange={(e) => setAlasan(e.target.value)} placeholder="Jelaskan alasan & rencana penyelesaian" /></Field>
         ) : (
           <>
-            {pp.suratAdminLink && <div className="callout field-full">Surat dari admin: <a href={pp.suratAdminLink} target="_blank" rel="noreferrer">buka</a>. Unduh, tanda tangani, lalu unggah tautannya di bawah.</div>}
+            {programOf(awal) === 'KP' && pp.suratAdminTersedia && (
+              <div className="callout field-full">
+                Surat dari admin sudah tersedia.{' '}
+                <button type="button" className="btn" onClick={() => {
+                  const config = getTemplateConfig('Perpanjangan KP', awal, dosenByKode, {});
+                  if (config) generateDocument(config.template, config.filename, config.data);
+                }}>Unduh surat perpanjangan KP (.docx)</button>{' '}
+                Unduh, tanda tangani, lalu unggah tautannya di bawah.
+              </div>
+            )}
+            {pp.suratAdmin && <div className="callout field-full">Surat dari admin: <a href={pp.suratAdmin.url || pp.suratAdmin.dataUrl} target="_blank" rel="noreferrer">{pp.suratAdmin.fileName}</a>. Unduh, tanda tangani, lalu unggah tautannya di bawah.</div>}
             <Field label="Link surat perpanjangan yang sudah ditandatangani (Google Drive)" full><input value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://drive.google.com/..." /></Field>
           </>
         )}

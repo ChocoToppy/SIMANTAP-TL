@@ -3,17 +3,21 @@
 // data URL base64 lalu disimpan sebagai field biasa pada record mahasiswa —
 // mengikuti alur onSave -> updateData -> Firestore yang sudah dipakai field lain.
 //
-// CATATAN: ini pengganti sementara Firebase Storage (proyek Firebase sedang
-// diganti). Karena seluruh data tersimpan dalam SATU dokumen Firestore
-// (batas 1 MiB), ukuran berkas dibatasi agar aman. Saat Firebase Storage
-// sudah siap, cukup ganti isi fungsi ini agar mengunggah ke Storage dan
-// mengembalikan { fileName, fileType, size, url, uploadedAt } — pemanggil
-// (Portal.jsx) tidak perlu berubah.
-
+// CATATAN: ini pengganti sementara Firebase Storage. Migrasi ke Storage sudah
+// disiapkan (lihat firebase.js `storage`, storage.rules, firebase.json) tapi
+// ditunda karena project Firebase belum di-upgrade ke paket Blaze — Storage
+// belum bisa di-provision. Begitu paket sudah di-upgrade dan Storage aktif,
+// ganti isi readFileForUpload ini untuk mengunggah ke Storage lewat
+// uploadBytes/getDownloadURL dan mengembalikan { fileName, fileType, size,
+// url, uploadedAt } — pemanggil (Portal.jsx, Mahasiswa.jsx, kpDocuments.jsx)
+// sudah menangani field `url` selain `dataUrl` jadi tidak perlu berubah lagi.
+//
+// Karena seluruh data tersimpan dalam SATU dokumen Firestore (batas 1 MiB),
+// ukuran berkas dibatasi jauh lebih kecil agar aman untuk semua mahasiswa.
 import { todayISO } from './helpers.js';
 
-const MAX_BYTES = 2_000_000; // 2 MB — batas keras
-const WARN_BYTES = 500_000; // 500 KB — batas anjuran
+const MAX_BYTES = 400_000; // 400 KB — batas keras per berkas
+const WARN_BYTES = 150_000; // 150 KB — batas anjuran
 
 export function readFileForUpload(file) {
   return new Promise((resolve, reject) => {

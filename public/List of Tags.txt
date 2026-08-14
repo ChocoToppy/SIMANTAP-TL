@@ -21,27 +21,19 @@ permohonan-kp
 {nama_dosen_wali}
 {nip_dosen_wali}
 
-kelayakan-kp  (NEW — template file not yet created, code is wired up)
+kelayakan-kp
 
-{no_surat}
 {nama_mhs}
 {nim}
-{semester}
-{sks}
-{judul_kp}
-{tgl_surat_klkp}
 {nama_dosen_wali}
 {nip_dosen_wali}
 
-kelayakan-proposal-kp  (NEW — template file not yet created, code is wired up)
+kelayakan-proposal-kp  	
 
-{no_surat}
 {nama_mhs}
 {nim}
+{tema_kp} NEW tags
 {judul_kp}
-{tgl_surat_klpkp}
-{nama_dosen_wali}
-{nip_dosen_wali}
 
 perpanjangan-kp
 

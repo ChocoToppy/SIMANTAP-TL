@@ -1,7 +1,7 @@
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import { saveAs } from 'file-saver';
-import { formatTanggal, todayISO, tambahHari } from './helpers.js';
+import { formatTanggal, todayISO, tambahHari, bidangLabel } from './helpers.js';
 
 /**
  * Generates and downloads a .docx file based on a template and JSON data.
@@ -75,13 +75,8 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
         template: 'KP/kelayakan-kp.docx',
         filename: `Kelayakan_KP_${m.nama}.docx`,
         data: {
-          no_surat: m.nomorSurat || jEv.nomorST || "___/UN7.../2026",
           nama_mhs: m.nama,
           nim: m.nim,
-          semester: m.pendaftaran?.semester || "-",
-          sks: (m.pendaftaran?.sksIpk || "").split('/')[0]?.trim() || "-",
-          judul_kp: m.judul,
-          tgl_surat_klkp: formatTanggal(todayISO()),
           ...wali,
         }
       };
@@ -91,12 +86,10 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
         template: 'KP/kelayakan-proposal-kp.docx',
         filename: `Kelayakan_Proposal_KP_${m.nama}.docx`,
         data: {
-          no_surat: m.nomorSurat || jEv.nomorST || "___/UN7.../2026",
           nama_mhs: m.nama,
           nim: m.nim,
+          tema_kp: bidangLabel(m.bidang),
           judul_kp: m.judul,
-          tgl_surat_klpkp: formatTanggal(todayISO()),
-          ...wali,
         }
       };
 

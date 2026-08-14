@@ -682,14 +682,6 @@ export function dokTA(jenis, m, dosenByKode = {}, ev = '') {
     const alasanTahap = pp.alasan ? `Alasan: ${pp.alasan}` : 'Alasan: ..........................................................';
     return `Kepada Yth. Koordinator Tugas Akhir\nDepartemen Teknik Lingkungan, Fakultas Teknik Undip\n\nHal: Permohonan Perpanjangan Tugas Akhir\n\nDengan hormat, saya yang bertanda tangan di bawah ini:\n  Nama     : ${nama}\n  NIM      : ${nim}\n  Judul TA : ${judul}\n  Waktu TA : ${mulai} s.d. ${akhir}\n\nMemohon perpanjangan penyelesaian Tugas Akhir selama 1 (satu) bulan.\n${alasanTahap}\n\nDemikian surat ini dibuat untuk dapat dipergunakan sebagaimana perlunya.\n\nSemarang, ${pp.tanggalDiminta ? formatTanggal(pp.tanggalDiminta) : tglSurat}\nPemohon,\n\n\n${nama}\nNIM. ${nim}\n\nMenyetujui,\nDosen Pembimbing I                         Dosen Pembimbing II\n\n\n${p1}                     ${p2}\nNIP. ${p1n}               NIP. ${p2n}\n\n============================================================\n\nPERPANJANGAN TUGAS AKHIR\nNo: ............................................\n\nMahasiswa berikut ini:\n  Nama            : ${nama}\n  NIM             : ${nim}\n  Dosen Pemb. I   : ${p1}\n  Dosen Pemb. II  : ${p2}\n  Judul           : ${judul}\n\nBerdasarkan Surat Tugas terdahulu yang berakhir pada tanggal ${akhir}, dan mengingat\nTugas Akhir mahasiswa tersebut belum dapat diselesaikan, maka diberikan perpanjangan\nwaktu penyelesaian Tugas Akhir selama 1 (satu) bulan terhitung sejak ${akhir}.\n\nSemarang, ${tglSurat}\nDepartemen Teknik Lingkungan, Fakultas Teknik, Universitas Diponegoro\nKetua,\n\n\n${K}\nNIP. ${KN}`;
   }
-  if (jenis === 'perubahanJudul') {
-    const riwayat = m.riwayatJudul || [];
-    const terakhir = riwayat.length ? riwayat[riwayat.length - 1] : null;
-    const judulLama = (terakhir && terakhir.judulLama) || '..........................................................';
-    const judulBaru = judul || '..........................................................';
-    const labelProgram = programLabel(programOf(m));
-    return `Kepada Yth. Koordinator ${labelProgram}\nDepartemen Teknik Lingkungan, Fakultas Teknik Undip\n\nHal: Permohonan Perubahan Judul ${labelProgram}\n\nDengan hormat, saya yang bertanda tangan di bawah ini:\n  Nama     : ${nama}\n  NIM      : ${nim}\n  Program  : ${labelProgram}\n\nMemohon perubahan judul ${labelProgram} sebagai berikut:\n  Judul lama : ${judulLama}\n  Judul baru : ${judulBaru}\n\nDemikian surat ini dibuat untuk dapat dipergunakan sebagaimana perlunya.\n\nSemarang, ${terakhir && terakhir.at ? formatTanggal(terakhir.at.slice(0, 10)) : tglSurat}\nPemohon,\n\n\n${nama}\nNIM. ${nim}\n\nMenyetujui,\nDosen Pembimbing I                         Dosen Pembimbing II\n\n\n${p1}                     ${p2}\nNIP. ${p1n}               NIP. ${p2n}\n\n============================================================\n\nPERSETUJUAN PERUBAHAN JUDUL ${labelProgram.toUpperCase()}\nNo: ${nomor}\n\nBerdasarkan permohonan mahasiswa tersebut di atas, judul ${labelProgram} yang bersangkutan\ndisetujui untuk diubah dari:\n  "${judulLama}"\nmenjadi:\n  "${judulBaru}"\n\nSemarang, ${tglSurat}\nDepartemen Teknik Lingkungan, Fakultas Teknik, Universitas Diponegoro\nKetua,\n\n\n${K}\nNIP. ${KN}`;
-  }
   return stEvent();
 }
 
@@ -766,15 +758,13 @@ export const KP_DOKUMEN = [
   },
   {
     key: 'kelayakanKP', stage: 'Pendaftaran', label: 'Surat Kelayakan KP', docType: 'Kelayakan KP',
-    syarat: 'Tersedia setelah pendaftaran diverifikasi admin.',
+    syarat: 'Tersedia setelah pendaftaran diverifikasi admin. Unduh, tanda tangani, lalu unggah kembali.',
     eligible: (m) => statusVerif(m).key === 'terverifikasi',
-    studentUpload: false,
   },
   {
     key: 'kelayakanProposalKP', stage: 'Pendaftaran', label: 'Surat Kelayakan Proposal KP', docType: 'Kelayakan Proposal KP',
-    syarat: 'Tersedia setelah pendaftaran diverifikasi admin.',
+    syarat: 'Tersedia setelah pendaftaran diverifikasi admin. Unduh, tanda tangani, lalu unggah kembali.',
     eligible: (m) => statusVerif(m).key === 'terverifikasi',
-    studentUpload: false,
   },
   {
     key: 'stPembimbing', stage: 'Pendaftaran', label: 'ST Pembimbing KP', docType: 'ST Pembimbing KP',
@@ -785,7 +775,7 @@ export const KP_DOKUMEN = [
   {
     key: 'suratBalasan', stage: 'Bimbingan', label: 'Surat Balasan Perusahaan', docType: null,
     syarat: 'Unggah bukti diterima magang/KP dari perusahaan setelah menerima ST Pembimbing.',
-    eligible: (m) => !!((m.dokumenKP || {}).stPembimbing),
+    eligible: (m) => statusVerif(m).key === 'terverifikasi' && !!m.pembimbing1,
   },
   {
     key: 'persetujuanSmkp', stage: 'Bimbingan', label: 'Persetujuan SMKP', docType: 'Persetujuan SMKP',

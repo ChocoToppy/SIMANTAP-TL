@@ -412,6 +412,23 @@ function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, periodeList
     setM((prev) => ({ ...prev, dokumenKP: { ...(prev.dokumenKP || {}), [key]: hasil } }));
   }
 
+  // Admin memberikan surat perpanjangan ke mahasiswa sebagai berkas terunggah
+  // (bukan tautan Drive) — langsung muncul di Portal mahasiswa untuk diunduh.
+  const [ppBusy, setPpBusy] = useState(false);
+  const [ppErr, setPpErr] = useState('');
+  async function berikanSuratPerpanjangan(file) {
+    setPpErr('');
+    setPpBusy(true);
+    try {
+      const hasil = await readFileForUpload(file);
+      setPP('suratAdmin', hasil);
+    } catch (ex) {
+      setPpErr(ex.message || 'Gagal mengunggah berkas.');
+    } finally {
+      setPpBusy(false);
+    }
+  }
+
   function gantiProgram(p) {
     setM((prev) => {
       const stages = stagesFor(p);
@@ -429,9 +446,6 @@ function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, periodeList
   function submit() {
     if (!m.nama.trim()) { setErr('Nama wajib diisi.'); return; }
     let calon = { ...m, angkatan: Number(m.angkatan) || m.angkatan };
-    if (awal && awal.judul !== calon.judul) {
-      calon = { ...calon, riwayatJudul: [...(calon.riwayatJudul || []), { judulLama: awal.judul, judulBaru: calon.judul, at: nowStamp() }] };
-    }
     const masalah = [];
     // Validasi tanggal jadwal: dalam rentang & berurutan sesuai tahapan.
     const evs = eventsFor(programOf(calon));
@@ -552,9 +566,6 @@ function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, periodeList
           )}
           {evA && <button type="button" className="btn" onClick={tidakLulus}>Tandai tidak lulus (ulang)</button>}
           {!next && !prevStage && <span className="hint">Satu-satunya tahap pada program ini.</span>}
-          <button type="button" className="btn" onClick={() => cetakSuratPDF(`Perubahan Judul - ${m.nama}`, dokTA('perubahanJudul', m, dosenByKode))}>
-            Cetak surat perubahan judul (PDF)
-          </button>
         </div>
         <div className="hint">Tahap saat ini juga bisa diganti langsung lewat dropdown "Tahap saat ini" di atas. Perubahan tersimpan saat klik "Simpan".</div>
       </div>
@@ -758,9 +769,9 @@ function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, periodeList
               {(m.perpanjangan && m.perpanjangan.diminta)
                 ? <div className="verif-info"><div>Alasan mahasiswa: <strong>{m.perpanjangan.alasan || '—'}</strong>{m.perpanjangan.tanggalDiminta ? ` · ${formatTanggal(m.perpanjangan.tanggalDiminta)}` : ''}</div></div>
                 : <div className="hint">Belum ada pengajuan perpanjangan dari mahasiswa.</div>}
-              <Field label="Link surat perpanjangan (dari admin)" full>
-                <input value={(m.perpanjangan || {}).suratAdminLink || ''} onChange={(e) => setPP('suratAdminLink', e.target.value)} placeholder="https://drive.google.com/..." />
-              </Field>
+              {(m.perpanjangan || {}).suratAdminTersedia
+                ? <div className="callout callout-green">Surat perpanjangan sudah terlihat di Portal mahasiswa.</div>
+                : <div className="hint">Surat perpanjangan belum ditampilkan ke mahasiswa.</div>}
               {(m.perpanjangan || {}).suratFinalLink
                 ? <div className="callout callout-green">Surat final (ditandatangani) dari mahasiswa: <a href={m.perpanjangan.suratFinalLink} target="_blank" rel="noreferrer">buka</a></div>
                 : <div className="hint">Surat final dari mahasiswa belum diunggah.</div>}
@@ -769,6 +780,9 @@ function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, periodeList
                   const config = getTemplateConfig('Perpanjangan KP', m, dosenByKode, {});
                   if (config) generateDocument(config.template, config.filename, config.data);
                 }}>Cetak surat perpanjangan KP (.docx)</button>
+                {!(m.perpanjangan || {}).suratAdminTersedia && (
+                  <button type="button" className="btn btn-primary" onClick={() => setPP('suratAdminTersedia', true)}>Kirim ke mahasiswa</button>
+                )}
               </div>
             </div>
           </div>
@@ -898,9 +912,16 @@ function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, periodeList
             {(m.perpanjangan && m.perpanjangan.diminta)
               ? <div className="verif-info"><div>Alasan mahasiswa: <strong>{m.perpanjangan.alasan || '—'}</strong>{m.perpanjangan.tanggalDiminta ? ` · ${formatTanggal(m.perpanjangan.tanggalDiminta)}` : ''}</div></div>
               : <div className="hint">Belum ada pengajuan perpanjangan dari mahasiswa.</div>}
-            <Field label="Link surat perpanjangan (dari admin)" full>
-              <input value={(m.perpanjangan || {}).suratAdminLink || ''} onChange={(e) => setPP('suratAdminLink', e.target.value)} placeholder="https://drive.google.com/..." />
-            </Field>
+            {(m.perpanjangan || {}).suratAdmin
+              ? <div className="callout callout-green">Surat diberikan ke mahasiswa: <a href={m.perpanjangan.suratAdmin.url || m.perpanjangan.suratAdmin.dataUrl} target="_blank" rel="noreferrer">{m.perpanjangan.suratAdmin.fileName}</a></div>
+              : <div className="hint">Surat perpanjangan belum diberikan ke mahasiswa.</div>}
+            <div style={{ marginTop: 6 }}>
+              <label className="btn" style={{ display: 'inline-block', cursor: 'pointer' }}>
+                {ppBusy ? 'Mengunggah…' : ((m.perpanjangan || {}).suratAdmin ? 'Ganti berkas & berikan ulang' : 'Berikan surat ke mahasiswa')}
+                <input type="file" accept=".pdf,.docx,.jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) berikanSuratPerpanjangan(f); }} disabled={ppBusy} style={{ display: 'none' }} />
+              </label>
+              {ppErr && <div className="login-err" style={{ marginTop: 4 }}>{ppErr}</div>}
+            </div>
             {(m.perpanjangan || {}).suratFinalLink
               ? <div className="callout callout-green">Surat final (ditandatangani) dari mahasiswa: <a href={m.perpanjangan.suratFinalLink} target="_blank" rel="noreferrer">buka</a></div>
               : <div className="hint">Surat final dari mahasiswa belum diunggah.</div>}

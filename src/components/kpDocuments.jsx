@@ -9,7 +9,9 @@ import { generateDocument, getTemplateConfig } from '../utils/documentGenerator.
 export function KpDocumentPanel({ m, dosenByKode = {}, canUpload = false, role = 'student', onUpload, collapsible = true, title = 'Dokumen KP' }) {
   const [expanded, setExpanded] = useState(!collapsible);
   const grup = kpDokumenPerTahap(m);
+  const [stageTab, setStageTab] = useState(grup[0] ? grup[0].stage : null);
   if (grup.length === 0) return null;
+  const aktif = grup.find((g) => g.stage === stageTab) || grup[0];
 
   return (
     <div className="kp-dok-panel" style={{ marginTop: 8 }}>
@@ -21,17 +23,17 @@ export function KpDocumentPanel({ m, dosenByKode = {}, canUpload = false, role =
         <div className="sched-title">{title}</div>
       )}
       {expanded && (
-        <div className="kp-dok-groups" style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {grup.map(({ stage, dokumen }) => (
-            <div key={stage} className="kp-dok-group">
-              <div className="cell-sub" style={{ fontWeight: 600, marginBottom: 4 }}>{stage}</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {dokumen.map((d) => (
-                  <KpDokumenItem key={d.key} d={d} m={m} dosenByKode={dosenByKode} canUpload={canUpload} role={role} onUpload={onUpload} />
-                ))}
-              </div>
-            </div>
-          ))}
+        <div style={{ marginTop: 8 }}>
+          <div className="tabs" style={{ marginBottom: 12 }}>
+            {grup.map(({ stage }) => (
+              <button key={stage} type="button" className={'tab' + (aktif.stage === stage ? ' active' : '')} onClick={() => setStageTab(stage)}>{stage}</button>
+            ))}
+          </div>
+          <div className="kp-dok-group" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {aktif.dokumen.map((d) => (
+              <KpDokumenItem key={d.key} d={d} m={m} dosenByKode={dosenByKode} canUpload={canUpload} role={role} onUpload={onUpload} />
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -80,7 +82,7 @@ function KpDokumenItem({ d, m, dosenByKode, canUpload, role, onUpload }) {
 
       {d.upload ? (
         <div className="callout callout-green" style={{ marginTop: 6 }}>
-          Berkas terunggah: <a href={d.upload.dataUrl} download={d.upload.fileName}>{d.upload.fileName}</a>
+          Berkas terunggah: <a href={d.upload.url || d.upload.dataUrl} target="_blank" rel="noreferrer">{d.upload.fileName}</a>
           {d.upload.uploadedAt ? ` · ${formatTanggal(d.upload.uploadedAt)}` : ''}
         </div>
       ) : (

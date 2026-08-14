@@ -51,10 +51,27 @@ export default function App() {
     } catch (e) {}
   }, [sesi]);
 
+  // Seluruh data aplikasi (semua mahasiswa, dosen, berkas terunggah) tersimpan
+  // dalam SATU dokumen Firestore yang dibatasi 1 MiB (1.048.576 byte) oleh
+  // Firestore sendiri. Cek ukuran di sisi klien dulu sebelum menulis, supaya
+  // kegagalan (mis. berkas terlalu besar) ketahuan SEKARANG dan tidak
+  // menimpa data lokal dengan optimis lalu "hilang lagi" saat onSnapshot
+  // berikutnya menarik versi lama dari server.
+  const FIRESTORE_DOC_LIMIT = 1_048_576;
+  const SAFE_DOC_LIMIT = 950_000; // sisakan margin untuk overhead field Firestore
+
   const updateData = (updater) => {
     setData((prev) => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
-      setDoc(doc(db, 'sistem_ta', 'global_state'), next).catch((e) => console.error("FB err:", e));
+      const perkiraanUkuran = new Blob([JSON.stringify(next)]).size;
+      if (perkiraanUkuran > SAFE_DOC_LIMIT) {
+        alert(`Gagal menyimpan: total data sudah ${Math.round(perkiraanUkuran / 1024)} KB, mendekati/melebihi batas ${Math.round(FIRESTORE_DOC_LIMIT / 1024)} KB per dokumen Firestore. Perubahan ini TIDAK disimpan. Coba unggah berkas dengan ukuran lebih kecil (kompres/scan ulang resolusi rendah), atau hubungi admin.`);
+        return prev;
+      }
+      setDoc(doc(db, 'sistem_ta', 'global_state'), next).catch((e) => {
+        console.error("FB err:", e);
+        alert('Gagal menyimpan perubahan ke server: ' + (e.message || e) + '\n\nPerubahan Anda BELUM tersimpan secara permanen. Coba lagi, atau hubungi admin.');
+      });
       return next;
     });
   };

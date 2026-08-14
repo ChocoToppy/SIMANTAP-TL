@@ -1,0 +1,11 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Sama seperti firestore.rules: aplikasi ini tidak memakai Firebase Auth,
+    // jadi akses dibuka penuh dan diamankan hanya lewat password di sisi
+    // aplikasi (bukan aturan Storage). Cocokkan jika model keamanan berubah.
+    match /uploads/{allPaths=**} {
+      allow read, write: if true;
+    }
+  }
+}
