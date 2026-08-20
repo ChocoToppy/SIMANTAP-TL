@@ -38,25 +38,20 @@ export function ThemeToggle() {
   );
 }
 
-// Indikator tahap: segmen terisi sampai tahap saat ini (warna inline agar tahan
-// terhadap perubahan CSS). Hijau bila sudah Lulus, indigo bila masih berjalan.
+// Indikator tahap: bilah tersegmen — hijau untuk tahap yang sudah dilewati,
+// amber untuk tahap yang sedang berjalan, biru muda untuk yang belum dicapai.
 export function StageBar({ program, tahap }) {
   const stages = stagesFor(program);
   const total = Math.max(1, stages.length - 1); // tanpa "Lulus"
   const idx = stages.indexOf(tahap);
   const lulus = tahap === 'Lulus';
-  const done = lulus ? total : (idx < 0 ? 0 : idx);
-  const onColor = lulus ? 'var(--green)' : 'var(--accent)';
   return (
     <div className="stagebar" title={tahap}>
       <div className="stagebar-track">
-        {Array.from({ length: total }).map((_, i) => (
-          <span
-            key={i}
-            className="seg"
-            style={{ flex: 1, height: 6, borderRadius: 3, background: i < done ? onColor : 'var(--border-strong)' }}
-          />
-        ))}
+        {Array.from({ length: total }).map((_, i) => {
+          const cls = lulus || i < idx ? 'seg seg-done' : i === idx ? 'seg seg-active' : 'seg';
+          return <span key={i} className={cls} />;
+        })}
       </div>
       <span className="stagebar-label">{tahap}</span>
     </div>

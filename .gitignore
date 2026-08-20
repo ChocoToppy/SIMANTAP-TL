@@ -4,6 +4,9 @@
 # Build output
 dist/
 
+#notes
+note-to-self.txt
+
 # Windows Explorer
 desktop.ini
 

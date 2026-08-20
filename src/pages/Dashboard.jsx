@@ -214,7 +214,7 @@ export function Dashboard({ mahasiswa, dosen }) {
 
 function Metric({ label, value, tone }) {
   return (
-    <div className="metric">
+    <div className={'metric metric-' + (tone || 'blue')}>
       <span className="metric-label">{label}</span>
       <span className={'metric-value' + (tone ? ' val-' + tone : '')}>{value}</span>
     </div>

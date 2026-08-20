@@ -7,6 +7,7 @@ import { KpDocumentPanel } from '../components/kpDocuments.jsx';
 import { generateDocument, getTemplateConfig } from '../utils/documentGenerator.js';
 import { readFileForUpload } from '../utils/fileUpload.js';
 import { useColumnWidths } from '../utils/useColumnWidths.js';
+import logoTl from '../assets/logo-tl.png';
 
 // ===================== Portal.jsx =====================
 // Portal.jsx — tampilan untuk mahasiswa (Rute A)
@@ -35,7 +36,7 @@ export function Portal({ nim, nama, mahasiswa, allDosen, periodeBuka = [], pandu
     <div className="app">
       <header className="topbar">
         <div className="brand">
-          <span className="brand-mark">SM</span>
+          <img className="brand-mark" src={logoTl} alt="TL Undip" />
           <span className="brand-name">SIMANTAP</span>
         </div>
         <div className="topbar-right">
@@ -45,6 +46,7 @@ export function Portal({ nim, nama, mahasiswa, allDosen, periodeBuka = [], pandu
           <button className="btn ghost" onClick={onLogout}>Keluar</button>
         </div>
       </header>
+      <div className="masthead-rule" />
 
       <main className="content">
         {view.mode === 'list' && (
@@ -591,7 +593,7 @@ export function DosenPortal({ dosen, allDosen, mahasiswa, periodeList = [], onGr
     <div className="app">
       <header className="topbar">
         <div className="brand">
-          <span className="brand-mark">SM</span>
+          <img className="brand-mark" src={logoTl} alt="TL Undip" />
           <span className="brand-name">SIMANTAP</span>
         </div>
         <div className="topbar-right">
@@ -611,6 +613,7 @@ export function DosenPortal({ dosen, allDosen, mahasiswa, periodeList = [], onGr
           <button className="btn ghost" onClick={onLogout}>Keluar</button>
         </div>
       </header>
+      <div className="masthead-rule" />
 
       <main className="content">
         <div className="toolbar">
@@ -721,7 +724,7 @@ function KpDosenActions({ m, dosenByKode, onGradeSave }) {
 
 function MetricDosen({ label, value, tone }) {
   return (
-    <div className="metric">
+    <div className={'metric metric-' + (tone || 'blue')}>
       <span className="metric-label">{label}</span>
       <span className={'metric-value' + (tone ? ' val-' + tone : '')}>{value}</span>
     </div>

@@ -3,6 +3,7 @@ import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, stagesFor, eventsFor, 
 import { DOSEN_AWAL, plusHari, RAW_MAHASISWA, MAHASISWA_AWAL, AKUN_AWAL, PERIODE_BUKA_AWAL } from '../data/seed.js';
 import { csvEscape, triggerDownload, downloadCSV, downloadDoc, cetakSuratPDF, loadXLSX } from '../utils/exportUtils.js';
 import { Badge, StageBar, Field, Modal, Empty, ExportMenu, ThemeToggle, TextSizeToggle } from '../components/ui.jsx';
+import logoTl from '../assets/logo-tl.png';
 
 // ===================== Login.jsx =====================
 // Login.jsx — layar masuk: pilih peran, lalu masuk/daftar
@@ -36,7 +37,7 @@ export function Login({ akun, dosen = [], pengumuman = [], periodeAktif = '', on
         </div>
         <div className="login-card">
         <div className="login-brand">
-          <span className="brand-mark">SM</span>
+          <img className="brand-mark" src={logoTl} alt="TL Undip" />
           <div>
             <div className="login-title">SIMANTAP</div>
             <div className="login-sub">Sistem Manajemen Tugas Akhir &amp; Praktik</div>

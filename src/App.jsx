@@ -9,6 +9,7 @@ import { DOSEN_AWAL, plusHari, RAW_MAHASISWA, MAHASISWA_AWAL, AKUN_AWAL, PERIODE
 import { Badge, StageBar, Field, Modal, Empty, ExportMenu, TextSizeToggle, ThemeToggle } from './components/ui.jsx';
 import { db } from './utils/firebase.js';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import logoTl from './assets/logo-tl.png';
 
 // ===================== App.js =====================
 // App.js — akar: sesi login, simpan ke localStorage, render Login / Portal / Admin
@@ -206,7 +207,7 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <div className="brand">
-          <span className="brand-mark">SM</span>
+          <img className="brand-mark" src={logoTl} alt="TL Undip" />
           <span className="brand-name">SIMANTAP</span>
         </div>
         <div className="topbar-right">
@@ -226,6 +227,7 @@ export default function App() {
           <button className="btn ghost" onClick={() => setSesi(null)}>Keluar</button>
         </div>
       </header>
+      <div className="masthead-rule" />
 
       {showPeriode && (
         <KelolaPeriode
