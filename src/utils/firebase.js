@@ -21,5 +21,6 @@ const app = initializeApp(firebaseConfig);
 // Ekspor koneksi Database Firestore
 export const db = getFirestore(app);
 
-// Ekspor koneksi Firebase Storage (berkas tanda tangan/nilai mahasiswa)
+// Ekspor koneksi Firebase Storage (berkas tanda tangan/nilai mahasiswa) —
+// aktif setelah project di-upgrade ke paket Blaze.
 export const storage = getStorage(app);

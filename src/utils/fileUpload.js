@@ -1,43 +1,37 @@
 // ===================== fileUpload.js =====================
-// Baca berkas yang diunggah mahasiswa (dokumen bertanda tangan/nilai) menjadi
-// data URL base64 lalu disimpan sebagai field biasa pada record mahasiswa —
-// mengikuti alur onSave -> updateData -> Firestore yang sudah dipakai field lain.
-//
-// CATATAN: ini pengganti sementara Firebase Storage. Migrasi ke Storage sudah
-// disiapkan (lihat firebase.js `storage`, storage.rules, firebase.json) tapi
-// ditunda karena project Firebase belum di-upgrade ke paket Blaze — Storage
-// belum bisa di-provision. Begitu paket sudah di-upgrade dan Storage aktif,
-// ganti isi readFileForUpload ini untuk mengunggah ke Storage lewat
-// uploadBytes/getDownloadURL dan mengembalikan { fileName, fileType, size,
-// url, uploadedAt } — pemanggil (Portal.jsx, Mahasiswa.jsx, kpDocuments.jsx)
-// sudah menangani field `url` selain `dataUrl` jadi tidak perlu berubah lagi.
-//
-// Karena seluruh data tersimpan dalam SATU dokumen Firestore (batas 1 MiB),
-// ukuran berkas dibatasi jauh lebih kecil agar aman untuk semua mahasiswa.
+// Unggah berkas yang diunggah mahasiswa/admin (dokumen bertanda tangan/nilai)
+// ke Firebase Storage, lalu simpan hanya referensinya (url) sebagai field pada
+// record mahasiswa di Firestore — bukan isi berkasnya. Ini menggantikan
+// pendekatan base64 lama (lihat riwayat git) yang menyimpan berkas langsung
+// sebagai field dataUrl di dalam dokumen Firestore.
+import { storage } from './firebase.js';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { todayISO } from './helpers.js';
 
-const MAX_BYTES = 400_000; // 400 KB — batas keras per berkas
-const WARN_BYTES = 150_000; // 150 KB — batas anjuran
+const MAX_BYTES = 8_000_000; // 8 MB — jauh lebih longgar dari batas lama karena berkas tidak lagi ikut menambah ukuran dokumen Firestore
+const WARN_BYTES = 5_000_000; // 5 MB — batas anjuran
 
-export function readFileForUpload(file) {
-  return new Promise((resolve, reject) => {
-    if (!file) { reject(new Error('Tidak ada berkas dipilih.')); return; }
-    if (file.size > MAX_BYTES) {
-      reject(new Error(`Berkas terlalu besar (${Math.round(file.size / 1024)} KB). Maksimal ${Math.round(MAX_BYTES / 1024)} KB — kompres atau scan ulang dengan resolusi lebih rendah.`));
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      resolve({
-        fileName: file.name,
-        fileType: file.type || 'application/octet-stream',
-        size: file.size,
-        dataUrl: e.target.result,
-        uploadedAt: todayISO(),
-        warnBesar: file.size > WARN_BYTES,
-      });
-    };
-    reader.onerror = () => reject(reader.error || new Error('Gagal membaca berkas.'));
-    reader.readAsDataURL(file);
-  });
+export async function readFileForUpload(file, pathHint = 'misc') {
+  if (!file) throw new Error('Tidak ada berkas dipilih.');
+  const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+  if (!isPdf) {
+    throw new Error('Berkas harus berupa PDF. Simpan/scan dokumen sebagai .pdf sebelum mengunggah.');
+  }
+  if (file.size > MAX_BYTES) {
+    throw new Error(`Berkas terlalu besar (${Math.round(file.size / 1024)} KB). Maksimal ${Math.round(MAX_BYTES / 1024 / 1024)} MB — kompres atau scan ulang dengan resolusi lebih rendah.`);
+  }
+  const safeName = file.name.replace(/[^A-Za-z0-9._-]/g, '_');
+  const path = `uploads/${pathHint}/${Date.now()}-${safeName}`;
+  const storageRef = ref(storage, path);
+  await uploadBytes(storageRef, file);
+  const url = await getDownloadURL(storageRef);
+  return {
+    fileName: file.name,
+    fileType: file.type || 'application/octet-stream',
+    size: file.size,
+    url,
+    path,
+    uploadedAt: todayISO(),
+    warnBesar: file.size > WARN_BYTES,
+  };
 }

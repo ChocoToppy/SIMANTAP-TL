@@ -18,6 +18,22 @@ function readBlobAsBinaryString(blob) {
   });
 }
 
+// Layanan konversi .docx -> PDF (Cloud Run, LibreOffice headless — lihat
+// converter-service/). Surat yang dihasilkan dari template selalu diunduh
+// sebagai PDF; kalau layanan ini gagal/tidak terjangkau, jatuh kembali ke
+// .docx supaya pengguna tetap dapat suratnya.
+const CONVERTER_URL = 'https://simantap-pdf-converter-493633903702.asia-southeast2.run.app';
+
+async function convertDocxToPdf(docxBlob) {
+  const res = await fetch(`${CONVERTER_URL}/convert`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+    body: docxBlob,
+  });
+  if (!res.ok) throw new Error(`Konversi PDF gagal (${res.status})`);
+  return res.blob();
+}
+
 export const generateDocument = async (templatePath, outputName, data) => {
   try {
     const response = await fetch(`/doc-templates/${templatePath}`);
@@ -35,13 +51,18 @@ export const generateDocument = async (templatePath, outputName, data) => {
     // Inject the data into the template
     doc.render(data);
 
-    const out = doc.getZip().generate({
+    const docxBlob = doc.getZip().generate({
       type: "blob",
       mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     });
 
-    // Trigger the download
-    saveAs(out, outputName);
+    try {
+      const pdfBlob = await convertDocxToPdf(docxBlob);
+      saveAs(pdfBlob, outputName.replace(/\.docx$/i, '.pdf'));
+    } catch (convertErr) {
+      console.error('Gagal mengonversi ke PDF, unduh .docx sebagai gantinya:', convertErr);
+      saveAs(docxBlob, outputName);
+    }
   } catch (error) {
     console.error("Error generating document:", error);
     alert("Gagal mencetak dokumen. Periksa konsol untuk detail error.");

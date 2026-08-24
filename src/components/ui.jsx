@@ -86,6 +86,41 @@ export function Empty({ children }) {
   return <div className="empty">{children}</div>;
 }
 
+// Kotak unggah berkas drag-&-drop (klik untuk telusuri berkas juga bisa) —
+// dipakai di semua tempat unggah berkas mahasiswa/admin agar seragam.
+export function FileDropZone({ accept, onFile, busy, label, hint = 'Seret & lepas berkas di sini, atau klik untuk memilih' }) {
+  const [dragOver, setDragOver] = useState(false);
+  const inputId = useMemo(() => `filedrop-${Math.random().toString(36).slice(2)}`, []);
+  function handleFiles(files) {
+    const f = files && files[0];
+    if (f) onFile(f);
+  }
+  return (
+    <label
+      htmlFor={inputId}
+      className={'file-drop' + (dragOver ? ' file-drop-over' : '') + (busy ? ' file-drop-busy' : '')}
+      onDragOver={(e) => { e.preventDefault(); if (!busy) setDragOver(true); }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragOver(false);
+        if (!busy) handleFiles(e.dataTransfer.files);
+      }}
+    >
+      <input
+        id={inputId}
+        type="file"
+        accept={accept}
+        disabled={busy}
+        onChange={(e) => { handleFiles(e.target.files); e.target.value = ''; }}
+      />
+      <span className="file-drop-icon" aria-hidden="true">⬆</span>
+      <span className="file-drop-label">{busy ? 'Mengunggah…' : label}</span>
+      {!busy && <span className="file-drop-hint">{hint}</span>}
+    </label>
+  );
+}
+
 // Pegangan drag di tepi kanan header tabel untuk mengubah lebar kolom (seperti Excel).
 export function ColResizeHandle({ onMouseDown }) {
   return <span className="col-resize-handle" onMouseDown={onMouseDown} onClick={(e) => e.stopPropagation()} />;

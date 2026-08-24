@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, stagesFor, eventsFor, punyaKlasifikasi, punyaSyarat, rolesFor, syaratLabel, getJadwal, STAGES, KLASIFIKASI, BIDANG, KP_TEMA, HARI, bidangLabel, todayISO, parseISO, daysBetween, BULAN, formatTanggal, kondisi, isAktif, indexTahap, hitungBeban, hitungBebanProgram, hitungBebanRinci, SEMUA, filterByPeriode, daftarPeriode, buatId, ADMIN_PASSWORD, DOSEN_PASSWORD, PERIODE_AKTIF, TOPIK, VERIFIKASI, statusVerif, tambahHari, LABEL_PENDAFTARAN, ringkasPendaftaran, RUANG, menitJam, rentangJadwal, jamTampil, beririsan, dosenTerlibat, kumpulkanEvent, cariBentrok, pesanNotifikasi, waLink, mailtoLink, waMahasiswa, TEMPLATE_SURAT, tokenSurat, renderSurat, PEJABAT, KOP_SURAT, evKeyDok, dokTA, DURASI_EVENT, JAM_KERJA, durasiEvent, jamTambah, dalamJamKerja, tahapBerikut, eventAktif, BERKAS_SYARAT, berkasSyarat, bolehAjukanJadwal, KP_DOKUMEN, catatAktivitas, tanggalDibuat, aktivitasTerakhir, AKTIVITAS_LABEL, formatWaktu } from '../utils/helpers.js';
 import { DOSEN_AWAL, plusHari, RAW_MAHASISWA, MAHASISWA_AWAL, AKUN_AWAL, PERIODE_BUKA_AWAL } from '../data/seed.js';
 import { csvEscape, triggerDownload, downloadCSV, downloadDoc, cetakSuratPDF, cetakSuratPDFHtml, loadXLSX } from '../utils/exportUtils.js';
-import { Badge, StageBar, Field, Modal, Empty, ExportMenu, ColResizeHandle, TextSizeToggle, ThemeToggle } from '../components/ui.jsx';
+import { Badge, StageBar, Field, Modal, Empty, ExportMenu, ColResizeHandle, TextSizeToggle, ThemeToggle, FileDropZone } from '../components/ui.jsx';
 import { KpDocumentPanel } from '../components/kpDocuments.jsx';
 import { generateDocument, getTemplateConfig } from '../utils/documentGenerator.js';
 import { readFileForUpload } from '../utils/fileUpload.js';
@@ -19,7 +19,7 @@ export function Portal({ nim, nama, mahasiswa, allDosen, periodeBuka = [], pandu
   function simpan(rec) { onSave(rec); setView({ mode: 'list' }); }
 
   async function uploadDokumenKP(m, key, file) {
-    const hasil = await readFileForUpload(file);
+    const hasil = await readFileForUpload(file, `${m.id}/${key}`);
     const label = (KP_DOKUMEN.find((d) => d.key === key) || {}).label || key;
     let rec = { ...m, dokumenKP: { ...(m.dokumenKP || {}), [key]: hasil } };
     rec = catatAktivitas(rec, 'unggah', label);
@@ -187,7 +187,7 @@ function KartuPengajuan({ m, allDosen = [], onEdit, onJadwal, onPerpanjangan, on
         <div className="callout callout-green"><strong>Lulus.</strong>{m.tanggalLulus ? ` Tanggal lulus: ${formatTanggal(m.tanggalLulus)}` : ''}</div>
       )}
 
-    {/* Dokumen KP per tahap: unduh (.docx) & unggah berkas ditandatangani/dinilai */}
+    {/* Dokumen KP per tahap: unduh (PDF) & unggah berkas ditandatangani/dinilai */}
       {isKP && (
         <KpDocumentPanel m={m} dosenByKode={dosenByKode} canUpload onUpload={onUploadDokumenKP} />
       )}
@@ -203,14 +203,14 @@ function KartuPengajuan({ m, allDosen = [], onEdit, onJadwal, onPerpanjangan, on
         if (!suratSiap) {
           return <div className="callout" style={{ marginTop: 8 }}>Perpanjangan diajukan{pp.tanggalDiminta ? ` (${formatTanggal(pp.tanggalDiminta)})` : ''} — menunggu surat dari admin.</div>;
         }
-        if (!pp.suratFinalLink) {
+        if (!pp.suratFinal && !pp.suratFinalLink) {
           return (
             <div className="callout" style={{ marginTop: 8 }}>
               {isKPProgram ? (
                 <button className="btn" onClick={() => {
                   const config = getTemplateConfig('Perpanjangan KP', m, dosenByKode, {});
                   if (config) generateDocument(config.template, config.filename, config.data);
-                }}>Unduh surat perpanjangan KP (.docx)</button>
+                }}>Unduh surat perpanjangan KP (PDF)</button>
               ) : (
                 <>Surat perpanjangan dari admin: <a href={pp.suratAdmin.url || pp.suratAdmin.dataUrl} target="_blank" rel="noreferrer">{pp.suratAdmin.fileName}</a>.{' '}</>
               )}{' '}
@@ -218,7 +218,8 @@ function KartuPengajuan({ m, allDosen = [], onEdit, onJadwal, onPerpanjangan, on
             </div>
           );
         }
-        return <div className="callout callout-green" style={{ marginTop: 8 }}>Perpanjangan selesai. Surat final: <a href={pp.suratFinalLink} target="_blank" rel="noreferrer">buka</a></div>;
+        const finalHref = pp.suratFinal ? (pp.suratFinal.url || pp.suratFinal.dataUrl) : pp.suratFinalLink;
+        return <div className="callout callout-green" style={{ marginTop: 8 }}>Perpanjangan selesai. Surat final: <a href={finalHref} target="_blank" rel="noreferrer">buka</a></div>;
       })()}
 
       <div className="kartu-aksi">
@@ -481,14 +482,31 @@ function FormPerpanjangan({ awal, allDosen = [], mode, onCancel, onSave }) {
   const pp = awal.perpanjangan || {};
   const dosenByKode = Object.fromEntries(allDosen.map((d) => [d.kode, d]));
   const [alasan, setAlasan] = useState(pp.alasan || '');
-  const [link, setLink] = useState(pp.suratFinalLink || '');
+  const [upload, setUpload] = useState(pp.suratFinal || null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
   const minta = mode === 'minta';
+  async function pilihBerkas(f) {
+    setErr('');
+    setBusy(true);
+    try {
+      const hasil = await readFileForUpload(f, `${awal.id}/perpanjangan-final`);
+      setUpload(hasil);
+    } catch (ex) {
+      setErr(ex.message || 'Gagal mengunggah berkas.');
+    } finally {
+      setBusy(false);
+    }
+  }
   function submit() {
     if (minta) {
       const rec = { ...awal, perpanjangan: { ...pp, diminta: true, alasan, tanggalDiminta: todayISO() } };
       onSave(catatAktivitas(rec, 'perpanjanganMinta'));
     } else {
-      const rec = { ...awal, perpanjangan: { ...pp, suratFinalLink: link } };
+      if (!upload) { setErr('Unggah berkas surat final terlebih dahulu.'); return; }
+      const ppNext = { ...pp, suratFinal: upload };
+      delete ppNext.suratFinalLink;
+      const rec = { ...awal, perpanjangan: ppNext };
       onSave(catatAktivitas(rec, 'perpanjanganFinal'));
     }
   }
@@ -506,15 +524,19 @@ function FormPerpanjangan({ awal, allDosen = [], mode, onCancel, onSave }) {
                 <button type="button" className="btn" onClick={() => {
                   const config = getTemplateConfig('Perpanjangan KP', awal, dosenByKode, {});
                   if (config) generateDocument(config.template, config.filename, config.data);
-                }}>Unduh surat perpanjangan KP (.docx)</button>{' '}
-                Unduh, tanda tangani, lalu unggah tautannya di bawah.
+                }}>Unduh surat perpanjangan KP (PDF)</button>{' '}
+                Unduh, tanda tangani, lalu unggah berkasnya di bawah.
               </div>
             )}
-            {pp.suratAdmin && <div className="callout field-full">Surat dari admin: <a href={pp.suratAdmin.url || pp.suratAdmin.dataUrl} target="_blank" rel="noreferrer">{pp.suratAdmin.fileName}</a>. Unduh, tanda tangani, lalu unggah tautannya di bawah.</div>}
-            <Field label="Link surat perpanjangan yang sudah ditandatangani (Google Drive)" full><input value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://drive.google.com/..." /></Field>
+            {pp.suratAdmin && <div className="callout field-full">Surat dari admin: <a href={pp.suratAdmin.url || pp.suratAdmin.dataUrl} target="_blank" rel="noreferrer">{pp.suratAdmin.fileName}</a>. Unduh, tanda tangani, lalu unggah berkasnya di bawah.</div>}
+            <Field label="Berkas surat perpanjangan yang sudah ditandatangani" full>
+              <FileDropZone accept=".pdf" busy={busy} onFile={pilihBerkas} label={upload ? 'Ganti berkas' : 'Unggah berkas'} />
+              {upload && <div className="hint" style={{ marginTop: 4 }}>Berkas terpilih: {upload.fileName}</div>}
+            </Field>
           </>
         )}
       </div>
+      {err && <div className="login-err" style={{ marginTop: 12 }}>{err}</div>}
       <div className="modal-foot" style={{ paddingLeft: 0, paddingRight: 0 }}>
         <button className="btn" onClick={onCancel}>Batal</button>
         <button className="btn btn-primary" onClick={submit}>{minta ? 'Ajukan' : 'Simpan'}</button>
@@ -704,7 +726,7 @@ function KpDosenActions({ m, dosenByKode, onGradeSave }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
-      <button type="button" className="btn" onClick={unduhSuratTugas}>Unduh Surat Tugas (.docx)</button>
+      <button type="button" className="btn" onClick={unduhSuratTugas}>Unduh Surat Tugas (PDF)</button>
       <label className="field" style={{ margin: 0 }}>
         <span className="field-label">Nilai Seminar KP</span>
         <select

@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, stagesFor, eventsFor, punyaKlasifikasi, punyaSyarat, rolesFor, syaratLabel, getJadwal, STAGES, KLASIFIKASI, BIDANG, KP_TEMA, HARI, bidangLabel, todayISO, parseISO, daysBetween, BULAN, formatTanggal, kondisi, isAktif, indexTahap, hitungBeban, hitungBebanProgram, hitungBebanRinci, SEMUA, filterByPeriode, daftarPeriode, buatId, ADMIN_PASSWORD, DOSEN_PASSWORD, PERIODE_AKTIF, TOPIK, VERIFIKASI, statusVerif, tambahHari, LABEL_PENDAFTARAN, ringkasPendaftaran, RUANG, menitJam, rentangJadwal, jamTampil, beririsan, dosenTerlibat, kumpulkanEvent, cariBentrok, pesanNotifikasi, waLink, mailtoLink, waMahasiswa, TEMPLATE_SURAT, tokenSurat, renderSurat, PEJABAT, KOP_SURAT, evKeyDok, dokTA, DURASI_EVENT, JAM_KERJA, durasiEvent, jamTambah, dalamJamKerja, tahapBerikut, tahapSebelumnya, eventAktif, BERKAS_SYARAT, berkasSyarat, bolehAjukanJadwal, catatAktivitas, tanggalDibuat, aktivitasTerakhir, AKTIVITAS_LABEL, formatWaktu, hitungNomorUrut, nowStamp } from '../utils/helpers.js';
 import { DOSEN_AWAL, plusHari, RAW_MAHASISWA, MAHASISWA_AWAL, AKUN_AWAL, PERIODE_BUKA_AWAL } from '../data/seed.js';
 import { csvEscape, triggerDownload, downloadCSV, downloadDoc, cetakSuratPDF, cetakSuratPDFHtml, loadXLSX } from '../utils/exportUtils.js';
-import { Badge, StageBar, Field, Modal, Empty, ExportMenu, ColResizeHandle } from '../components/ui.jsx';
+import { Badge, StageBar, Field, Modal, Empty, ExportMenu, ColResizeHandle, FileDropZone } from '../components/ui.jsx';
 import { KpDocumentPanel } from '../components/kpDocuments.jsx';
 import { generateDocument, getTemplateConfig } from '../utils/documentGenerator.js';
 import { readFileForUpload } from '../utils/fileUpload.js';
@@ -408,7 +408,7 @@ function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, periodeList
   // Admin mengunggah berkas KP yang ditandatangani (mis. BA Seminar KP) atas nama
   // mahasiswa — disimpan ke state lokal, ikut tersimpan saat admin klik "Simpan".
   async function uploadAdminDokumenKP(key, file) {
-    const hasil = await readFileForUpload(file);
+    const hasil = await readFileForUpload(file, `${m.id}/${key}`);
     setM((prev) => ({ ...prev, dokumenKP: { ...(prev.dokumenKP || {}), [key]: hasil } }));
   }
 
@@ -420,7 +420,7 @@ function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, periodeList
     setPpErr('');
     setPpBusy(true);
     try {
-      const hasil = await readFileForUpload(file);
+      const hasil = await readFileForUpload(file, `${m.id}/perpanjangan-admin`);
       setPP('suratAdmin', hasil);
     } catch (ex) {
       setPpErr(ex.message || 'Gagal mengunggah berkas.');
@@ -772,14 +772,14 @@ function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, periodeList
               {(m.perpanjangan || {}).suratAdminTersedia
                 ? <div className="callout callout-green">Surat perpanjangan sudah terlihat di Portal mahasiswa.</div>
                 : <div className="hint">Surat perpanjangan belum ditampilkan ke mahasiswa.</div>}
-              {(m.perpanjangan || {}).suratFinalLink
-                ? <div className="callout callout-green">Surat final (ditandatangani) dari mahasiswa: <a href={m.perpanjangan.suratFinalLink} target="_blank" rel="noreferrer">buka</a></div>
+              {((m.perpanjangan || {}).suratFinal || (m.perpanjangan || {}).suratFinalLink)
+                ? <div className="callout callout-green">Surat final (ditandatangani) dari mahasiswa: <a href={m.perpanjangan.suratFinal ? (m.perpanjangan.suratFinal.url || m.perpanjangan.suratFinal.dataUrl) : m.perpanjangan.suratFinalLink} target="_blank" rel="noreferrer">{m.perpanjangan.suratFinal ? m.perpanjangan.suratFinal.fileName : 'buka'}</a></div>
                 : <div className="hint">Surat final dari mahasiswa belum diunggah.</div>}
               <div className="notif-actions" style={{ marginTop: 8 }}>
                 <button type="button" className="btn" onClick={() => {
                   const config = getTemplateConfig('Perpanjangan KP', m, dosenByKode, {});
                   if (config) generateDocument(config.template, config.filename, config.data);
-                }}>Cetak surat perpanjangan KP (.docx)</button>
+                }}>Cetak surat perpanjangan KP (PDF)</button>
                 {!(m.perpanjangan || {}).suratAdminTersedia && (
                   <button type="button" className="btn btn-primary" onClick={() => setPP('suratAdminTersedia', true)}>Kirim ke mahasiswa</button>
                 )}
@@ -916,14 +916,11 @@ function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, periodeList
               ? <div className="callout callout-green">Surat diberikan ke mahasiswa: <a href={m.perpanjangan.suratAdmin.url || m.perpanjangan.suratAdmin.dataUrl} target="_blank" rel="noreferrer">{m.perpanjangan.suratAdmin.fileName}</a></div>
               : <div className="hint">Surat perpanjangan belum diberikan ke mahasiswa.</div>}
             <div style={{ marginTop: 6 }}>
-              <label className="btn" style={{ display: 'inline-block', cursor: 'pointer' }}>
-                {ppBusy ? 'Mengunggah…' : ((m.perpanjangan || {}).suratAdmin ? 'Ganti berkas & berikan ulang' : 'Berikan surat ke mahasiswa')}
-                <input type="file" accept=".pdf,.docx,.jpg,.jpeg,.png" onChange={(e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) berikanSuratPerpanjangan(f); }} disabled={ppBusy} style={{ display: 'none' }} />
-              </label>
+              <FileDropZone accept=".pdf" busy={ppBusy} onFile={berikanSuratPerpanjangan} label={(m.perpanjangan || {}).suratAdmin ? 'Ganti berkas & berikan ulang' : 'Berikan surat ke mahasiswa'} />
               {ppErr && <div className="login-err" style={{ marginTop: 4 }}>{ppErr}</div>}
             </div>
-            {(m.perpanjangan || {}).suratFinalLink
-              ? <div className="callout callout-green">Surat final (ditandatangani) dari mahasiswa: <a href={m.perpanjangan.suratFinalLink} target="_blank" rel="noreferrer">buka</a></div>
+            {((m.perpanjangan || {}).suratFinal || (m.perpanjangan || {}).suratFinalLink)
+              ? <div className="callout callout-green">Surat final (ditandatangani) dari mahasiswa: <a href={m.perpanjangan.suratFinal ? (m.perpanjangan.suratFinal.url || m.perpanjangan.suratFinal.dataUrl) : m.perpanjangan.suratFinalLink} target="_blank" rel="noreferrer">{m.perpanjangan.suratFinal ? m.perpanjangan.suratFinal.fileName : 'buka'}</a></div>
               : <div className="hint">Surat final dari mahasiswa belum diunggah.</div>}
             {m.program === 'TA' && (
               <div className="notif-actions" style={{ marginTop: 8 }}>

@@ -468,6 +468,21 @@ html[data-theme="dark"] .icon-btn:hover { background: rgba(241, 241, 238, 0.1); 
 .portal-form { max-width: 760px; margin: 0 auto; background: var(--surface); padding: 32px; border-radius: 0; border-top: 3px solid var(--text); border-bottom: 1px solid var(--border); }
 .portal-form .page-title { margin-bottom: 20px; }
 
+/* ---------- Kotak unggah berkas (drag & drop) ---------- */
+.file-drop {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px; text-align: center; padding: 20px 16px; cursor: pointer;
+  border: 2px dashed var(--border-strong); border-radius: var(--radius-sm);
+  background: var(--surface-2); color: var(--text); transition: border-color 0.15s, background 0.15s;
+}
+.file-drop input[type="file"] { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+.file-drop:hover { border-color: var(--accent); }
+.file-drop-over { border-color: var(--accent); background: var(--accent-weak); }
+.file-drop-busy { cursor: not-allowed; opacity: 0.7; }
+.file-drop-icon { font-size: 1.3rem; color: var(--muted); }
+.file-drop-label { font-weight: 600; }
+.file-drop-hint { font-size: 0.78rem; color: var(--muted); }
+
 /* ---------- Info verifikasi (admin) ---------- */
 .verif-info { font-size: 0.85rem; color: var(--text); display: flex; flex-direction: column; gap: 4px; background: var(--surface-2); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-top: 8px; }
 .verif-info a { color: var(--blue); text-decoration: none; font-weight: 500; }

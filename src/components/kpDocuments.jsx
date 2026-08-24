@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { kpDokumenPerTahap, formatTanggal, getJadwal } from '../utils/helpers.js';
 import { generateDocument, getTemplateConfig } from '../utils/documentGenerator.js';
+import { FileDropZone } from './ui.jsx';
 
 // ===================== kpDocuments.jsx =====================
 // Panel dokumen KP per tahap — dipakai bersama oleh Portal mahasiswa (dengan
@@ -53,9 +54,7 @@ function KpDokumenItem({ d, m, dosenByKode, canUpload, role, onUpload }) {
     generateDocument(config.template, config.filename, config.data);
   }
 
-  async function pilihBerkas(e) {
-    const file = e.target.files && e.target.files[0];
-    e.target.value = '';
+  async function pilihBerkas(file) {
     if (!file || !onUpload) return;
     setErr('');
     setBusy(true);
@@ -73,7 +72,7 @@ function KpDokumenItem({ d, m, dosenByKode, canUpload, role, onUpload }) {
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8 }}>
         <span>{d.label}</span>
         {d.docType && (d.eligible ? (
-          <button type="button" className="btn btn-primary" onClick={unduh}>Unduh (.docx)</button>
+          <button type="button" className="btn btn-primary" onClick={unduh}>Unduh (PDF)</button>
         ) : (
           <span className="hint">Belum tersedia</span>
         ))}
@@ -91,10 +90,7 @@ function KpDokumenItem({ d, m, dosenByKode, canUpload, role, onUpload }) {
 
       {bolehUnggahDiSini && d.eligible && (
         <div style={{ marginTop: 6 }}>
-          <label className="btn" style={{ display: 'inline-block', cursor: 'pointer' }}>
-            {busy ? 'Mengunggah…' : (d.upload ? 'Ganti berkas' : 'Unggah berkas ditandatangani/dinilai')}
-            <input type="file" accept=".pdf,.docx,.jpg,.jpeg,.png" onChange={pilihBerkas} disabled={busy} style={{ display: 'none' }} />
-          </label>
+          <FileDropZone accept=".pdf" busy={busy} onFile={pilihBerkas} label={d.upload ? 'Ganti berkas' : 'Unggah berkas ditandatangani/dinilai'} />
           {err && <div className="login-err" style={{ marginTop: 4 }}>{err}</div>}
         </div>
       )}
