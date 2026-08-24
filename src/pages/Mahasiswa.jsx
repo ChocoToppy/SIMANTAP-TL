@@ -416,6 +416,17 @@ function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, periodeList
   // (bukan tautan Drive) — langsung muncul di Portal mahasiswa untuk diunduh.
   const [ppBusy, setPpBusy] = useState(false);
   const [ppErr, setPpErr] = useState('');
+  const [dlBusyKP, setDlBusyKP] = useState(false);
+  async function unduhPerpanjanganKP() {
+    const config = getTemplateConfig('Perpanjangan KP', m, dosenByKode, {});
+    if (!config) return;
+    setDlBusyKP(true);
+    try {
+      await generateDocument(config.template, config.filename, config.data);
+    } finally {
+      setDlBusyKP(false);
+    }
+  }
   async function berikanSuratPerpanjangan(file) {
     setPpErr('');
     setPpBusy(true);
@@ -776,10 +787,7 @@ function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, periodeList
                 ? <div className="callout callout-green">Surat final (ditandatangani) dari mahasiswa: <a href={m.perpanjangan.suratFinal ? (m.perpanjangan.suratFinal.url || m.perpanjangan.suratFinal.dataUrl) : m.perpanjangan.suratFinalLink} target="_blank" rel="noreferrer">{m.perpanjangan.suratFinal ? m.perpanjangan.suratFinal.fileName : 'buka'}</a></div>
                 : <div className="hint">Surat final dari mahasiswa belum diunggah.</div>}
               <div className="notif-actions" style={{ marginTop: 8 }}>
-                <button type="button" className="btn" onClick={() => {
-                  const config = getTemplateConfig('Perpanjangan KP', m, dosenByKode, {});
-                  if (config) generateDocument(config.template, config.filename, config.data);
-                }}>Cetak surat perpanjangan KP (PDF)</button>
+                <button type="button" className="btn" onClick={unduhPerpanjanganKP} disabled={dlBusyKP}>{dlBusyKP ? 'Menyiapkan PDF…' : 'Cetak surat perpanjangan KP (PDF)'}</button>
                 {!(m.perpanjangan || {}).suratAdminTersedia && (
                   <button type="button" className="btn btn-primary" onClick={() => setPP('suratAdminTersedia', true)}>Kirim ke mahasiswa</button>
                 )}

@@ -43,15 +43,21 @@ export function KpDocumentPanel({ m, dosenByKode = {}, canUpload = false, role =
 
 function KpDokumenItem({ d, m, dosenByKode, canUpload, role, onUpload }) {
   const [busy, setBusy] = useState(false);
+  const [dlBusy, setDlBusy] = useState(false);
   const [err, setErr] = useState('');
   const bolehUnggahDiSini = canUpload && (
     role === 'admin' ? !!d.adminUpload : d.studentUpload !== false
   );
 
-  function unduh() {
+  async function unduh() {
     const config = getTemplateConfig(d.docType, m, dosenByKode, getJadwal(m, 'Seminar KP'));
     if (!config) return;
-    generateDocument(config.template, config.filename, config.data);
+    setDlBusy(true);
+    try {
+      await generateDocument(config.template, config.filename, config.data);
+    } finally {
+      setDlBusy(false);
+    }
   }
 
   async function pilihBerkas(file) {
@@ -72,7 +78,7 @@ function KpDokumenItem({ d, m, dosenByKode, canUpload, role, onUpload }) {
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8 }}>
         <span>{d.label}</span>
         {d.docType && (d.eligible ? (
-          <button type="button" className="btn btn-primary" onClick={unduh}>Unduh (PDF)</button>
+          <button type="button" className="btn btn-primary" onClick={unduh} disabled={dlBusy}>{dlBusy ? 'Menyiapkan PDF…' : 'Unduh (PDF)'}</button>
         ) : (
           <span className="hint">Belum tersedia</span>
         ))}

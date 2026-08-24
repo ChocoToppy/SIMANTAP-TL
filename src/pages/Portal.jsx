@@ -129,6 +129,17 @@ function KartuPengajuan({ m, allDosen = [], onEdit, onJadwal, onPerpanjangan, on
   const jadwalTeks = [jEv.tanggal ? formatTanggal(jEv.tanggal) : null, jamTampil(jEv), jEv.ruang].filter(Boolean).join(' · ');
   const dosenByKode = Object.fromEntries(allDosen.map((d) => [d.kode, d]));
   const isTA = programOf(m) === 'TA';
+  const [dlBusy, setDlBusy] = useState(false);
+  async function unduhPerpanjanganKP() {
+    const config = getTemplateConfig('Perpanjangan KP', m, dosenByKode, {});
+    if (!config) return;
+    setDlBusy(true);
+    try {
+      await generateDocument(config.template, config.filename, config.data);
+    } finally {
+      setDlBusy(false);
+    }
+  }
 
   return (
     <div className="card kartu">
@@ -207,10 +218,7 @@ function KartuPengajuan({ m, allDosen = [], onEdit, onJadwal, onPerpanjangan, on
           return (
             <div className="callout" style={{ marginTop: 8 }}>
               {isKPProgram ? (
-                <button className="btn" onClick={() => {
-                  const config = getTemplateConfig('Perpanjangan KP', m, dosenByKode, {});
-                  if (config) generateDocument(config.template, config.filename, config.data);
-                }}>Unduh surat perpanjangan KP (PDF)</button>
+                <button className="btn" onClick={unduhPerpanjanganKP} disabled={dlBusy}>{dlBusy ? 'Menyiapkan PDF…' : 'Unduh surat perpanjangan KP (PDF)'}</button>
               ) : (
                 <>Surat perpanjangan dari admin: <a href={pp.suratAdmin.url || pp.suratAdmin.dataUrl} target="_blank" rel="noreferrer">{pp.suratAdmin.fileName}</a>.{' '}</>
               )}{' '}
@@ -484,8 +492,19 @@ function FormPerpanjangan({ awal, allDosen = [], mode, onCancel, onSave }) {
   const [alasan, setAlasan] = useState(pp.alasan || '');
   const [upload, setUpload] = useState(pp.suratFinal || null);
   const [busy, setBusy] = useState(false);
+  const [dlBusy, setDlBusy] = useState(false);
   const [err, setErr] = useState('');
   const minta = mode === 'minta';
+  async function unduhPerpanjanganKP() {
+    const config = getTemplateConfig('Perpanjangan KP', awal, dosenByKode, {});
+    if (!config) return;
+    setDlBusy(true);
+    try {
+      await generateDocument(config.template, config.filename, config.data);
+    } finally {
+      setDlBusy(false);
+    }
+  }
   async function pilihBerkas(f) {
     setErr('');
     setBusy(true);
@@ -521,10 +540,7 @@ function FormPerpanjangan({ awal, allDosen = [], mode, onCancel, onSave }) {
             {programOf(awal) === 'KP' && pp.suratAdminTersedia && (
               <div className="callout field-full">
                 Surat dari admin sudah tersedia.{' '}
-                <button type="button" className="btn" onClick={() => {
-                  const config = getTemplateConfig('Perpanjangan KP', awal, dosenByKode, {});
-                  if (config) generateDocument(config.template, config.filename, config.data);
-                }}>Unduh surat perpanjangan KP (PDF)</button>{' '}
+                <button type="button" className="btn" onClick={unduhPerpanjanganKP} disabled={dlBusy}>{dlBusy ? 'Menyiapkan PDF…' : 'Unduh surat perpanjangan KP (PDF)'}</button>{' '}
                 Unduh, tanda tangani, lalu unggah berkasnya di bawah.
               </div>
             )}
@@ -718,15 +734,22 @@ export function DosenPortal({ dosen, allDosen, mahasiswa, periodeList = [], onGr
 function KpDosenActions({ m, dosenByKode, onGradeSave }) {
   const j = getJadwal(m, 'Seminar KP');
   const bisaNilai = !!(j.dikonfirmasi && j.tanggal);
+  const [dlBusy, setDlBusy] = useState(false);
 
-  function unduhSuratTugas() {
+  async function unduhSuratTugas() {
     const config = getTemplateConfig('ST Pembimbing KP', m, dosenByKode, getJadwal(m, 'Seminar KP'));
-    if (config) generateDocument(config.template, config.filename, config.data);
+    if (!config) return;
+    setDlBusy(true);
+    try {
+      await generateDocument(config.template, config.filename, config.data);
+    } finally {
+      setDlBusy(false);
+    }
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
-      <button type="button" className="btn" onClick={unduhSuratTugas}>Unduh Surat Tugas (PDF)</button>
+      <button type="button" className="btn" onClick={unduhSuratTugas} disabled={dlBusy}>{dlBusy ? 'Menyiapkan PDF…' : 'Unduh Surat Tugas (PDF)'}</button>
       <label className="field" style={{ margin: 0 }}>
         <span className="field-label">Nilai Seminar KP</span>
         <select
