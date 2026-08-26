@@ -9,31 +9,47 @@ Also new: "no_surat" is now sourced from a single per-student Nomor Surat (set o
 admin at first verification) instead of a per-event number, but the tag name in the
 templates stays the same ({no_surat}) — no template changes needed for this part.
 
-permohonan-kp
+NOTE (2026-08-26): {tgl_cetak} replaces every per-document "tgl_surat_*" tag that used
+to sit at the bottom of these letters ({tgl_surat_stkp}, {tgl_surat_smkp},
+{tgl_surat_ppkp}; permohonan-kp's {tgl_surat_pmkp} is now moot, see below). It is a real
+print timestamp: computed fresh at the moment the student actually clicks "Unduh" (never
+cached/reused), for every KP document universally — including perpanjangan-kp, whose
+letter date intentionally moved from "date the extension was requested" to "date
+printed". See documentGenerator.js: templates + the Cloud Run PDF converter are warmed
+ahead of time (on page load) purely to cut latency, but the render itself (and thus
+{tgl_cetak}) always happens at click time.
 
-{nama_mhs}
-{nim}
-{semester}
-{sks}
-{no_telpon}
-{judul_kp}
-{tgl_surat_pmkp}
-{nama_dosen_wali}
-{nip_dosen_wali}
+permohonan-kp — REMOVED from the app. Filling this form now happens on an external
+website; the student portal only has an upload zone for the resulting file (see
+KP_DOKUMEN.permohonan in src/utils/helpers.js). No tags are rendered by the app for this
+template anymore.
 
 kelayakan-kp
 
 {nama_mhs}
 {nim}
+{tgl_cetak}
 {nama_dosen_wali}
 {nip_dosen_wali}
 
-kelayakan-proposal-kp  	
+kelayakan-proposal-kp
 
 {nama_mhs}
 {nim}
 {tema_kp} NEW tags
 {judul_kp}
+{tgl_cetak}
+
+persetujuan-smkp
+
+{nama_mhs}
+{nim}
+{judul_kp}
+{tgl_cetak}
+{nama_dosen1}
+{nip1}
+{nama_dosen_wali}
+{nip_dosen_wali}
 
 perpanjangan-kp
 
@@ -45,7 +61,7 @@ perpanjangan-kp
 {akhir_kp}
 {mulai_ppkp}
 {akhir_ppkp}
-{tgl_surat_ppkp} 
+{tgl_cetak}
 {nama_dosen1}
 {nip1}
 
@@ -59,7 +75,7 @@ pembimbing-kp-st
 {judul_kp}
 {mulai_kp}
 {akhir_kp}
-{tgl_surat_stkp}
+{tgl_cetak}
 
 seminar-kp-ba
 
@@ -71,7 +87,7 @@ seminar-kp-ba
 {tanggal_smkp}
 {waktu_smkp}
 {tempat_smkp}
-{tgl_surat_smkp}
+{tgl_cetak}
 {nama_dosen1}
 {nip1}
 

@@ -208,6 +208,16 @@ export function buatId() {
   return 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
 
+// Password acak pendek untuk reset akun mahasiswa oleh admin (lihat Pengaturan
+// → Akun). Karakter ambigu (0/O, 1/l/I) dihindari supaya mudah dibacakan lewat
+// telepon/WA.
+export function buatPasswordAcak(len = 6) {
+  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  let out = '';
+  for (let i = 0; i < len; i++) out += chars[Math.floor(Math.random() * chars.length)];
+  return out;
+}
+
 // ===================== Autentikasi & verifikasi (Rute A / lokal) =====================
 
 // Password admin untuk prototipe (ganti sesuai kebutuhan).
@@ -732,14 +742,30 @@ export function eventAktif(m) {
 }
 
 // Deskripsi dokumen yang harus diunggah per kegiatan (bisa diubah di sini).
+// Tiap array = satu item; dirender sebagai daftar bernomor di UI.
 export const BERKAS_SYARAT = {
-  'Seminar Proposal': 'Proposal/UGB, lembar persetujuan pembimbing, kartu bimbingan, transkrip & IRS.',
-  'Seminar Hasil': 'Draft laporan lengkap, lembar persetujuan, kartu bimbingan, bukti lulus Seminar Proposal.',
-  'Sidang': 'Draft akhir, hasil cek Turnitin, lembar persetujuan pembimbing, kartu bimbingan, bukti lulus Seminar Hasil.',
-  'Expo': 'Poster/produk, laporan akhir, lembar persetujuan pembimbing.',
-  'Seminar KP': 'Lembar persetujuan & asistensi, lembar kehadiran seminar min. 3x, handout/draft artikel jurnal, draft laporan KP.',
+  'Seminar Proposal': ['Proposal/UGB', 'Lembar persetujuan pembimbing', 'Kartu bimbingan', 'Transkrip & IRS'],
+  'Seminar Hasil': ['Draft laporan lengkap', 'Lembar persetujuan', 'Kartu bimbingan', 'Bukti lulus Seminar Proposal'],
+  'Sidang': ['Draft akhir', 'Hasil cek Turnitin', 'Lembar persetujuan pembimbing', 'Kartu bimbingan', 'Bukti lulus Seminar Hasil'],
+  'Expo': ['Poster/produk', 'Laporan akhir', 'Lembar persetujuan pembimbing'],
+  'Seminar KP': ['Lembar persetujuan & asistensi', 'Lembar kehadiran seminar min. 3x', 'Handout/draft artikel jurnal', 'Draft laporan KP'],
 };
-export function berkasSyarat(ev) { return BERKAS_SYARAT[ev] || 'Dokumen persyaratan sesuai ketentuan tahap ini.'; }
+export function berkasSyarat(ev, konten = {}) {
+  const override = (konten && konten.berkasSyarat) || {};
+  return override[ev] || BERKAS_SYARAT[ev] || ['Dokumen persyaratan sesuai ketentuan tahap ini.'];
+}
+
+// Tautan yang diketik pengguna sendiri (link berkas persyaratan, Turnitin,
+// dst.) sering tanpa skema (mis. "google.com" atau "drive.google.com/xyz").
+// Tanpa ini, <a href> memperlakukannya sebagai URL relatif dan menempelkannya
+// ke domain aplikasi sendiri alih-alih membuka tautan eksternal yang dimaksud.
+export function normalizeUrl(url) {
+  if (!url) return url;
+  const trimmed = url.trim();
+  if (!trimmed) return trimmed;
+  if (/^([a-z][a-z0-9+.-]*:|\/\/)/i.test(trimmed)) return trimmed; // sudah punya skema (https:, mailto:, //...)
+  return `https://${trimmed}`;
+}
 
 // Apakah mahasiswa boleh mengajukan jadwal (terverifikasi & sudah ada pembimbing).
 export function bolehAjukanJadwal(m) {
@@ -751,10 +777,11 @@ export function bolehAjukanJadwal(m) {
 // syarat kelayakan tiap dokumen tidak dobel-tulis di beberapa tempat.
 export const KP_DOKUMEN = [
   {
-    key: 'permohonan', stage: 'Pendaftaran', label: 'Permohonan KP', docType: 'Permohonan KP',
-    syarat: 'Tersedia setelah pendaftaran diverifikasi admin.',
+    key: 'permohonan', stage: 'Pendaftaran', label: 'Permohonan KP', docType: null,
+    syarat: 'Ajukan melalui formulir eksternal, lalu unggah berkas hasil pengajuan di sini.',
     eligible: (m) => statusVerif(m).key === 'terverifikasi',
-    studentUpload: false,
+    linkEksternal: 'https://mandala.undip.ac.id/',
+    linkLabel: 'Untuk membuat formulir Permohonan KP silahkan kunjungi Mandala UNDIP',
   },
   {
     key: 'kelayakanKP', stage: 'Pendaftaran', label: 'Surat Kelayakan KP', docType: 'Kelayakan KP',
@@ -791,16 +818,50 @@ export const KP_DOKUMEN = [
 ];
 
 // Status tiap dokumen KP untuk seorang mahasiswa: kelayakan + berkas yang sudah diunggah.
-export function kpDokumenStatus(m) {
-  return KP_DOKUMEN.map((d) => ({ ...d, eligible: d.eligible(m), upload: (m.dokumenKP || {})[d.key] || null }));
+// `konten` (opsional) = override teks admin dari halaman Pengaturan → Konten
+// (lihat KONTEN_DEFAULT/config.konten) — label/syarat bawaan tetap dipakai
+// untuk field yang belum di-override.
+export function kpDokumenStatus(m, konten = {}) {
+  const override = (konten && konten.dokumen) || {};
+  return KP_DOKUMEN.map((d) => {
+    const o = override[d.key] || {};
+    return {
+      ...d,
+      label: o.label || d.label,
+      syarat: o.syarat || d.syarat,
+      eligible: d.eligible(m),
+      upload: (m.dokumenKP || {})[d.key] || null,
+    };
+  });
 }
 
 // Kelompokkan status dokumen KP per tahap, urutan sesuai PROGRAMS.KP.stages.
-export function kpDokumenPerTahap(m) {
-  const status = kpDokumenStatus(m);
+export function kpDokumenPerTahap(m, konten = {}) {
+  const status = kpDokumenStatus(m, konten);
   return stagesFor('KP')
     .map((stage) => ({ stage, dokumen: status.filter((d) => d.stage === stage) }))
     .filter((g) => g.dokumen.length > 0);
+}
+
+// Semua path Storage yang tercatat pada satu record mahasiswa (dokumen KP +
+// surat perpanjangan) — dipakai untuk membersihkan berkas yatim di Storage
+// saat sebuah record diubah/disimpan (lihat orphanedUploadPaths di bawah).
+export function collectUploadPaths(m) {
+  const paths = new Set();
+  Object.values((m && m.dokumenKP) || {}).forEach((u) => { if (u && u.path) paths.add(u.path); });
+  const pp = (m && m.perpanjangan) || {};
+  if (pp.suratAdmin && pp.suratAdmin.path) paths.add(pp.suratAdmin.path);
+  if (pp.suratFinal && pp.suratFinal.path) paths.add(pp.suratFinal.path);
+  return paths;
+}
+
+// Path yang ada di record LAMA tapi sudah tidak ada di record BARU (diganti
+// atau dihapus) — inilah yang perlu dihapus dari Storage supaya tidak
+// menumpuk sebagai sampah setiap kali berkas diganti/dihapus.
+export function orphanedUploadPaths(oldM, newM) {
+  const before = collectUploadPaths(oldM);
+  const after = collectUploadPaths(newM);
+  return [...before].filter((p) => !after.has(p));
 }
 
 // ===================== Riwayat aktivitas mahasiswa =====================
@@ -813,6 +874,7 @@ export const AKTIVITAS_LABEL = {
   perbaikan: 'Perbaikan pendaftaran dikirim ulang',
   jadwal: 'Mengajukan/memperbarui jadwal',
   unggah: 'Mengunggah dokumen',
+  hapusBerkas: 'Menghapus dokumen',
   tahapBimbingan: 'Memasuki tahap Bimbingan (surat balasan perusahaan diterima)',
   perpanjanganMinta: 'Mengajukan perpanjangan',
   perpanjanganFinal: 'Mengunggah surat perpanjangan final',

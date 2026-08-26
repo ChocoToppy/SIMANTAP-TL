@@ -5,11 +5,11 @@
 // pendekatan base64 lama (lihat riwayat git) yang menyimpan berkas langsung
 // sebagai field dataUrl di dalam dokumen Firestore.
 import { storage } from './firebase.js';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL, deleteObject, listAll } from 'firebase/storage';
 import { todayISO } from './helpers.js';
 
-const MAX_BYTES = 8_000_000; // 8 MB — jauh lebih longgar dari batas lama karena berkas tidak lagi ikut menambah ukuran dokumen Firestore
-const WARN_BYTES = 5_000_000; // 5 MB — batas anjuran
+const MAX_BYTES = 25_000_000; // 25 MB — jauh lebih longgar dari batas lama karena berkas tidak lagi ikut menambah ukuran dokumen Firestore
+const WARN_BYTES = 20_000_000; // 20 MB — batas anjuran
 
 export async function readFileForUpload(file, pathHint = 'misc') {
   if (!file) throw new Error('Tidak ada berkas dipilih.');
@@ -34,4 +34,36 @@ export async function readFileForUpload(file, pathHint = 'misc') {
     uploadedAt: todayISO(),
     warnBesar: file.size > WARN_BYTES,
   };
+}
+
+// Hapus satu berkas dari Storage lewat path yang tersimpan pada record (field
+// `.path` hasil readFileForUpload di atas). Dipakai saat berkas diganti/dihapus
+// supaya versi lama tidak menumpuk sebagai sampah di bucket.
+export async function deleteUploadedFile(path) {
+  if (!path) return;
+  try {
+    await deleteObject(ref(storage, path));
+  } catch (err) {
+    if (err?.code !== 'storage/object-not-found') {
+      console.error('Gagal menghapus berkas dari Storage:', path, err);
+    }
+  }
+}
+
+// Hapus seluruh folder (dan subfoldernya) di Storage secara rekursif — dipakai
+// saat satu record mahasiswa dihapus, supaya semua berkasnya (yang semua
+// disimpan di bawah `uploads/{id}/...`) ikut terhapus sekaligus.
+export async function deleteUploadedFolder(prefix) {
+  if (!prefix) return;
+  let res;
+  try {
+    res = await listAll(ref(storage, prefix));
+  } catch (err) {
+    console.error('Gagal membaca folder Storage untuk dihapus:', prefix, err);
+    return;
+  }
+  await Promise.all([
+    ...res.items.map((item) => deleteObject(item).catch(() => {})),
+    ...res.prefixes.map((sub) => deleteUploadedFolder(sub.fullPath)),
+  ]);
 }

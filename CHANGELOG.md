@@ -1,6 +1,32 @@
 # Changelog
 
-## 2026-08-24 — Restrukturisasi database, penyimpanan file, dan konversi PDF
+## 26-08-2026 — Halaman Pengaturan, editor konten, dan pembenahan dokumen KP
+
+### Halaman Pengaturan
+- Membuat halaman pengaturan dan memindahkan Kelola periode/pengumuman/panduan dari modal+tombol topbar menjadi satu halaman terpisah di alamat `/pengaturan`, diakses lewat ikon gear di topbar.
+- Menambahkan tab Konten: admin bisa mengubah label & syarat tiap dokumen KP serta daftar berkas per kegiatan tanpa mengubah kode.
+- Menambahkan tab Akun: admin bisa melihat & reset password mahasiswa langsung (password acak baru, tanpa alur verifikasi OTP/SMS) untuk keperluan troubleshooting.
+
+### Tabel mahasiswa & dosen
+- Semua kolom di tabel Mahasiswa sekarang bisa diurutkan (sebelumnya hanya sebagian).
+- Pembimbing 1/2 dan Penguji 1/2 sekarang kolom terpisah, bukan digabung jadi satu teks.
+- Tabel yang kolomnya banyak (Mahasiswa, Dosen, tabel dosen di portal) tidak lagi memepetkan kolom supaya muat di layar — sekarang melebar sesuai kebutuhan dan bisa digulir ke samping.
+
+### Dokumen KP
+- Permohonan KP tidak lagi dibuat dari template — sekarang hanya kotak unggah (pengajuan dilakukan lewat Mandala UNDIP).
+- Menambahkan tombol Hapus berkas untuk mahasiswa/admin (sebelumnya hanya bisa mengganti).
+- Zona unggah kini disembunyikan secara default (tombol "Unggah/Ganti berkas") supaya panel tidak penuh.
+- Berkas di Firebase Storage kini otomatis ikut terhapus saat diganti/dihapus, atau saat seluruh data mahasiswa dihapus.
+- Menambahkan tag `{tgl_cetak}` (tanggal cetak real-time, dihitung saat tombol Unduh diklik) menggantikan tag `tgl_surat_*` lama di semua surat KP.
+- Template & konverter PDF di-warm-up saat halaman dibuka supaya unduhan terasa lebih cepat.
+- Daftar "Dokumen yang perlu disiapkan" sekarang tampil sebagai list bernomor.
+
+### Perbaikan lain
+- Memperbaiki tautan (Link berkas persyaratan, Turnitin, panduan, dll.) yang salah terbuka ke domain aplikasi sendiri jika diketik tanpa "https://".
+- Riwayat aktivitas & daftar pengumuman kini dibatasi tinggi ~3 baris dan bisa discroll.
+- Menyederhanakan blok "Notifikasi" admin menjadi nomor WA mahasiswa + tombol salin.
+
+## 24-08-2026 — Restrukturisasi database, penyimpanan file, dan konversi PDF
 
 ### Unggah file
 - Menambahkan komponen unggah file dengan drag-and-drop serta opsi klik untuk memilih file, menggantikan metode tautan Google Drive dan input tersembunyi sebelumnya.
@@ -28,14 +54,14 @@
 - Jika layanan konversi tidak tersedia, sistem akan kembali mengunduh file `.docx` asli.
 - Memperbaiki masalah font yang sebelumnya menyebabkan tata letak surat berubah setelah konversi.
 
-## 2026-08-20 — Desain ulang UI
+## 20-08-2026 — Desain ulang UI
 
 - Menerapkan desain baru bergaya editorial/broadsheet dengan identitas visual TL Undip.
 - Memperbarui header, navigasi, pelacak tahapan, kartu statistik, tabel, warna, dan tipografi.
 - Menambahkan logo TL Undip pada aplikasi, halaman login, dan favicon.
 - Menyesuaikan tema gelap dengan sistem desain baru.
 
-## 2026-08-17 — Perbaikan alur dokumen KP dan bug kehilangan data
+## 17-08-2026 — Perbaikan alur dokumen KP dan bug kehilangan data
 
 - Mengaktifkan kembali unggahan dokumen Kelayakan KP dan Kelayakan Proposal KP oleh mahasiswa.
 - Memperbaiki masalah kotak unggah Surat Balasan Perusahaan yang tidak muncul.
@@ -45,7 +71,7 @@
 - Menghapus fitur Surat Perubahan Judul karena sebelumnya ditambahkan tanpa diminta.
 - Menemukan penyebab data hilang setelah unggah file, yang kemudian diperbaiki melalui restrukturisasi database dan penyimpanan file pada 24 Agustus.
 
-## 2026-08-13 — Fitur baru
+## 13-08-2026 — Fitur baru
 
 - Menambahkan satu nomor surat yang digunakan untuk seluruh dokumen mahasiswa selama program.
 - Menambahkan pengisian nilai akhir khusus admin pada tahap Lulus.

@@ -167,6 +167,8 @@ html[data-theme="dark"] .btn:hover { background: rgba(241, 241, 238, 0.08); }
 .btn.ghost { background: transparent; border-color: transparent; color: var(--muted); }
 .btn.ghost:hover { color: var(--text); background: rgba(21, 32, 43, 0.05); }
 html[data-theme="dark"] .btn.ghost:hover { background: rgba(241, 241, 238, 0.08); }
+.btn-amber { background: var(--amber-bg); border: 1px solid var(--amber); color: var(--amber-text); }
+.btn-amber:hover { background: var(--amber-border); border-color: var(--amber); }
 .push { margin-left: auto; }
 
 input, select, textarea {
@@ -187,6 +189,27 @@ textarea { resize: vertical; }
   border-radius: var(--radius); padding: 20px 22px;
 }
 .card-title { margin: 0 0 16px; font-size: 1.05rem; font-weight: 600; letter-spacing: -0.01em; }
+
+/* ---------- KP document panel ---------- */
+.kp-dok-panel {
+  border: 1px solid var(--border-strong); border-radius: var(--radius);
+  background: var(--surface); overflow: hidden;
+}
+.kp-dok-toggle {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 14px 18px; background: var(--accent-weak); border: none; cursor: pointer;
+  font-family: var(--font-heading); font-weight: 700; font-size: 0.95rem; color: var(--text);
+  text-align: left; transition: background 0.15s ease;
+}
+.kp-dok-toggle:hover { background: var(--amber-border); }
+html[data-theme="dark"] .kp-dok-toggle:hover { background: rgba(241, 241, 238, 0.1); }
+.kp-dok-chevron { font-size: 0.7rem; color: var(--muted); transition: transform 0.15s ease; flex-shrink: 0; }
+.kp-dok-toggle.expanded .kp-dok-chevron { transform: rotate(90deg); }
+.kp-dok-heading {
+  display: flex; align-items: center; gap: 10px; padding: 14px 18px;
+  background: var(--accent-weak); font-family: var(--font-heading); font-weight: 700; font-size: 0.95rem;
+}
+.kp-dok-body { padding: 16px 18px; border-top: 1px solid var(--border-strong); }
 
 /* ---------- Dashboard ---------- */
 .dashboard { display: flex; flex-direction: column; gap: 22px; }
@@ -298,7 +321,12 @@ html[data-theme="dark"] .tbl tbody tr:hover { background: rgba(241, 241, 238, 0.
 }
 
 /* ---------- Tabel dengan kolom bisa digeser (resizable) ---------- */
-.tbl-resizable { table-layout: fixed; width: 100%; }
+/* width:auto + min-width:100% (bukan width:100%) supaya saat kolom butuh lebih
+   banyak ruang daripada layar, tabel melebar sesuai kebutuhan kolom (bukan
+   dipepetkan/diciutkan) dan .table-wrap (overflow-x:auto) yang menggulir. */
+.tbl-resizable { table-layout: fixed; width: auto; min-width: 100%; }
+/* Tabel lebar tanpa resize (mis. tabel beban dosen) — perilaku sama. */
+.tbl-wide { width: auto; min-width: 100%; }
 .tbl-resizable th { position: relative; overflow: hidden; text-overflow: ellipsis; border-right: 1px solid var(--border); }
 .tbl-resizable th:last-child { border-right: none; }
 .tbl-resizable td { overflow-wrap: break-word; }
@@ -340,6 +368,8 @@ html[data-theme="dark"] .tbl tbody tr:hover { background: rgba(241, 241, 238, 0.
 .modal-body { padding: 24px; overflow-y: auto; flex: 1 1 auto; }
 .modal-foot { display: flex; justify-content: flex-end; gap: 12px; padding: 16px 24px; border-top: 1px solid var(--border); flex: 0 0 auto; }
 .icon-btn { background: none; border: none; font-size: 1.125rem; cursor: pointer; color: var(--muted); padding: 6px; border-radius: var(--radius-sm); transition: all 0.2s ease; display: grid; place-items: center; }
+/* gear.png adalah ikon hitam solid — dibalik jadi putih di mode gelap supaya tetap terlihat di atas latar gelap topbar. */
+html[data-theme="dark"] .gear-icon { filter: invert(1); }
 .icon-btn:hover { background: rgba(21, 32, 43, 0.07); color: var(--text); }
 html[data-theme="dark"] .icon-btn:hover { background: rgba(241, 241, 238, 0.1); }
 
@@ -351,6 +381,27 @@ html[data-theme="dark"] .icon-btn:hover { background: rgba(241, 241, 238, 0.1); 
 @media (max-width: 860px) {
   .modal-kp-layout { flex-direction: column; }
   .modal-kp-side { position: static; flex-basis: auto; width: 100%; }
+}
+
+/* ---------- Halaman Pengaturan (sidebar, gaya "Settings") ---------- */
+.pengaturan-layout { display: flex; gap: 40px; align-items: flex-start; }
+.pengaturan-side { flex: 0 0 240px; position: sticky; top: 20px; }
+.pengaturan-nav { display: flex; flex-direction: column; gap: 2px; }
+.pengaturan-nav-item {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  padding: 10px 16px; border: none; border-radius: 999px; background: none; cursor: pointer;
+  font-family: var(--font-heading); font-size: 0.88rem; font-weight: 600; color: var(--text);
+  transition: background 0.15s ease;
+}
+.pengaturan-nav-item:hover { background: var(--surface-2); }
+.pengaturan-nav-item.active { background: var(--accent-weak); color: var(--accent); }
+.pengaturan-nav-icon { font-size: 1rem; line-height: 1; }
+.pengaturan-main { flex: 1; min-width: 0; }
+.pengaturan-section-title { font-size: 1rem; font-weight: 700; margin-bottom: 14px; font-family: var(--font-heading); }
+@media (max-width: 720px) {
+  .pengaturan-layout { flex-direction: column; gap: 20px; }
+  .pengaturan-side { position: static; flex-basis: auto; width: 100%; }
+  .pengaturan-nav { flex-direction: row; flex-wrap: wrap; }
 }
 
 /* ---------- Form ---------- */
@@ -495,6 +546,9 @@ html[data-theme="dark"] .icon-btn:hover { background: rgba(241, 241, 238, 0.1); 
 /* ---------- Kelola periode ---------- */
 .periode-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .periode-item { display: flex; align-items: center; justify-content: space-between; background: var(--surface-2); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 0.875rem; font-weight: 500; }
+/* Cap riwayat aktivitas to ~3 rows tall, scroll for the rest — otherwise a
+   long-lived student's activity log pushes the whole edit modal open-ended. */
+.riwayat-list { max-height: 168px; overflow-y: auto; }
 
 /* ---------- Panel notifikasi ---------- */
 .notif-msg { width: 100%; resize: vertical; font: inherit; padding: 12px 14px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); line-height: 1.5; }
@@ -502,6 +556,11 @@ html[data-theme="dark"] .icon-btn:hover { background: rgba(241, 241, 238, 0.1); 
 .notif-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 6px; align-items: center; }
 .notif-actions .btn { text-decoration: none; }
 .notif-dsn { display: inline-flex; gap: 8px; }
+.phone-display { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.phone-display-number {
+  font-family: var(--font-heading); font-size: 1rem; font-weight: 600; letter-spacing: 0.02em;
+  padding: 8px 14px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface-2);
+}
 
 /* ---------- Tambahan batch perbaikan ---------- */
 .th-sort { cursor: pointer; user-select: none; white-space: nowrap; transition: color 0.2s; }

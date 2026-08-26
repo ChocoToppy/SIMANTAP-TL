@@ -64,7 +64,7 @@ export function Dosen({ dosen, mahasiswa, periodeLabel, onSave, onDelete }) {
       </div>
 
       <div className="table-wrap card">
-        <table className="tbl">
+        <table className="tbl tbl-wide">
           <thead>
             <tr>
               <th>Dosen</th>

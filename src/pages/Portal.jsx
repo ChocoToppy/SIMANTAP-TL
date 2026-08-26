@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, stagesFor, eventsFor, punyaKlasifikasi, punyaSyarat, rolesFor, syaratLabel, getJadwal, STAGES, KLASIFIKASI, BIDANG, KP_TEMA, HARI, bidangLabel, todayISO, parseISO, daysBetween, BULAN, formatTanggal, kondisi, isAktif, indexTahap, hitungBeban, hitungBebanProgram, hitungBebanRinci, SEMUA, filterByPeriode, daftarPeriode, buatId, ADMIN_PASSWORD, DOSEN_PASSWORD, PERIODE_AKTIF, TOPIK, VERIFIKASI, statusVerif, tambahHari, LABEL_PENDAFTARAN, ringkasPendaftaran, RUANG, menitJam, rentangJadwal, jamTampil, beririsan, dosenTerlibat, kumpulkanEvent, cariBentrok, pesanNotifikasi, waLink, mailtoLink, waMahasiswa, TEMPLATE_SURAT, tokenSurat, renderSurat, PEJABAT, KOP_SURAT, evKeyDok, dokTA, DURASI_EVENT, JAM_KERJA, durasiEvent, jamTambah, dalamJamKerja, tahapBerikut, eventAktif, BERKAS_SYARAT, berkasSyarat, bolehAjukanJadwal, KP_DOKUMEN, catatAktivitas, tanggalDibuat, aktivitasTerakhir, AKTIVITAS_LABEL, formatWaktu } from '../utils/helpers.js';
+import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, stagesFor, eventsFor, punyaKlasifikasi, punyaSyarat, rolesFor, syaratLabel, getJadwal, STAGES, KLASIFIKASI, BIDANG, KP_TEMA, HARI, bidangLabel, todayISO, parseISO, daysBetween, BULAN, formatTanggal, kondisi, isAktif, indexTahap, hitungBeban, hitungBebanProgram, hitungBebanRinci, SEMUA, filterByPeriode, daftarPeriode, buatId, ADMIN_PASSWORD, DOSEN_PASSWORD, PERIODE_AKTIF, TOPIK, VERIFIKASI, statusVerif, tambahHari, LABEL_PENDAFTARAN, ringkasPendaftaran, RUANG, menitJam, rentangJadwal, jamTampil, beririsan, dosenTerlibat, kumpulkanEvent, cariBentrok, pesanNotifikasi, waLink, mailtoLink, waMahasiswa, TEMPLATE_SURAT, tokenSurat, renderSurat, PEJABAT, KOP_SURAT, evKeyDok, dokTA, DURASI_EVENT, JAM_KERJA, durasiEvent, jamTambah, dalamJamKerja, tahapBerikut, eventAktif, BERKAS_SYARAT, berkasSyarat, bolehAjukanJadwal, KP_DOKUMEN, catatAktivitas, tanggalDibuat, aktivitasTerakhir, AKTIVITAS_LABEL, formatWaktu, normalizeUrl } from '../utils/helpers.js';
 import { DOSEN_AWAL, plusHari, RAW_MAHASISWA, MAHASISWA_AWAL, AKUN_AWAL, PERIODE_BUKA_AWAL } from '../data/seed.js';
 import { csvEscape, triggerDownload, downloadCSV, downloadDoc, cetakSuratPDF, cetakSuratPDFHtml, loadXLSX } from '../utils/exportUtils.js';
 import { Badge, StageBar, Field, Modal, Empty, ExportMenu, ColResizeHandle, TextSizeToggle, ThemeToggle, FileDropZone } from '../components/ui.jsx';
@@ -12,7 +12,7 @@ import logoTl from '../assets/logo-tl.png';
 // ===================== Portal.jsx =====================
 // Portal.jsx — tampilan untuk mahasiswa (Rute A)
 
-export function Portal({ nim, nama, mahasiswa, allDosen, periodeBuka = [], panduan = [], onSave, onLogout }) {
+export function Portal({ nim, nama, mahasiswa, allDosen, periodeBuka = [], panduan = [], konten = {}, onSave, onLogout }) {
   const mine = mahasiswa.filter((m) => m.owner === nim);
   const [view, setView] = useState({ mode: 'list' });
 
@@ -27,6 +27,19 @@ export function Portal({ nim, nama, mahasiswa, allDosen, periodeBuka = [], pandu
       rec = { ...rec, tahap: 'Bimbingan' };
       rec = catatAktivitas(rec, 'tahapBimbingan');
     }
+    onSave(rec);
+  }
+
+  // Berkas lama (bila ada) dibersihkan dari Storage otomatis oleh
+  // simpanMahasiswa di App.jsx begitu record baru ini (tanpa key tsb.)
+  // tersimpan — di sini cukup keluarkan key-nya dari dokumenKP.
+  function hapusDokumenKP(m, key) {
+    if (!(m.dokumenKP || {})[key]) return;
+    const label = (KP_DOKUMEN.find((d) => d.key === key) || {}).label || key;
+    const dokumenKP = { ...(m.dokumenKP || {}) };
+    delete dokumenKP[key];
+    let rec = { ...m, dokumenKP };
+    rec = catatAktivitas(rec, 'hapusBerkas', label);
     onSave(rec);
   }
 
@@ -58,7 +71,7 @@ export function Portal({ nim, nama, mahasiswa, allDosen, periodeBuka = [], pandu
                   {panduan.map((p) => (
                     <li key={p.id} className="periode-item">
                       <span>{p.label}</span>
-                      <a className="link-btn" href={p.url} target="_blank" rel="noreferrer">Baca Panduan</a>
+                      <a className="link-btn" href={normalizeUrl(p.url)} target="_blank" rel="noreferrer">Baca Panduan</a>
                     </li>
                   ))}
                 </ul>
@@ -73,11 +86,12 @@ export function Portal({ nim, nama, mahasiswa, allDosen, periodeBuka = [], pandu
             ) : (
               <div className="cards">
                 {mine.map((m) => (
-                  <KartuPengajuan key={m.id} m={m} allDosen={allDosen}
+                  <KartuPengajuan key={m.id} m={m} allDosen={allDosen} konten={konten}
                     onEdit={() => setView({ mode: 'edit', id: m.id })}
                     onJadwal={(ev) => setView({ mode: 'jadwal', id: m.id, ev })}
                     onPerpanjangan={(mode) => setView({ mode: 'pp-' + mode, id: m.id })}
-                    onUploadDokumenKP={(key, file) => uploadDokumenKP(m, key, file)} />
+                    onUploadDokumenKP={(key, file) => uploadDokumenKP(m, key, file)}
+                    onDeleteDokumenKP={(key) => hapusDokumenKP(m, key)} />
                 ))}
               </div>
             )}
@@ -97,7 +111,7 @@ export function Portal({ nim, nama, mahasiswa, allDosen, periodeBuka = [], pandu
         )}
 
         {view.mode === 'jadwal' && editing && (
-          <FormJadwalMhs awal={editing} ev={view.ev || eventAktif(editing)} onCancel={() => setView({ mode: 'list' })} onSave={simpan} />
+          <FormJadwalMhs awal={editing} ev={view.ev || eventAktif(editing)} konten={konten} onCancel={() => setView({ mode: 'list' })} onSave={simpan} />
         )}
 
         {(view.mode === 'pp-minta' || view.mode === 'pp-final') && editing && (
@@ -108,7 +122,7 @@ export function Portal({ nim, nama, mahasiswa, allDosen, periodeBuka = [], pandu
   );
 }
 
-function KartuPengajuan({ m, allDosen = [], onEdit, onJadwal, onPerpanjangan, onUploadDokumenKP }) {
+function KartuPengajuan({ m, allDosen = [], konten = {}, onEdit, onJadwal, onPerpanjangan, onUploadDokumenKP, onDeleteDokumenKP }) {
   const v = statusVerif(m);
   const k = kondisi(m);
   const terverifikasi = v.key === 'terverifikasi';
@@ -200,7 +214,7 @@ function KartuPengajuan({ m, allDosen = [], onEdit, onJadwal, onPerpanjangan, on
 
     {/* Dokumen KP per tahap: unduh (PDF) & unggah berkas ditandatangani/dinilai */}
       {isKP && (
-        <KpDocumentPanel m={m} dosenByKode={dosenByKode} canUpload onUpload={onUploadDokumenKP} />
+        <KpDocumentPanel m={m} dosenByKode={dosenByKode} konten={konten} canUpload onUpload={onUploadDokumenKP} onDeleteUpload={onDeleteDokumenKP} />
       )}
 
       {/* Perpanjangan (KP / TA / Magang) */}
@@ -209,7 +223,7 @@ function KartuPengajuan({ m, allDosen = [], onEdit, onJadwal, onPerpanjangan, on
         const isKPProgram = programOf(m) === 'KP';
         const suratSiap = isKPProgram ? pp.suratAdminTersedia : pp.suratAdmin;
         if (!pp.diminta && !suratSiap) {
-          return <div style={{ marginTop: 8 }}><button className="btn ghost" onClick={() => onPerpanjangan('minta')}>Ajukan perpanjangan</button></div>;
+          return <div style={{ marginTop: 8 }}><button className="btn btn-amber" onClick={() => onPerpanjangan('minta')}>Ajukan perpanjangan</button></div>;
         }
         if (!suratSiap) {
           return <div className="callout" style={{ marginTop: 8 }}>Perpanjangan diajukan{pp.tanggalDiminta ? ` (${formatTanggal(pp.tanggalDiminta)})` : ''} — menunggu surat dari admin.</div>;
@@ -400,7 +414,7 @@ function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], onCancel
   );
 }
 
-function FormJadwalMhs({ awal, ev, onCancel, onSave }) {
+function FormJadwalMhs({ awal, ev, konten = {}, onCancel, onSave }) {
   const isSidang = ev.includes('Sidang');
   const isKP = programOf(awal) === 'KP' || ev.includes('KP');
   // Seminar KP tidak dibatasi rentang mulai/akhir KP: durasi KP terikat kerja
@@ -443,7 +457,12 @@ function FormJadwalMhs({ awal, ev, onCancel, onSave }) {
           ? 'Jadwal sidang ditetapkan admin. Anda cukup mengunggah draft & berkas di sini.'
           : `Durasi ${ev} otomatis ${durasi} menit, dalam jam kerja ${JAM_KERJA.mulai}–${JAM_KERJA.selesai}. Nomor surat tugas & persetujuan jadwal ditentukan admin.`}
       </p>
-      <div className="callout" style={{ marginBottom: 12 }}><strong>Dokumen yang perlu disiapkan:</strong> {berkasSyarat(ev)}</div>
+      <div className="callout" style={{ marginBottom: 12 }}>
+        <strong>Dokumen yang perlu disiapkan:</strong>
+        <ol style={{ margin: '6px 0 0', paddingLeft: 20 }}>
+          {berkasSyarat(ev, konten).map((item, i) => <li key={i}>{item}</li>)}
+        </ol>
+      </div>
       <div className="form-grid">
         {!isSidang && (
           <>
