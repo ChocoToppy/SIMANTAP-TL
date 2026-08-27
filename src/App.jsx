@@ -4,7 +4,7 @@ import { Mahasiswa } from './pages/Mahasiswa.jsx';
 import { Dosen } from './pages/Dosen.jsx';
 import { Pengaturan } from './pages/Pengaturan.jsx';
 import { Login } from './pages/Login.jsx';
-import { Portal, DosenPortal } from './pages/Portal.jsx';
+import { Portal, DosenPortal, PanduanPage } from './pages/Portal.jsx';
 import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, stagesFor, eventsFor, punyaKlasifikasi, punyaSyarat, rolesFor, syaratLabel, getJadwal, STAGES, KLASIFIKASI, BIDANG, KP_TEMA, HARI, bidangLabel, todayISO, parseISO, daysBetween, BULAN, formatTanggal, kondisi, isAktif, indexTahap, hitungBeban, hitungBebanProgram, hitungBebanRinci, SEMUA, filterByPeriode, daftarPeriode, ADMIN_PASSWORD, DOSEN_PASSWORD, PERIODE_AKTIF, TOPIK, VERIFIKASI, statusVerif, tambahHari, LABEL_PENDAFTARAN, ringkasPendaftaran, RUANG, menitJam, rentangJadwal, jamTampil, beririsan, dosenTerlibat, kumpulkanEvent, cariBentrok, pesanNotifikasi, waLink, mailtoLink, waMahasiswa, TEMPLATE_SURAT, tokenSurat, renderSurat, PEJABAT, KOP_SURAT, evKeyDok, dokTA, DURASI_EVENT, JAM_KERJA, durasiEvent, jamTambah, dalamJamKerja, tahapBerikut, eventAktif, BERKAS_SYARAT, berkasSyarat, bolehAjukanJadwal, orphanedUploadPaths } from './utils/helpers.js';
 import { deleteUploadedFile, deleteUploadedFolder } from './utils/fileUpload.js';
 import { DOSEN_AWAL, plusHari, RAW_MAHASISWA, MAHASISWA_AWAL, AKUN_AWAL, PERIODE_BUKA_AWAL, PENGUMUMAN_AWAL, PERIODE_AKTIF_AWAL, PANDUAN_AWAL } from './data/seed.js';
@@ -285,10 +285,24 @@ export default function App() {
   // ----- Login sebagai mahasiswa -----
   if (sesi.peran === 'mahasiswa') {
     const akun = (data.akun || []).find((a) => a.nim === sesi.nim);
+    const namaMhs = akun ? akun.nama : sesi.nim;
+    // Alamat sendiri (/panduan), sama pola dengan /pengaturan di bawah —
+    // supaya bisa dibuka langsung/dibagikan, bukan cuma dropdown di header.
+    if (route === '/panduan') {
+      return (
+        <PanduanPage
+          nama={namaMhs}
+          nim={sesi.nim}
+          panduan={data.panduan || []}
+          onBack={() => navigate('/')}
+          onLogout={keluar}
+        />
+      );
+    }
     return (
       <Portal
         nim={sesi.nim}
-        nama={akun ? akun.nama : sesi.nim}
+        nama={namaMhs}
         mahasiswa={data.mahasiswa}
         allDosen={data.dosen}
         periodeBuka={periodeBuka}
@@ -296,6 +310,7 @@ export default function App() {
         konten={data.konten || {}}
         onSave={simpanMahasiswa}
         onLogout={() => setSesi(null)}
+        onOpenPanduan={() => navigate('/panduan')}
       />
     );
   }

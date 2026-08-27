@@ -12,8 +12,23 @@ import logoTl from '../assets/logo-tl.png';
 // ===================== Portal.jsx =====================
 // Portal.jsx — tampilan untuk mahasiswa (Rute A)
 
-export function Portal({ nim, nama, mahasiswa, allDosen, periodeBuka = [], panduan = [], konten = {}, onSave, onLogout }) {
+const PORTAL_TABS = [
+  { key: 'pengajuan', label: 'Pengajuan' },
+  { key: 'ruang', label: 'Penggunaan Ruang' },
+];
+
+// Panduan yang ditampilkan langsung di kartu pengajuan (tombol di sebelah
+// badge verifikasi) — sengaja HANYA yang ditandai program itu spesifik, bukan
+// yang "Umum", supaya kartu tidak penuh kalau daftar panduan Umum bertambah
+// banyak. Panduan Umum tetap ada, tapi cuma di halaman /panduan (lihat
+// PanduanPage) yang memang mengelompokkan semuanya termasuk Umum.
+function panduanUntukProgram(panduan, programKey) {
+  return panduan.filter((p) => p.program === programKey);
+}
+
+export function Portal({ nim, nama, mahasiswa, allDosen, periodeBuka = [], panduan = [], konten = {}, onSave, onLogout, onOpenPanduan }) {
   const mine = mahasiswa.filter((m) => m.owner === nim);
+  const [tab, setTab] = useState('pengajuan');
   const [view, setView] = useState({ mode: 'list' });
 
   function simpan(rec) { onSave(rec); setView({ mode: 'list' }); }
@@ -53,6 +68,7 @@ export function Portal({ nim, nama, mahasiswa, allDosen, periodeBuka = [], pandu
           <span className="brand-name">SIMANTAP</span>
         </div>
         <div className="topbar-right">
+          <button className="btn btn-primary" onClick={onOpenPanduan}>Panduan</button>
           <ThemeToggle />
           <TextSizeToggle />
           <span className="hint">{nama} · {nim}</span>
@@ -61,68 +77,172 @@ export function Portal({ nim, nama, mahasiswa, allDosen, periodeBuka = [], pandu
       </header>
       <div className="masthead-rule" />
 
+      <nav className="tabs">
+        {PORTAL_TABS.map((t) => (
+          <button key={t.key} className={'tab' + (tab === t.key ? ' active' : '')} onClick={() => setTab(t.key)}>{t.label}</button>
+        ))}
+      </nav>
+
       <main className="content">
-        {view.mode === 'list' && (
-          <div className="portal">
-            {panduan.length > 0 && (
-              <div className="card" style={{ marginBottom: 16 }}>
-                <h3 className="card-title">Unduh Panduan</h3>
-                <ul className="periode-list">
-                  {panduan.map((p) => (
-                    <li key={p.id} className="periode-item">
-                      <span>{p.label}</span>
-                      <a className="link-btn" href={normalizeUrl(p.url)} target="_blank" rel="noreferrer">Baca Panduan</a>
-                    </li>
-                  ))}
-                </ul>
+        {tab === 'pengajuan' && (
+          <>
+            {view.mode === 'list' && (
+              <div className="portal">
+                <div className="toolbar">
+                  <h2 className="page-title">Pengajuan saya</h2>
+                  <button className="btn btn-primary push" onClick={() => setView({ mode: 'daftar' })}>+ Ajukan pendaftaran</button>
+                </div>
+                {mine.length === 0 ? (
+                  <Empty>Belum ada pengajuan. Klik "Ajukan pendaftaran" untuk memulai.</Empty>
+                ) : (
+                  <div className="cards">
+                    {mine.map((m) => (
+                      <KartuPengajuan key={m.id} m={m} allDosen={allDosen} konten={konten} panduan={panduan}
+                        onEdit={() => setView({ mode: 'edit', id: m.id })}
+                        onJadwal={(ev) => setView({ mode: 'jadwal', id: m.id, ev })}
+                        onPerpanjangan={(mode) => setView({ mode: 'pp-' + mode, id: m.id })}
+                        onUploadDokumenKP={(key, file) => uploadDokumenKP(m, key, file)}
+                        onDeleteDokumenKP={(key) => hapusDokumenKP(m, key)} />
+                    ))}
+                  </div>
+                )}
               </div>
             )}
-            <div className="toolbar">
-              <h2 className="page-title">Pengajuan saya</h2>
-              <button className="btn btn-primary push" onClick={() => setView({ mode: 'daftar' })}>+ Ajukan pendaftaran</button>
-            </div>
-            {mine.length === 0 ? (
-              <Empty>Belum ada pengajuan. Klik "Ajukan pendaftaran" untuk memulai.</Empty>
-            ) : (
-              <div className="cards">
-                {mine.map((m) => (
-                  <KartuPengajuan key={m.id} m={m} allDosen={allDosen} konten={konten}
-                    onEdit={() => setView({ mode: 'edit', id: m.id })}
-                    onJadwal={(ev) => setView({ mode: 'jadwal', id: m.id, ev })}
-                    onPerpanjangan={(mode) => setView({ mode: 'pp-' + mode, id: m.id })}
-                    onUploadDokumenKP={(key, file) => uploadDokumenKP(m, key, file)}
-                    onDeleteDokumenKP={(key) => hapusDokumenKP(m, key)} />
-                ))}
-              </div>
+
+            {(view.mode === 'daftar' || view.mode === 'edit') && (
+              <FormPendaftaran
+                awal={editing}
+                nim={nim}
+                nama={nama}
+                allDosen={allDosen}
+                periodeBuka={periodeBuka}
+                onCancel={() => setView({ mode: 'list' })}
+                onSave={simpan}
+              />
             )}
-          </div>
+
+            {view.mode === 'jadwal' && editing && (
+              <FormJadwalMhs awal={editing} ev={view.ev || eventAktif(editing)} konten={konten} onCancel={() => setView({ mode: 'list' })} onSave={simpan} />
+            )}
+
+            {(view.mode === 'pp-minta' || view.mode === 'pp-final') && editing && (
+              <FormPerpanjangan awal={editing} allDosen={allDosen} mode={view.mode === 'pp-final' ? 'final' : 'minta'} onCancel={() => setView({ mode: 'list' })} onSave={simpan} />
+            )}
+          </>
         )}
 
-        {(view.mode === 'daftar' || view.mode === 'edit') && (
-          <FormPendaftaran
-            awal={editing}
-            nim={nim}
-            nama={nama}
-            allDosen={allDosen}
-            periodeBuka={periodeBuka}
-            onCancel={() => setView({ mode: 'list' })}
-            onSave={simpan}
-          />
-        )}
-
-        {view.mode === 'jadwal' && editing && (
-          <FormJadwalMhs awal={editing} ev={view.ev || eventAktif(editing)} konten={konten} onCancel={() => setView({ mode: 'list' })} onSave={simpan} />
-        )}
-
-        {(view.mode === 'pp-minta' || view.mode === 'pp-final') && editing && (
-          <FormPerpanjangan awal={editing} allDosen={allDosen} mode={view.mode === 'pp-final' ? 'final' : 'minta'} onCancel={() => setView({ mode: 'list' })} onSave={simpan} />
-        )}
+        {tab === 'ruang' && <PenggunaanRuangPortal mahasiswa={mahasiswa} />}
       </main>
     </div>
   );
 }
 
-function KartuPengajuan({ m, allDosen = [], konten = {}, onEdit, onJadwal, onPerpanjangan, onUploadDokumenKP, onDeleteDokumenKP }) {
+// Halaman /panduan — daftar SEMUA panduan (dikelola admin di Pengaturan >
+// Kelola Panduan), dikelompokkan per program; item tanpa program masuk "Umum".
+// Alamat sendiri (bukan tab/dropdown) supaya bisa dibuka langsung/dibagikan,
+// sama seperti /pengaturan di App.jsx.
+export function PanduanPage({ nama, nim, panduan = [], onBack, onLogout }) {
+  const grup = [
+    { key: '', label: 'Umum (semua program)' },
+    ...PROGRAM_KEYS.map((p) => ({ key: p, label: programLabel(p) })),
+  ]
+    .map((g) => ({ ...g, items: panduan.filter((p) => (p.program || '') === g.key) }))
+    .filter((g) => g.items.length > 0);
+
+  return (
+    <div className="app">
+      <header className="topbar">
+        <div className="brand">
+          <img className="brand-mark" src={logoTl} alt="TL Undip" />
+          <span className="brand-name">SIMANTAP</span>
+        </div>
+        <div className="topbar-right">
+          <ThemeToggle />
+          <TextSizeToggle />
+          {nama && <span className="hint">{nama} · {nim}</span>}
+          <button className="btn ghost" onClick={onBack}>← Kembali</button>
+          <button className="btn ghost" onClick={onLogout}>Keluar</button>
+        </div>
+      </header>
+      <div className="masthead-rule" />
+      <main className="content">
+        <div className="portal">
+          <div className="toolbar">
+            <h2 className="page-title">Panduan</h2>
+          </div>
+          {grup.length === 0 ? (
+            <Empty>Belum ada panduan yang diunggah admin.</Empty>
+          ) : (
+            grup.map((g) => (
+              <div className="card" key={g.key || 'umum'} style={{ marginBottom: 16 }}>
+                <h3 className="card-title">{g.label}</h3>
+                <ul className="periode-list">
+                  {g.items.map((p) => (
+                    <li key={p.id} className="periode-item">
+                      <span>{p.label}</span>
+                      <a className="btn btn-primary btn-sm" href={normalizeUrl(p.url)} target="_blank" rel="noreferrer">Baca Panduan</a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))
+          )}
+        </div>
+      </main>
+      <footer className="foot">SIMANTAP © 2026 Universitas Diponegoro</footer>
+    </div>
+  );
+}
+
+// Jadwal seminar/sidang/expo & pemakaian ruang seluruh mahasiswa (bukan cuma
+// punya sendiri) — supaya mahasiswa bisa cek potensi bentrok ruang/jam sendiri.
+// Saat ini baru program KP yang jalan; program lain otomatis muncul begitu ada
+// datanya (lihat kumpulkanEvent di helpers.js).
+function PenggunaanRuangPortal({ mahasiswa }) {
+  const jadwalEvents = kumpulkanEvent(mahasiswa);
+  return (
+    <div className="portal">
+      <div className="toolbar">
+        <h2 className="page-title">Penggunaan Ruang</h2>
+      </div>
+      {jadwalEvents.length === 0 ? (
+        <Empty>Belum ada jadwal seminar/sidang/expo.</Empty>
+      ) : (
+        <div className="table-wrap card">
+          <table className="tbl tbl-wide">
+            <thead>
+              <tr>
+                <th>Tanggal</th>
+                <th>Jam</th>
+                <th>Ruang</th>
+                <th>Kegiatan</th>
+                <th>Mahasiswa</th>
+                <th>Dosen</th>
+              </tr>
+            </thead>
+            <tbody>
+              {jadwalEvents.map((e) => (
+                <tr key={e.key}>
+                  <td className="cell-sub">{formatTanggal(e.tanggal)}</td>
+                  <td className="cell-sub">{e.jam || '—'}</td>
+                  <td>{e.ruang ? <Badge tone="blue">{e.ruang}</Badge> : <span className="muted">—</span>}</td>
+                  <td className="cell-sub">{programLabel(programOf(e.m))} · {e.ev}</td>
+                  <td>
+                    <div className="cell-name">{e.m.nama}</div>
+                    <div className="cell-sub">{e.m.nim}</div>
+                  </td>
+                  <td className="cell-sub">{e.dosen.join(', ') || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function KartuPengajuan({ m, allDosen = [], konten = {}, panduan = [], onEdit, onJadwal, onPerpanjangan, onUploadDokumenKP, onDeleteDokumenKP }) {
   const v = statusVerif(m);
   const k = kondisi(m);
   const terverifikasi = v.key === 'terverifikasi';
@@ -143,6 +263,7 @@ function KartuPengajuan({ m, allDosen = [], konten = {}, onEdit, onJadwal, onPer
   const jadwalTeks = [jEv.tanggal ? formatTanggal(jEv.tanggal) : null, jamTampil(jEv), jEv.ruang].filter(Boolean).join(' · ');
   const dosenByKode = Object.fromEntries(allDosen.map((d) => [d.kode, d]));
   const isTA = programOf(m) === 'TA';
+  const panduanRelevan = panduanUntukProgram(panduan, programOf(m));
   const [dlBusy, setDlBusy] = useState(false);
   async function unduhPerpanjanganKP() {
     const config = getTemplateConfig('Perpanjangan KP', m, dosenByKode, {});
@@ -159,7 +280,12 @@ function KartuPengajuan({ m, allDosen = [], konten = {}, onEdit, onJadwal, onPer
     <div className="card kartu">
       <div className="kartu-head">
         <span className="kartu-prog">{programLabel(programOf(m))}</span>
-        <Badge tone={v.tone}>{v.label}</Badge>
+        <div className="kartu-head-right">
+          {panduanRelevan.map((p) => (
+            <a key={p.id} className="btn btn-primary btn-sm" href={normalizeUrl(p.url)} target="_blank" rel="noreferrer">{p.label}</a>
+          ))}
+          <Badge tone={v.tone}>{v.label}</Badge>
+        </div>
       </div>
       <div className="kartu-judul">{m.judul || <span className="muted">(judul belum diisi)</span>}</div>
       <div className="cell-sub">{m.nim} · {bidangLabel(m.bidang)}{m.klasifikasi ? ` · ${m.klasifikasi}` : ''}</div>
@@ -243,6 +369,7 @@ function KartuPengajuan({ m, allDosen = [], konten = {}, onEdit, onJadwal, onPer
         const finalHref = pp.suratFinal ? (pp.suratFinal.url || pp.suratFinal.dataUrl) : pp.suratFinalLink;
         return <div className="callout callout-green" style={{ marginTop: 8 }}>Perpanjangan selesai. Surat final: <a href={finalHref} target="_blank" rel="noreferrer">buka</a></div>;
       })()}
+
 
       <div className="kartu-aksi">
         <button className="btn" onClick={onEdit}>Edit pendaftaran</button>

@@ -20,9 +20,22 @@ const STATUS_FILTER = [
   { key: 'batal', label: 'Dibatalkan' },
 ];
 
+// Kolom "peran dosen" beda tiap program (lihat PROGRAMS di helpers.js) — KP/Magang
+// cuma satu pembimbing rangkap penguji, TA/Tesis S2 punya 2 pembimbing + 2 penguji, dst.
+function kolomDosenProgram(programKey) {
+  const p = PROGRAMS[programKey] || PROGRAMS.TA;
+  const cols = [{ key: 'pembimbing1', label: p.pembimbingLabel || 'Pembimbing 1' }];
+  if (p.pembimbing >= 2) cols.push({ key: 'pembimbing2', label: 'Pembimbing 2' });
+  if (p.penguji >= 1) cols.push({ key: 'penguji1', label: p.penguji >= 2 ? 'Penguji 1' : 'Penguji' });
+  if (p.penguji >= 2) cols.push({ key: 'penguji2', label: 'Penguji 2' });
+  return cols;
+}
+
 export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeList, konten = {}, onSave, onDelete }) {
   const [q, setQ] = useState('');
-  const [fProgram, setFProgram] = useState('');
+  // Satu tabel = satu program (kolomnya beda-beda tiap program, jadi tidak
+  // dicampur lagi) — defaultnya KP karena itu yang aktif jalan sekarang.
+  const [programTab, setProgramTab] = useState('KP');
   const [fAngkatan, setFAngkatan] = useState('');
   const [fBidang, setFBidang] = useState('');
   const [fStatus, setFStatus] = useState('all');
@@ -41,30 +54,30 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
   // Nomor identitas tetap (berdasarkan urutan pendaftaran pertama), dihitung dari
   // SELURUH data \u2014 tidak berubah walau tabel disortir/difilter.
   const nomorUrut = useMemo(() => hitungNomorUrut(allMahasiswa || mahasiswa), [allMahasiswa, mahasiswa]);
+  const dosenByKode = useMemo(() => Object.fromEntries((allDosen || []).map((d) => [d.kode, d])), [allDosen]);
   const [groupMode, setGroupMode] = useState(periode === SEMUA ? 'periode' : 'none');
   useEffect(() => {
     setGroupMode(periode === SEMUA ? 'periode' : 'none');
   }, [periode]);
 
-  const COLS = [
+  const dosenCols = useMemo(() => kolomDosenProgram(programTab), [programTab]);
+  const COLS = useMemo(() => [
     { key: 'no', width: 56 },
     { key: 'mahasiswa', width: 220 },
     { key: 'judul', width: 260 },
     { key: 'tahap', width: 210 },
-    { key: 'pembimbing1', width: 100 },
-    { key: 'pembimbing2', width: 100 },
-    { key: 'penguji1', width: 100 },
-    { key: 'penguji2', width: 100 },
+    ...dosenCols.map((c) => ({ key: c.key, width: 100 })),
     { key: 'deadline', width: 130 },
     { key: 'aktivitas', width: 170 },
+    { key: 'nomorSurat', width: 130 },
     { key: 'aksi', width: 100, flex: true, minWidth: 100 },
-  ];
+  ], [dosenCols]);
   const tableWrapRef = useRef(null);
   const [colWidths, startResize, tableWidth] = useColumnWidths('simantap-col-mahasiswa', COLS, tableWrapRef);
 
   const angkatanList = useMemo(
-    () => Array.from(new Set(mahasiswa.map((m) => m.angkatan))).sort((a, b) => b - a),
-    [mahasiswa]
+    () => Array.from(new Set(mahasiswa.filter((m) => programOf(m) === programTab).map((m) => m.angkatan))).sort((a, b) => b - a),
+    [mahasiswa, programTab]
   );
 
   const rows = useMemo(() => {
@@ -72,8 +85,8 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
     return mahasiswa
       .map((m) => ({ m, k: kondisi(m) }))
       .filter(({ m, k }) => {
+        if (programOf(m) !== programTab) return false;
         if (term && !(`${m.nama} ${m.nim} ${m.judul}`.toLowerCase().includes(term))) return false;
-        if (fProgram && programOf(m) !== fProgram) return false;
         if (fAngkatan && String(m.angkatan) !== fAngkatan) return false;
         if (fBidang && m.bidang !== fBidang) return false;
         if (fDosen && ![m.pembimbing1, m.pembimbing2, m.penguji1, m.penguji2].includes(fDosen)) return false;
@@ -99,7 +112,7 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
           : m.nama;
         return String(val(a.m)).localeCompare(String(val(b.m)), 'id') * arah;
       });
-  }, [mahasiswa, q, fProgram, fAngkatan, fBidang, fStatus, fVerif, fDosen, sortBy, sortDir, nomorUrut, groupMode]);
+  }, [mahasiswa, programTab, q, fAngkatan, fBidang, fStatus, fVerif, fDosen, sortBy, sortDir, nomorUrut, groupMode]);
 
   const notif = useMemo(() => {
     let baru = 0, perluJadwal = 0, perluHasil = 0, bentrok = 0, kelompok = 0;
@@ -118,19 +131,32 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
     return { baru, perluJadwal, perluHasil, bentrok, kelompok };
   }, [mahasiswa]);
 
-  // Kelompokkan baris (yang sudah difilter & disortir) berdasarkan periode/angkatan,
-  // menjaga urutan relatif yang sudah ada — mirip tampilan "group" spreadsheet.
+  // Paginasi — pencarian/filter (di atas) selalu jalan di atas SELURUH `mahasiswa`,
+  // bukan cuma halaman yang lagi tampil; paginasi cuma memotong hasil akhir buat
+  // ditampilkan. Default 100 baris/halaman, bisa diperkecil.
+  const [pageSize, setPageSize] = useState(100);
+  const [page, setPage] = useState(1);
+  useEffect(() => {
+    setPage(1);
+  }, [q, programTab, fAngkatan, fBidang, fStatus, fVerif, fDosen, pageSize, groupMode, periode]);
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const pageRows = useMemo(() => rows.slice((safePage - 1) * pageSize, safePage * pageSize), [rows, safePage, pageSize]);
+
+  // Kelompokkan baris halaman ini (yang sudah difilter & disortir) berdasarkan
+  // periode/angkatan, menjaga urutan relatif yang sudah ada — mirip tampilan
+  // "group" spreadsheet.
   const grupRows = useMemo(() => {
     if (groupMode === 'none') return null;
     const keyOf = (m) => (groupMode === 'angkatan' ? (m.angkatan || '—') : (m.periode || '—'));
     const map = new Map();
-    rows.forEach((r) => {
+    pageRows.forEach((r) => {
       const k = keyOf(r.m);
       if (!map.has(k)) map.set(k, []);
       map.get(k).push(r);
     });
     return Array.from(map.entries()).map(([label, items]) => ({ label, items }));
-  }, [rows, groupMode]);
+  }, [pageRows, groupMode]);
 
   function noUntuk(m) {
     if (groupMode === 'angkatan') return (nomorUrut[m.id] || {}).angkatan ?? '—';
@@ -142,13 +168,17 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
   function simpan(m) { onSave(m); setOpen(false); }
   function hapus(m) { if (window.confirm(`Hapus data ${m.nama}?`)) onDelete(m.id); }
 
+  // Nama lengkap dosen dipakai khusus saat ekspor (kolom tabel tetap pakai kode
+  // singkat spy hemat lebar) — lihat dosenByKode di bawah.
+  const namaLengkapDosen = (kode) => (kode && dosenByKode[kode]) ? dosenByKode[kode].nama : (kode || '');
+
   const coreHeaders = ['No. (Periode)', 'Program', 'Nama', 'NIM', 'Angkatan', 'Judul', 'Periode', 'Klasifikasi', 'Bidang', 'Dosen Wali', 'Pembimbing 1', 'Pembimbing 2', 'Penguji 1', 'Penguji 2', 'Tahap', 'Status', 'Tanggal Mulai', 'Batas Akhir', 'Nomor Surat', 'Nilai Angka', 'Nilai Huruf', 'Catatan'];
   const coreRow = (m) => {
     const k = kondisi(m);
     return [
       (nomorUrut[m.id] || {}).periode ?? '', programLabel(programOf(m)), m.nama, m.nim, m.angkatan, m.judul, m.periode,
-      punyaKlasifikasi(programOf(m)) ? (m.klasifikasi || '') : '', bidangLabel(m.bidang), m.dosenWali || '',
-      m.pembimbing1 || '', m.pembimbing2 || '', m.penguji1 || '', m.penguji2 || '',
+      punyaKlasifikasi(programOf(m)) ? (m.klasifikasi || '') : '', bidangLabel(m.bidang), namaLengkapDosen(m.dosenWali),
+      namaLengkapDosen(m.pembimbing1), namaLengkapDosen(m.pembimbing2), namaLengkapDosen(m.penguji1), namaLengkapDosen(m.penguji2),
       m.tahap, k.label, m.tanggalMulai || '', m.batasAkhir || '', m.nomorSurat || '',
       (m.nilaiAkhir || {}).angka || '', (m.nilaiAkhir || {}).huruf || '', m.catatan || '',
     ];
@@ -188,12 +218,13 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
 
   return (
     <div>
+      <nav className="program-tabs">
+        {PROGRAM_KEYS.map((p) => (
+          <button key={p} className={'program-tab' + (programTab === p ? ' active' : '')} onClick={() => setProgramTab(p)}>{programLabel(p)}</button>
+        ))}
+      </nav>
       <div className="toolbar">
         <input className="search" placeholder="Cari nama, NIM, atau judul…" value={q} onChange={(e) => setQ(e.target.value)} />
-        <select value={fProgram} onChange={(e) => setFProgram(e.target.value)}>
-          <option value="">Semua program</option>
-          {PROGRAM_KEYS.map((p) => <option key={p} value={p}>{programLabel(p)}</option>)}
-        </select>
         <select value={fStatus} onChange={(e) => setFStatus(e.target.value)}>
           {STATUS_FILTER.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
         </select>
@@ -246,12 +277,12 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
               <th className="th-sort" onClick={() => ubahSort('nama')}>Mahasiswa{panah('nama')}<ColResizeHandle onMouseDown={(e) => startResize(1, e)} /></th>
               <th className="th-sort" onClick={() => ubahSort('judul')}>Judul{panah('judul')}<ColResizeHandle onMouseDown={(e) => startResize(2, e)} /></th>
               <th className="th-sort" onClick={() => ubahSort('tahap')}>Tahap &amp; jadwal{panah('tahap')}<ColResizeHandle onMouseDown={(e) => startResize(3, e)} /></th>
-              <th className="th-sort" onClick={() => ubahSort('pembimbing1')}>Pembimbing 1{panah('pembimbing1')}<ColResizeHandle onMouseDown={(e) => startResize(4, e)} /></th>
-              <th className="th-sort" onClick={() => ubahSort('pembimbing2')}>Pembimbing 2{panah('pembimbing2')}<ColResizeHandle onMouseDown={(e) => startResize(5, e)} /></th>
-              <th className="th-sort" onClick={() => ubahSort('penguji1')}>Penguji 1{panah('penguji1')}<ColResizeHandle onMouseDown={(e) => startResize(6, e)} /></th>
-              <th className="th-sort" onClick={() => ubahSort('penguji2')}>Penguji 2{panah('penguji2')}<ColResizeHandle onMouseDown={(e) => startResize(7, e)} /></th>
-              <th className="th-sort" onClick={() => ubahSort('deadline')}>Deadline{panah('deadline')}<ColResizeHandle onMouseDown={(e) => startResize(8, e)} /></th>
-              <th className="th-sort" onClick={() => ubahSort('dibuat')}>Aktivitas{panah('dibuat')}<ColResizeHandle onMouseDown={(e) => startResize(9, e)} /></th>
+              {dosenCols.map((c, i) => (
+                <th key={c.key} className="th-sort" onClick={() => ubahSort(c.key)}>{c.label}{panah(c.key)}<ColResizeHandle onMouseDown={(e) => startResize(4 + i, e)} /></th>
+              ))}
+              <th className="th-sort" onClick={() => ubahSort('deadline')}>Deadline{panah('deadline')}<ColResizeHandle onMouseDown={(e) => startResize(4 + dosenCols.length, e)} /></th>
+              <th className="th-sort" onClick={() => ubahSort('dibuat')}>Aktivitas{panah('dibuat')}<ColResizeHandle onMouseDown={(e) => startResize(5 + dosenCols.length, e)} /></th>
+              <th>No. Surat<ColResizeHandle onMouseDown={(e) => startResize(6 + dosenCols.length, e)} /></th>
               <th></th>
             </tr>
           </thead>
@@ -273,15 +304,13 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
                     <StageBar program={programOf(m)} tahap={m.tahap} />
                     <JadwalMini m={m} />
                   </td>
-                  <td>{m.pembimbing1 || '-'}</td>
-                  <td>{m.pembimbing2 || '-'}</td>
-                  <td>{m.penguji1 || '-'}</td>
-                  <td>{m.penguji2 || '-'}</td>
+                  {dosenCols.map((c) => <td key={c.key}>{m[c.key] || '-'}</td>)}
                   <td>
                     <Badge tone={k.tone}>{k.label}</Badge>
                     <div className="cell-sub">{formatTanggal(m.batasAkhir)}</div>
                   </td>
                   <td><AktivitasMini m={m} /></td>
+                  <td className="cell-sub">{m.nomorSurat || '—'}</td>
                   <td className="cell-actions">
                     <button className="link-btn" onClick={() => edit(m)}>Edit</button>
                     <button className="link-btn danger" onClick={() => hapus(m)}>Hapus</button>
@@ -298,12 +327,30 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
                   </React.Fragment>
                 ));
               }
-              return rows.map(baris);
+              return pageRows.map(baris);
             })()}
           </tbody>
         </table>
         {rows.length === 0 && <Empty>Tidak ada data yang cocok.</Empty>}
       </div>
+
+      {rows.length > 0 && (
+        <div className="pagination">
+          <span className="hint">
+            Menampilkan {rows.length === 0 ? 0 : (safePage - 1) * pageSize + 1}–{Math.min(safePage * pageSize, rows.length)} dari {rows.length} data
+          </span>
+          <div className="pagination-controls">
+            <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} title="Baris per halaman">
+              {[5, 10, 25, 50, 100, 500].map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+            <button className="btn btn-sm" disabled={safePage <= 1} onClick={() => setPage(1)}>«</button>
+            <button className="btn btn-sm" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>‹ Sebelumnya</button>
+            <span className="hint">{safePage} / {totalPages}</span>
+            <button className="btn btn-sm" disabled={safePage >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>Berikutnya ›</button>
+            <button className="btn btn-sm" disabled={safePage >= totalPages} onClick={() => setPage(totalPages)}>»</button>
+          </div>
+        </div>
+      )}
 
       {open && (
         <FormMahasiswa
@@ -313,6 +360,7 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
           periode={periode}
           periodeList={periodeList}
           konten={konten}
+          defaultProgram={programTab}
           onCancel={() => setOpen(false)}
           onSave={simpan}
         />
@@ -379,13 +427,13 @@ function JadwalMini({ m }) {
   );
 }
 
-function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, periodeList, konten = {}, onCancel, onSave }) {
+function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, periodeList, konten = {}, defaultProgram = 'TA', onCancel, onSave }) {
   const baru = !awal;
   const [err, setErr] = useState('');
   const [m, setM] = useState(() => {
     const base = awal || {
       id: buatId(),
-      program: 'TA',
+      program: defaultProgram,
       nama: '', nim: '', judul: '',
       periode: periode && periode !== SEMUA ? periode : (periodeList[periodeList.length - 1] || ''),
       angkatan: '', klasifikasi: 'Penelitian', bidang: 'U',
@@ -409,7 +457,7 @@ function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, periodeList
   // Tab tahap yang sedang dilihat admin di modal KP — navigasi tampilan saja,
   // TIDAK mengubah m.tahap (yang sebenarnya) sampai admin memakai tombol "Alur tahap".
   const [tahapTab, setTahapTab] = useState(() => {
-    const initStages = stagesFor((awal && awal.program) || 'TA');
+    const initStages = stagesFor((awal && awal.program) || defaultProgram);
     return (awal && initStages.includes(awal.tahap)) ? awal.tahap : initStages[0];
   });
   const dosenByKode = useMemo(() => Object.fromEntries((allDosen || []).map((d) => [d.kode, d])), [allDosen]);

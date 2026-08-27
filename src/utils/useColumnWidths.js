@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 const MIN_COL_WIDTH = 60;
 
@@ -21,6 +21,20 @@ const DEFAULT_FLEX_MIN = 80;
 export function useColumnWidths(storageKey, columns, containerRef) {
   const [widths, setWidths] = useState(() => columns.map((c) => c.width));
   const [dragged, setDragged] = useState(false);
+
+  // Set kolom bisa berubah bentuk di runtime (mis. tabel per-tab program dengan
+  // jumlah kolom peran dosen yang beda) — begitu key kolom berubah, widths &
+  // status "sudah di-drag" direset supaya tidak salah pasang ke kolom yang beda.
+  const colSig = columns.map((c) => c.key).join('|');
+  const prevSig = useRef(colSig);
+  useEffect(() => {
+    if (prevSig.current !== colSig) {
+      prevSig.current = colSig;
+      setWidths(columns.map((c) => c.width));
+      setDragged(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [colSig]);
 
   // Batas atas hanya angka besar sewajarnya supaya drag tidak "kabur" tak terbatas.
   const MAX_COL_WIDTH = 1200;

@@ -150,6 +150,19 @@ h1, h2, h3, h4, h5, h6, .brand-name {
 .tab:hover { color: var(--text); }
 .tab.active { color: var(--text); border-bottom-color: var(--accent); }
 
+/* Sub-tab per program (mis. daftar Mahasiswa: TA/KP/Capstone/Magang/Tesis S2)
+   — sengaja dibuat beda gaya dari .tabs (nav utama Dashboard/Mahasiswa/Dosen):
+   pil solid berwarna, bukan garis bawah tipis, supaya jelas ini level navigasi
+   yang berbeda (sub-filter di dalam satu tab utama, bukan tab utama itu sendiri). */
+.program-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.program-tab {
+  background: var(--surface); border: 1px solid var(--border-strong); color: var(--muted);
+  padding: 9px 18px; border-radius: 999px; font-size: 0.78rem; cursor: pointer;
+  font-weight: 700; font-family: var(--font-heading); transition: all 0.15s ease;
+}
+.program-tab:hover { color: var(--text); border-color: var(--accent); }
+.program-tab.active { background: var(--accent); border-color: var(--accent); color: #f5f5f2; }
+
 .content { min-height: 50vh; animation: fadeIn 0.4s ease-out; padding-top: 22px; }
 .foot { text-align: center; color: var(--muted-2); font-size: 0.7rem; margin-top: 40px; letter-spacing: 0.04em; }
 
@@ -158,6 +171,7 @@ h1, h2, h3, h4, h5, h6, .brand-name {
   border: 1px solid var(--border-strong); background: transparent; color: var(--text);
   padding: 8px 16px; border-radius: var(--radius-sm); font-size: 0.8rem; cursor: pointer; font-weight: 600;
   font-family: var(--font-heading); transition: background 0.15s ease;
+  text-decoration: none; display: inline-block;
 }
 .btn:hover { background: rgba(21, 32, 43, 0.05); }
 html[data-theme="dark"] .btn:hover { background: rgba(241, 241, 238, 0.08); }
@@ -169,6 +183,8 @@ html[data-theme="dark"] .btn:hover { background: rgba(241, 241, 238, 0.08); }
 html[data-theme="dark"] .btn.ghost:hover { background: rgba(241, 241, 238, 0.08); }
 .btn-amber { background: var(--amber-bg); border: 1px solid var(--amber); color: var(--amber-text); }
 .btn-amber:hover { background: var(--amber-border); border-color: var(--amber); }
+.btn-sm { padding: 5px 10px; font-size: 0.74rem; }
+.btn:disabled { opacity: 0.4; cursor: default; pointer-events: none; }
 .push { margin-left: auto; }
 
 input, select, textarea {
@@ -314,10 +330,21 @@ html[data-theme="dark"] .tbl tbody tr:hover { background: rgba(241, 241, 238, 0.
 .cell-judul { max-width: 280px; color: var(--text); line-height: 1.4; }
 .muted { color: var(--muted); }
 .cell-actions { white-space: nowrap; text-align: right; }
+.pagination {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between;
+  margin-top: 12px;
+}
+.pagination-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pagination-controls select { width: auto; min-width: 0; }
+/* Baris pemisah "2021 Ganjil" / "Angkatan 25" saat tabel dikelompokkan — dikasih
+   warna beda dari latar halaman/kartu (bukan transparan) spy kelihatan jelas
+   sebagai pembatas, dan lebar penuh (td-nya sudah colSpan penuh, .table-wrap.card
+   sendiri tanpa padding jadi background ini otomatis rata sampai tepi kartu). */
 .tbl-group-row td {
-  background: transparent; font-weight: 700; font-size: 0.7rem;
+  background: var(--blue-bg); font-weight: 700; font-size: 0.7rem;
   text-transform: uppercase; letter-spacing: 0.08em; color: var(--blue-text);
-  padding: 14px 12px 6px; border-bottom: 1px solid var(--border);
+  padding: 10px 12px; border-bottom: 1px solid var(--blue-border);
+  border-top: 1px solid var(--blue-border);
 }
 
 /* ---------- Tabel dengan kolom bisa digeser (resizable) ---------- */
@@ -506,10 +533,14 @@ html[data-theme="dark"] .icon-btn:hover { background: rgba(241, 241, 238, 0.1); 
 /* ---------- Portal mahasiswa ---------- */
 .page-title { font-size: 1.6rem; font-weight: 600; margin: 0; letter-spacing: -0.02em; }
 .portal .toolbar { align-items: center; margin-bottom: 24px; }
-.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 20px; }
+.cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+@media (max-width: 780px) {
+  .cards { grid-template-columns: 1fr; }
+}
 .kartu { display: flex; flex-direction: column; gap: 8px; border-top: 3px solid var(--text); }
 .kartu-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
 .kartu-prog { font-size: 0.7rem; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .08em; }
+.kartu-head-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .kartu-judul { font-size: 1.05rem; font-weight: 600; line-height: 1.4; }
 .kartu-aksi { margin-top: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .callout { background: var(--blue-bg); border-left: 3px solid var(--blue); border-radius: 0; padding: 12px 16px; font-size: 0.85rem; color: var(--blue-text); }

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Field, Empty } from '../components/ui.jsx';
-import { buatId, buatPasswordAcak, KP_DOKUMEN, BERKAS_SYARAT } from '../utils/helpers.js';
+import { buatId, buatPasswordAcak, KP_DOKUMEN, BERKAS_SYARAT, PROGRAM_KEYS, programLabel } from '../utils/helpers.js';
 
 // ===================== Pengaturan.jsx =====================
 // Halaman admin "Pengaturan" — dulunya tiga modal terpisah (Kelola periode /
@@ -14,7 +14,7 @@ import { buatId, buatPasswordAcak, KP_DOKUMEN, BERKAS_SYARAT } from '../utils/he
 const SUB_TABS = [
   { key: 'periode', label: 'Periode', icon: '🗓️' },
   { key: 'pengumuman', label: 'Pengumuman', icon: '📢' },
-  { key: 'panduan', label: 'Panduan', icon: '📘' },
+  { key: 'panduan', label: 'Kelola Panduan', icon: '📘' },
   { key: 'konten', label: 'Konten', icon: '📝' },
   { key: 'akun', label: 'Akun', icon: '🔑' },
 ];
@@ -187,30 +187,37 @@ function SeksiPengumuman({ daftar, onSimpan }) {
 function SeksiPanduan({ daftar, onSimpan }) {
   const [label, setLabel] = useState('');
   const [url, setUrl] = useState('');
+  const [program, setProgram] = useState('');
   const [editId, setEditId] = useState(null);
 
-  function kosongkan() { setLabel(''); setUrl(''); setEditId(null); }
+  function kosongkan() { setLabel(''); setUrl(''); setProgram(''); setEditId(null); }
 
   function simpan() {
     if (!label.trim() || !url.trim()) return;
     if (editId) {
-      onSimpan(daftar.map((p) => (p.id === editId ? { ...p, label: label.trim(), url: url.trim() } : p)));
+      onSimpan(daftar.map((p) => (p.id === editId ? { ...p, label: label.trim(), url: url.trim(), program } : p)));
     } else {
-      onSimpan([...daftar, { id: buatId(), label: label.trim(), url: url.trim() }]);
+      onSimpan([...daftar, { id: buatId(), label: label.trim(), url: url.trim(), program }]);
     }
     kosongkan();
   }
 
-  function edit(p) { setEditId(p.id); setLabel(p.label); setUrl(p.url); }
+  function edit(p) { setEditId(p.id); setLabel(p.label); setUrl(p.url); setProgram(p.program || ''); }
   function hapus(id) { if (window.confirm('Hapus tautan panduan ini?')) onSimpan(daftar.filter((p) => p.id !== id)); if (editId === id) kosongkan(); }
 
   return (
     <div className="card">
       <p className="hint" style={{ marginTop: 0 }}>
-        Daftar unduhan (Panduan KP, Panduan TA, dst.) yang tampil di Portal mahasiswa. Tautkan ke Google Drive atau sumber lain.
+        Daftar unduhan (Panduan KP, Panduan TA, dst.) yang tampil di halaman Panduan Portal mahasiswa, dikelompokkan per program. Tautkan ke Google Drive atau sumber lain.
       </p>
       <div className="form-grid">
         <Field label="Label" full><input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="mis. Panduan KP" /></Field>
+        <Field label="Program">
+          <select value={program} onChange={(e) => setProgram(e.target.value)}>
+            <option value="">Umum (semua program)</option>
+            {PROGRAM_KEYS.map((p) => <option key={p} value={p}>{programLabel(p)}</option>)}
+          </select>
+        </Field>
         <Field label="Tautan" full><input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://drive.google.com/..." /></Field>
       </div>
       <div className="modal-foot" style={{ paddingLeft: 0, paddingRight: 0 }}>
@@ -225,7 +232,7 @@ function SeksiPanduan({ daftar, onSimpan }) {
           <ul className="periode-list">
             {daftar.map((p) => (
               <li key={p.id} className="periode-item">
-                <span>{p.label}</span>
+                <span>{p.label} <span className="muted">— {p.program ? programLabel(p.program) : 'Umum'}</span></span>
                 <span style={{ display: 'flex', gap: 8 }}>
                   <button className="link-btn" onClick={() => edit(p)}>Edit</button>
                   <button className="link-btn danger" onClick={() => hapus(p.id)}>Hapus</button>
