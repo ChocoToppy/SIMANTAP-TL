@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, stagesFor, eventsFor, punyaKlasifikasi, punyaSyarat, rolesFor, syaratLabel, getJadwal, STAGES, KLASIFIKASI, BIDANG, KP_TEMA, HARI, bidangLabel, todayISO, parseISO, daysBetween, BULAN, formatTanggal, kondisi, isAktif, indexTahap, hitungBeban, hitungBebanProgram, hitungBebanRinci, SEMUA, filterByPeriode, daftarPeriode, buatId, ADMIN_PASSWORD, DOSEN_PASSWORD, PERIODE_AKTIF, TOPIK, VERIFIKASI, statusVerif, tambahHari, LABEL_PENDAFTARAN, ringkasPendaftaran, RUANG, menitJam, rentangJadwal, jamTampil, beririsan, kumpulkanEvent, cariBentrok, waMahasiswa, TEMPLATE_SURAT, tokenSurat, renderSurat, PEJABAT, KOP_SURAT, evKeyDok, dokTA, DURASI_EVENT, JAM_KERJA, durasiEvent, jamTambah, dalamJamKerja, tahapBerikut, tahapSebelumnya, eventAktif, BERKAS_SYARAT, berkasSyarat, bolehAjukanJadwal, catatAktivitas, tanggalDibuat, aktivitasTerakhir, AKTIVITAS_LABEL, formatWaktu, hitungNomorUrut, nowStamp, normalizeUrl } from '../utils/helpers.js';
 import { DOSEN_AWAL, plusHari, RAW_MAHASISWA, MAHASISWA_AWAL, AKUN_AWAL, PERIODE_BUKA_AWAL } from '../data/seed.js';
-import { csvEscape, triggerDownload, downloadCSV, downloadDoc, cetakSuratPDF, cetakSuratPDFHtml, loadXLSX } from '../utils/exportUtils.js';
+import { csvEscape, triggerDownload, downloadCSV, downloadDoc, cetakSuratPDF, cetakSuratPDFHtml, loadXLSX, downloadXLSX } from '../utils/exportUtils.js';
 import { Badge, StageBar, Field, Modal, Empty, ExportMenu, ColResizeHandle, FileDropZone } from '../components/ui.jsx';
 import { KpDocumentPanel } from '../components/kpDocuments.jsx';
 import { generateDocument, getTemplateConfig } from '../utils/documentGenerator.js';
@@ -60,7 +60,7 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
     { key: 'aksi', width: 100, flex: true, minWidth: 100 },
   ];
   const tableWrapRef = useRef(null);
-  const [colWidths, startResize] = useColumnWidths('simantap-col-mahasiswa', COLS, tableWrapRef);
+  const [colWidths, startResize, tableWidth] = useColumnWidths('simantap-col-mahasiswa', COLS, tableWrapRef);
 
   const angkatanList = useMemo(
     () => Array.from(new Set(mahasiswa.map((m) => m.angkatan))).sort((a, b) => b - a),
@@ -234,7 +234,7 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
         </div>
       )}
       <div className="table-wrap card" ref={tableWrapRef}>
-        <table className="tbl tbl-resizable">
+        <table className="tbl tbl-resizable" style={{ width: tableWidth }}>
           <colgroup>
             {COLS.map((c, i) => (
               <col key={c.key} style={i === COLS.length - 1 ? undefined : { width: colWidths[i] }} />

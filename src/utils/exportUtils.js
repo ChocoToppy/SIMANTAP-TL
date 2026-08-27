@@ -67,6 +67,7 @@ export function cetakSuratPDFHtml(judul, htmlTeks) {
   if (!w) { downloadDocHtml(judul + '.doc', htmlTeks); return; }
   w.document.open(); w.document.write(html); w.document.close();
 }
+let xlsxPromise;
 export function loadXLSX() {
   if (typeof window !== 'undefined' && window.XLSX) return Promise.resolve(window.XLSX);
   if (!xlsxPromise) {
@@ -82,7 +83,7 @@ export function loadXLSX() {
 }
 
 // sheets: [{ name, headers, rows }]
-async function downloadXLSX(filename, sheets) {
+export async function downloadXLSX(filename, sheets) {
   const XLSX = await loadXLSX();
   const wb = XLSX.utils.book_new();
   sheets.forEach((sh) => {

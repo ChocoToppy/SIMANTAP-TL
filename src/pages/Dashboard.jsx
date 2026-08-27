@@ -178,7 +178,7 @@ export function Dashboard({ mahasiswa, dosen }) {
           <Empty>Belum ada jadwal seminar/sidang/expo pada filter ini.</Empty>
         ) : (
           <div className="table-wrap">
-            <table className="tbl">
+            <table className="tbl tbl-wide">
               <thead>
                 <tr>
                   <th>Tanggal</th>

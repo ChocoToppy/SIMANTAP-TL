@@ -617,7 +617,7 @@ export function DosenPortal({ dosen, allDosen, mahasiswa, periodeList = [], onGr
     { key: 'suratNilai', width: 220, flex: true, minWidth: 180 },
   ];
   const tableWrapRef = useRef(null);
-  const [colWidths, startResize] = useColumnWidths('simantap-col-dosen', COLS, tableWrapRef);
+  const [colWidths, startResize, tableWidth] = useColumnWidths('simantap-col-dosen', COLS, tableWrapRef);
 
   const terkait = useMemo(
     () =>
@@ -688,7 +688,7 @@ export function DosenPortal({ dosen, allDosen, mahasiswa, periodeList = [], onGr
             <Empty>Belum ada mahasiswa pada filter ini.</Empty>
           ) : (
             <div className="table-wrap" ref={tableWrapRef}>
-              <table className="tbl tbl-resizable">
+              <table className="tbl tbl-resizable" style={{ width: tableWidth }}>
                 <colgroup>
                   {COLS.map((c, i) => (
                     <col key={c.key} style={i === COLS.length - 1 ? undefined : { width: colWidths[i] }} />

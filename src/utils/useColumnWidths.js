@@ -1,55 +1,47 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 const MIN_COL_WIDTH = 60;
+
 const DEFAULT_FLEX_MIN = 80;
 
 // Lebar kolom tabel yang bisa digeser mouse (drag-to-resize, seperti Excel).
-// Dibatasi supaya jumlah lebar kolom tidak pernah melebihi lebar wadah
-// (containerRef, biasanya .table-wrap) — satu kolom terakhir (flex: true)
-// menyerap sisa ruang, jadi batas maksimum tiap kolom lain dihitung ulang
-// tiap drag berdasarkan sisa ruang yang masih ada.
-// columns: [{ key, width, flex?, minWidth? }] — tepat satu kolom boleh flex:true.
-// Lebar tersimpan di localStorage per storageKey supaya preferensi bertahan
-// antar sesi/reload.
+// columns: [{ key, width, flex?, minWidth? }] — satu kolom terakhir (flex: true)
+// menyerap sisa ruang kalau tabel lebih lebar dari total kolom lain (mis. layar besar).
+// Tidak disimpan ke localStorage — sengaja dibuat "lupa" tiap reload, supaya
+// tabel selalu mulai lagi dari ukuran default (selebar layar) dan pengguna
+// yang melebarkannya lewat drag harus mengulang tiap sesi/reload.
+//
+// tableWidth (nilai ke-3 yang dikembalikan) = lebar eksplisit untuk `style={{ width }}`
+// pada <table>. Selama belum pernah di-drag, ini `undefined` (tabel ikut CSS
+// width:auto;min-width:100% biasa, mengisi persis selebar wadah/layar — ini
+// ukuran default, tidak pernah melebihi layar). Begitu pengguna mulai menggeser
+// kolom, tableWidth berubah jadi total kolom (termasuk lebar minimum kolom flex
+// terakhir) dalam px — kalau itu melebihi wadah, tabel melebar melebihi layar
+// dan .table-wrap (overflow-x:auto) yang scroll, bukan kolom terakhir yang "dipepetkan".
 export function useColumnWidths(storageKey, columns, containerRef) {
-  const [widths, setWidths] = useState(() => {
-    let saved = {};
-    try { saved = JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch (e) { /* abaikan */ }
-    return columns.map((c) => saved[c.key] || c.width);
-  });
+  const [widths, setWidths] = useState(() => columns.map((c) => c.width));
+  const [dragged, setDragged] = useState(false);
 
-  useEffect(() => {
-    try {
-      const obj = {};
-      columns.forEach((c, i) => { obj[c.key] = widths[i]; });
-      localStorage.setItem(storageKey, JSON.stringify(obj));
-    } catch (e) { /* abaikan */ }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [widths]);
+  // Batas atas hanya angka besar sewajarnya supaya drag tidak "kabur" tak terbatas.
+  const MAX_COL_WIDTH = 1200;
 
   const flexIdx = columns.findIndex((c) => c.flex);
   const flexMin = (flexIdx >= 0 && columns[flexIdx].minWidth) || DEFAULT_FLEX_MIN;
-
-  function maxFor(index, currentWidths) {
-    const container = containerRef && containerRef.current;
-    if (!container) return Infinity;
-    const containerWidth = container.clientWidth;
-    const otherFixedSum = currentWidths.reduce(
-      (sum, w, i) => (i === index || i === flexIdx ? sum : sum + w), 0
-    );
-    return Math.max(MIN_COL_WIDTH, containerWidth - otherFixedSum - flexMin);
-  }
+  const tableWidth = dragged
+    ? widths.reduce((sum, w, i) => (i === flexIdx ? sum : sum + w), 0) + flexMin
+    : undefined;
 
   function startResize(index, e) {
     e.preventDefault();
     e.stopPropagation();
+    setDragged(true);
     const startX = e.clientX;
     const startWidth = widths[index];
 
     function onMove(ev) {
       setWidths((cur) => {
         const proposed = startWidth + (ev.clientX - startX);
-        const clamped = Math.min(Math.max(MIN_COL_WIDTH, proposed), maxFor(index, cur));
+        const clamped = Math.min(Math.max(MIN_COL_WIDTH, proposed), MAX_COL_WIDTH);
         const copy = cur.slice();
         copy[index] = clamped;
         return copy;
@@ -63,5 +55,5 @@ export function useColumnWidths(storageKey, columns, containerRef) {
     document.addEventListener('mouseup', onUp);
   }
 
-  return [widths, startResize];
+  return [widths, startResize, tableWidth];
 }
