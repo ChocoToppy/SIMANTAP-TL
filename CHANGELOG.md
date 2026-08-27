@@ -1,5 +1,31 @@
 # Changelog
 
+## 27-08-2026 — Ekspor Excel, tabel per program, dan halaman Panduan
+
+### Ekspor & tabel Mahasiswa
+- Memperbaiki ekspor Excel yang sebelumnya tidak berfungsi sama sekali (fungsi belum diekspor dari modulnya) — sekarang mengunduh berkas `.xlsx` yang valid.
+- Ekspor Excel/CSV kini menuliskan nama lengkap dosen pembimbing/penguji (bukan kode singkat), sementara tampilan tabel tetap pakai kode singkat supaya hemat lebar kolom.
+- Menambahkan kolom "No. Surat" ke tabel Mahasiswa (sebelumnya hanya ada di ekspor & form edit).
+- Menambahkan paginasi ke tabel Mahasiswa — default 100 baris/halaman, bisa diperkecil (5/10/25/50) atau diperbesar sampai 500; pencarian & filter tetap menyisir seluruh data, bukan cuma halaman yang tampil.
+- Tabel Mahasiswa sekarang dipecah jadi tab per program (Tugas Akhir/KP/Capstone/Magang/Tesis S2) — kolom pembimbing/penguji menyesuaikan otomatis sesuai kebutuhan tiap program (mis. KP cuma satu kolom "Dosen Pembimbing/Penguji"), dan filter "Semua program" dihapus karena programnya tidak lagi dicampur. Tombol "+ Tambah" otomatis memakai program dari tab yang aktif.
+- Tab program ini sengaja dibuat beda gaya (pil hijau solid) dari tab navigasi utama (Dashboard/Mahasiswa/Dosen) supaya jelas ini level navigasi berbeda.
+
+### Perilaku tabel (lebar kolom & drag-resize)
+- Tabel dengan kolom bisa digeser (Mahasiswa, Dosen, tabel dosen di portal) sekarang defaultnya selalu selebar layar, dan baru melebar melebihi layar (dengan scroll ke samping) begitu ada kolom yang digeser lebih lebar — sebelumnya kolom malah dipepetkan/diciutkan saat digeser.
+- Lebar kolom hasil geser sengaja tidak lagi disimpan ke localStorage — selalu kembali ke ukuran default tiap reload.
+- Baris pemisah "2021 Ganjil" / "Angkatan 25" saat tabel dikelompokkan kini diberi warna latar biru muda (sebelumnya transparan/tidak kelihatan) supaya jelas sebagai pembatas.
+
+### Halaman Panduan (Portal mahasiswa)
+- Menambahkan halaman baru beralamat `/panduan`, berisi semua panduan yang diunggah admin, dikelompokkan per program (termasuk "Umum" untuk yang berlaku ke semua program) — dibuka lewat tombol hijau "Panduan" di header, bisa diakses/dibagikan langsung lewat alamatnya.
+- Tiap kartu pengajuan mahasiswa kini menampilkan tombol panduan (hijau, tanpa garis bawah) langsung di sebelah badge status verifikasi — khusus panduan program itu sendiri, tidak termasuk yang "Umum" (supaya kartu tidak penuh kalau panduan Umum makin banyak).
+- "Kelola Panduan" di Pengaturan admin sekarang punya field Program (Umum/TA/KP/Capstone/Magang/Tesis S2) untuk mengelompokkan tiap panduan.
+- Menambahkan tab "Penggunaan Ruang" ke Portal mahasiswa — tabel jadwal seminar/sidang/expo & pemakaian ruang seluruh mahasiswa (sama seperti di Dashboard admin), supaya mahasiswa bisa cek sendiri potensi bentrok jadwal/ruang.
+
+### Perbaikan kecil
+- Tombol berbentuk link (`<a>` bergaya `.btn`) tidak lagi bergaris bawah di seluruh aplikasi.
+- Tampilan pengajuan mahasiswa (Portal) sekarang 2 kartu per baris (sebelumnya 3).
+- Label paginasi disederhanakan ("1 / 1" alih-alih "Halaman 1 / 1", "100" alih-alih "100 / halaman").
+
 ## 26-08-2026 — Halaman Pengaturan, editor konten, dan pembenahan dokumen KP
 
 ### Halaman Pengaturan
