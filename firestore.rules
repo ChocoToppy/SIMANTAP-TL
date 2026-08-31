@@ -1,17 +1,100 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /mahasiswa/{document} {
-      allow read, write: if true;
+
+    // Catatan penting: untuk operasi "list" (query/onSnapshot atas satu
+    // koleksi, bukan satu dokumen tunggal), Firestore harus bisa membuktikan
+    // aturan berlaku untuk SEMUA kemungkinan dokumen yang bisa dikembalikan
+    // query itu — bukan memfilter dokumen satu per satu. Karena itu, semua
+    // fungsi di bawah ini SENGAJA hanya mengandalkan request.auth (token
+    // custom claim: role/kode/nim) yang nilainya tetap sepanjang satu
+    // request, bukan get() ke dokumen lain yang isinya berbeda per dokumen
+    // yang dibaca (mis. get(akun/$(resource.data.owner)) DILARANG di sini).
+    // Query dari klien WAJIB disertai where() yang cocok (lihat App.jsx).
+
+    function isSignedIn() { return request.auth != null; }
+    function role() { return request.auth.token.role; }
+    function lecturerKode() { return request.auth.token.kode; }
+    function studentNim() { return request.auth.token.nim; }
+
+    function isAdmin() {
+      return isSignedIn() && role() == 'admin'
+        && get(/databases/$(database)/documents/admin/$(request.auth.uid)).data.isActive == true;
     }
-    match /dosen/{document} {
-      allow read, write: if true;
+    function isLecturer() {
+      return isSignedIn() && role() == 'lecturer'
+        && get(/databases/$(database)/documents/dosen/$(lecturerKode())).data.isActive == true;
     }
-    match /akun/{document} {
-      allow read, write: if true;
+    function isStudent() {
+      return isSignedIn() && role() == 'student'
+        && get(/databases/$(database)/documents/akun/$(studentNim())).data.isActive == true;
     }
+    function assignedTo(m) {
+      return m.pembimbing1 == lecturerKode() || m.pembimbing2 == lecturerKode()
+        || m.penguji1 == lecturerKode() || m.penguji2 == lecturerKode();
+    }
+    function ownedByMe(m) { return m.owner == studentNim(); }
+
+    // ----- Data akademik mahasiswa (satu dokumen per program yang diikuti) -----
+    match /mahasiswa/{id} {
+      allow read, update, delete: if isAdmin()
+        || (isLecturer() && assignedTo(resource.data))
+        || (isStudent() && ownedByMe(resource.data));
+      allow create: if isAdmin() || (isStudent() && ownedByMe(request.resource.data));
+    }
+
+    // ----- Akun login mahasiswa -----
+    match /akun/{nim} {
+      allow read: if isAdmin() || (isStudent() && studentNim() == nim);
+      // Mahasiswa hanya boleh membersihkan sendiri flag mustChangePassword
+      // miliknya sendiri setelah ganti password — selain itu (isActive, dst.)
+      // hanya admin/Cloud Functions yang boleh menulis.
+      allow update: if isAdmin() || (
+        isStudent() && studentNim() == nim &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['mustChangePassword']) &&
+        request.resource.data.mustChangePassword == false
+      );
+      allow create, delete: if isAdmin();
+    }
+
+    // ----- Data dosen (profil + akun login) -----
+    match /dosen/{kode} {
+      allow read: if isSignedIn(); // nama dosen perlu tampil luas (pembimbing/penguji)
+      allow update: if isAdmin() || (
+        isLecturer() && lecturerKode() == kode &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['mustChangePassword']) &&
+        request.resource.data.mustChangePassword == false
+      );
+      allow create, delete: if isAdmin();
+    }
+
+    // ----- Akun admin -----
+    match /admin/{uid} {
+      allow read: if isAdmin();
+      // Admin hanya boleh membersihkan sendiri flag mustChangePassword miliknya
+      // sendiri setelah ganti password — sama seperti akun/dosen di atas.
+      allow update: if isAdmin() && request.auth.uid == uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['mustChangePassword']) &&
+        request.resource.data.mustChangePassword == false;
+      allow create, delete: if false; // hanya lewat Cloud Functions / skrip migrasi (Admin SDK)
+    }
+
+    // ----- Peta login (NIM/NIP -> email) untuk lookup sebelum login -----
+    match /loginIndex/{id} {
+      allow get: if true;
+      allow list, write: if false; // hanya Cloud Functions (Admin SDK) yang menulis
+    }
+
+    // ----- Log audit reset password oleh admin -----
+    match /auditLog/{id} {
+      allow read: if isAdmin();
+      allow write: if false; // hanya Cloud Functions (Admin SDK)
+    }
+
+    // ----- Konfigurasi umum (periode, pengumuman, panduan) -----
     match /config/{document} {
-      allow read, write: if true;
+      allow read: if true; // ditampilkan di halaman login publik
+      allow write: if isAdmin();
     }
   }
 }

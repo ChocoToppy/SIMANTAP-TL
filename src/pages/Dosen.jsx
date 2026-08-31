@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, stagesFor, eventsFor, punyaKlasifikasi, punyaSyarat, rolesFor, syaratLabel, getJadwal, STAGES, KLASIFIKASI, BIDANG, KP_TEMA, HARI, bidangLabel, todayISO, parseISO, daysBetween, BULAN, formatTanggal, kondisi, isAktif, indexTahap, hitungBeban, hitungBebanProgram, hitungBebanRinci, SEMUA, filterByPeriode, daftarPeriode, buatId, ADMIN_PASSWORD, DOSEN_PASSWORD, PERIODE_AKTIF, TOPIK, VERIFIKASI, statusVerif, tambahHari, LABEL_PENDAFTARAN, ringkasPendaftaran, RUANG, menitJam, rentangJadwal, jamTampil, beririsan, dosenTerlibat, kumpulkanEvent, cariBentrok, pesanNotifikasi, waLink, mailtoLink, waMahasiswa, TEMPLATE_SURAT, tokenSurat, renderSurat, PEJABAT, KOP_SURAT, evKeyDok, dokTA, DURASI_EVENT, JAM_KERJA, durasiEvent, jamTambah, dalamJamKerja, tahapBerikut, eventAktif, BERKAS_SYARAT, berkasSyarat, bolehAjukanJadwal } from '../utils/helpers.js';
+import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, stagesFor, eventsFor, punyaKlasifikasi, punyaSyarat, rolesFor, syaratLabel, getJadwal, STAGES, KLASIFIKASI, BIDANG, KP_TEMA, HARI, bidangLabel, todayISO, parseISO, daysBetween, BULAN, formatTanggal, kondisi, isAktif, indexTahap, hitungBeban, hitungBebanProgram, hitungBebanRinci, SEMUA, filterByPeriode, daftarPeriode, buatId, PERIODE_AKTIF, TOPIK, VERIFIKASI, statusVerif, tambahHari, LABEL_PENDAFTARAN, ringkasPendaftaran, RUANG, menitJam, rentangJadwal, jamTampil, beririsan, dosenTerlibat, kumpulkanEvent, cariBentrok, pesanNotifikasi, waLink, mailtoLink, waMahasiswa, TEMPLATE_SURAT, tokenSurat, renderSurat, PEJABAT, KOP_SURAT, evKeyDok, dokTA, DURASI_EVENT, JAM_KERJA, durasiEvent, jamTambah, dalamJamKerja, tahapBerikut, eventAktif, BERKAS_SYARAT, berkasSyarat, bolehAjukanJadwal } from '../utils/helpers.js';
 import { DOSEN_AWAL, plusHari, RAW_MAHASISWA, MAHASISWA_AWAL, AKUN_AWAL, PERIODE_BUKA_AWAL } from '../data/seed.js';
 import { csvEscape, triggerDownload, downloadCSV, downloadDoc, cetakSuratPDF, loadXLSX, downloadXLSX } from '../utils/exportUtils.js';
 import { Badge, StageBar, Field, Modal, Empty, ExportMenu } from '../components/ui.jsx';
@@ -29,7 +29,11 @@ export function Dosen({ dosen, mahasiswa, periodeLabel, onSave, onDelete }) {
   const bebanTone = (t) => (t >= 8 ? 'red' : t >= 6 ? 'amber' : 'blue');
 
   function tambah() { setEditing(null); setOpen(true); }
-  function edit(d) { setEditing(d); setOpen(true); }
+  // `d` di sini adalah baris tabel (raw dosen + beban terhitung dari
+  // hitungBebanRinci) — pakai data mentah dari prop `dosen`, bukan `d`
+  // langsung, supaya field beban (bimbinganTA, total, dst.) yang cuma untuk
+  // tampilan tidak ikut ke form lalu tersimpan sebagai field asing di Firestore.
+  function edit(d) { setEditing(dosen.find((x) => x.kode === d.kode) || null); setOpen(true); }
   function simpan(d) { onSave(d); setOpen(false); }
   function hapus(d) {
     if (window.confirm(`Hapus dosen ${d.kode}? Pastikan tidak sedang membimbing/menguji.`)) onDelete(d.kode);

@@ -77,5 +77,9 @@ node_modules/
 # dotenv environment variables file
 .env
 
+# Firebase Admin SDK service account keys (never commit — full project access)
+functions/*firebase-adminsdk*.json
+functions/serviceAccount.json
+
 # dataconnect generated files
 .dataconnect

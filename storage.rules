@@ -1,11 +1,33 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Sama seperti firestore.rules: aplikasi ini tidak memakai Firebase Auth,
-    // jadi akses dibuka penuh dan diamankan hanya lewat password di sisi
-    // aplikasi (bukan aturan Storage). Cocokkan jika model keamanan berubah.
-    match /uploads/{allPaths=**} {
-      allow read, write: if true;
+
+    function isSignedIn() { return request.auth != null; }
+    function role() { return request.auth.token.role; }
+    function mhsDoc(mahasiswaId) {
+      return firestore.get(/databases/(default)/documents/mahasiswa/$(mahasiswaId)).data;
+    }
+    function akunDoc(nim) {
+      return firestore.get(/databases/(default)/documents/akun/$(nim)).data;
+    }
+    function isAdmin() { return isSignedIn() && role() == 'admin'; }
+    function isAssignedLecturer(mahasiswaId) {
+      let m = mhsDoc(mahasiswaId);
+      let kode = request.auth.token.kode;
+      return isSignedIn() && role() == 'lecturer'
+        && (m.pembimbing1 == kode || m.pembimbing2 == kode || m.penguji1 == kode || m.penguji2 == kode);
+    }
+    function isOwnerStudent(mahasiswaId) {
+      return isSignedIn() && role() == 'student'
+        && akunDoc(mhsDoc(mahasiswaId).owner).uid == request.auth.uid;
+    }
+
+    // Berkas mahasiswa (proposal, laporan, dokumen KP, dst.) disimpan per
+    // mahasiswaId (= id dokumen mahasiswa/{id}) — akses mengikuti aturan yang
+    // sama seperti Firestore: admin bebas, dosen hanya untuk mahasiswa yang
+    // dibimbing/diuji, mahasiswa hanya untuk berkas miliknya sendiri.
+    match /uploads/{mahasiswaId}/{allPaths=**} {
+      allow read, write: if isAdmin() || isAssignedLecturer(mahasiswaId) || isOwnerStudent(mahasiswaId);
     }
   }
 }

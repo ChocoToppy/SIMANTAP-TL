@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Field, Empty } from '../components/ui.jsx';
-import { buatId, buatPasswordAcak, KP_DOKUMEN, BERKAS_SYARAT, PROGRAM_KEYS, programLabel } from '../utils/helpers.js';
+import { Field, Empty, Modal } from '../components/ui.jsx';
+import { buatId, KP_DOKUMEN, BERKAS_SYARAT, PROGRAM_KEYS, programLabel } from '../utils/helpers.js';
 
 // ===================== Pengaturan.jsx =====================
 // Halaman admin "Pengaturan" — dulunya tiga modal terpisah (Kelola periode /
@@ -16,7 +16,8 @@ const SUB_TABS = [
   { key: 'pengumuman', label: 'Pengumuman', icon: '📢' },
   { key: 'panduan', label: 'Kelola Panduan', icon: '📘' },
   { key: 'konten', label: 'Konten', icon: '📝' },
-  { key: 'akun', label: 'Akun', icon: '🔑' },
+  { key: 'akun', label: 'Akun Mahasiswa', icon: '🔑' },
+  { key: 'staf', label: 'Dosen & Admin', icon: '👤' },
 ];
 
 export function Pengaturan({
@@ -24,7 +25,8 @@ export function Pengaturan({
   pengumuman, onSimpanPengumuman,
   panduan, onSimpanPanduan,
   konten = {}, onSimpanKonten,
-  akun = [], onResetPassword,
+  akun = [], dosen = [], admin = [],
+  onResetPassword, onCreateUser, onToggleAkunAktif, onToggleDosenAktif, onEditDosen,
 }) {
   const [subTab, setSubTab] = useState(SUB_TABS[0].key);
   const aktif = SUB_TABS.find((t) => t.key === subTab) || SUB_TABS[0];
@@ -70,7 +72,10 @@ export function Pengaturan({
           <SeksiKonten konten={konten} onSimpan={onSimpanKonten} />
         )}
         {subTab === 'akun' && (
-          <SeksiAkun daftar={akun} onReset={onResetPassword} />
+          <SeksiAkun daftar={akun} onReset={onResetPassword} onToggleAktif={onToggleAkunAktif} />
+        )}
+        {subTab === 'staf' && (
+          <SeksiStaf dosen={dosen} admin={admin} onReset={onResetPassword} onCreate={onCreateUser} onToggleDosenAktif={onToggleDosenAktif} onEditDosen={onEditDosen} />
         )}
       </div>
     </div>
@@ -389,14 +394,15 @@ function KontenBerkasCard({ ev, defaultList, override, onSimpan, onReset }) {
 }
 
 // ----- Daftar akun mahasiswa + reset password -----
-// Tidak ada alur verifikasi (OTP/SMS dsb.) — password memang tersimpan polos
-// di Firestore (lihat catatan di firestore.rules), jadi cara paling sederhana
-// untuk "reset" adalah admin melihat/mengganti langsung dari sini lalu
-// mengabarkannya ke mahasiswa (telepon/WA), sama seperti admin & dosen sudah
-// jadi satu-satunya pemegang otoritas login di aplikasi ini.
-function SeksiAkun({ daftar, onReset }) {
+// Password disimpan & diverifikasi oleh Firebase Authentication — TIDAK
+// PERNAH bisa dilihat siapa pun, termasuk admin (lihat functions/index.js:
+// adminResetPassword). Satu-satunya aksi yang tersedia di sini adalah reset
+// ke password sementara baru; mahasiswa wajib menggantinya saat login
+// berikutnya (mustChangePassword).
+function SeksiAkun({ daftar, onReset, onToggleAktif }) {
   const [q, setQ] = useState('');
   const [pesan, setPesan] = useState(null); // { nim, teks }
+  const [busy, setBusy] = useState(null);
 
   const rows = daftar.filter((a) => {
     const term = q.trim().toLowerCase();
@@ -404,26 +410,32 @@ function SeksiAkun({ daftar, onReset }) {
     return `${a.nama} ${a.nim}`.toLowerCase().includes(term);
   });
 
-  function salin(nim, password) {
-    navigator.clipboard.writeText(password).catch(() => {});
+  function salin(nim, teks) {
+    navigator.clipboard.writeText(teks).catch(() => {});
     setPesan({ nim, teks: 'Tersalin!' });
     setTimeout(() => setPesan(null), 1500);
   }
 
-  function reset(a) {
+  async function reset(a) {
+    if (!a.uid) { setPesan({ nim: a.nim, teks: 'Akun ini belum bermigrasi ke Firebase Auth.' }); return; }
     if (!window.confirm(`Reset password ${a.nama} (${a.nim})? Password lama tidak akan berlaku lagi.`)) return;
-    const baru = buatPasswordAcak();
-    onReset(a.nim, baru);
-    setPesan({ nim: a.nim, teks: `Password baru: ${baru}` });
+    setBusy(a.nim);
+    try {
+      const { tempPassword } = await onReset(a.uid);
+      setPesan({ nim: a.nim, teks: `Password sementara: ${tempPassword}` });
+    } catch (e) {
+      setPesan({ nim: a.nim, teks: 'Gagal reset: ' + (e.message || e) });
+    } finally {
+      setBusy(null);
+    }
   }
 
   return (
     <div className="card">
       <p className="hint" style={{ marginTop: 0 }}>
-        Untuk troubleshooting saat mahasiswa lupa password — lihat langsung atau reset ke
-        password acak baru, lalu kabarkan sendiri ke mahasiswa (telepon/WA). Tidak ada
-        verifikasi otomatis di sini; siapa pun yang bisa membuka halaman ini bisa melihat
-        semua password.
+        Untuk troubleshooting saat mahasiswa lupa password — reset ke password sementara
+        baru, lalu kabarkan sendiri ke mahasiswa (telepon/WA); mereka wajib menggantinya
+        saat login berikutnya. Password tidak pernah bisa dilihat di sini — hanya "Reset".
       </p>
       <input
         value={q}
@@ -440,7 +452,8 @@ function SeksiAkun({ daftar, onReset }) {
               <tr>
                 <th>Nama</th>
                 <th>NIM</th>
-                <th>Password</th>
+                <th>Email</th>
+                <th>Status</th>
                 <th></th>
               </tr>
             </thead>
@@ -449,16 +462,25 @@ function SeksiAkun({ daftar, onReset }) {
                 <tr key={a.nim}>
                   <td>{a.nama}</td>
                   <td className="cell-sub">{a.nim}</td>
+                  <td className="cell-sub">{a.email || '-'}</td>
                   <td>
-                    <span className="phone-display-number" style={{ fontSize: '0.8rem', padding: '4px 10px' }}>{a.password}</span>
+                    <span className={'chip ' + (a.isActive === false ? 'chip-off' : 'chip-on')}>
+                      {a.isActive === false ? 'Nonaktif' : 'Aktif'}
+                    </span>
                   </td>
                   <td className="cell-actions">
                     {pesan && pesan.nim === a.nim ? (
-                      <span className="hint">{pesan.teks}</span>
+                      <span className="hint">
+                        {pesan.teks} {pesan.teks.startsWith('Password') && (
+                          <button className="link-btn" onClick={() => salin(a.nim, pesan.teks.split(': ')[1])}>Salin</button>
+                        )}
+                      </span>
                     ) : (
                       <>
-                        <button className="link-btn" onClick={() => salin(a.nim, a.password)}>Salin</button>
-                        <button className="link-btn danger" onClick={() => reset(a)}>Reset</button>
+                        <button className="link-btn" disabled={busy === a.nim} onClick={() => reset(a)}>Reset Password</button>
+                        <button className="link-btn danger" onClick={() => onToggleAktif(a.nim, a.isActive === false)}>
+                          {a.isActive === false ? 'Aktifkan' : 'Nonaktifkan'}
+                        </button>
                       </>
                     )}
                   </td>
@@ -468,6 +490,183 @@ function SeksiAkun({ daftar, onReset }) {
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+// ----- Kelola akun dosen & admin (roster kecil, dibuat manual oleh admin) -----
+function SeksiStaf({ dosen, admin, onReset, onCreate, onToggleDosenAktif, onEditDosen }) {
+  const [open, setOpen] = useState(false); // form hanya tampil (sbg modal) saat true
+  const [tipe, setTipe] = useState('lecturer'); // 'lecturer' | 'admin'
+  const [editKode, setEditKode] = useState(null); // null = mode "buat baru"; else kode dosen yang diedit
+  const [nama, setNama] = useState('');
+  const [email, setEmail] = useState('');
+  const [kode, setKode] = useState('');
+  const [nip, setNip] = useState('');
+  const [kompetensi, setKompetensi] = useState('');
+  const [err, setErr] = useState('');
+  const [hasil, setHasil] = useState(null); // { loginId, tempPassword } — tetap tampil setelah modal ditutup
+  const [busy, setBusy] = useState(false);
+  const [pesan, setPesan] = useState(null); // { key, teks }
+
+  function kosongkan() { setNama(''); setEmail(''); setKode(''); setNip(''); setKompetensi(''); setErr(''); setEditKode(null); setTipe('lecturer'); }
+
+  function mulaiTambah(tipeBaru) {
+    kosongkan();
+    setHasil(null);
+    setTipe(tipeBaru);
+    setOpen(true);
+  }
+
+  function mulaiEdit(d) {
+    setTipe('lecturer');
+    setEditKode(d.kode);
+    setNama(d.nama || ''); setEmail(d.email || ''); setKode(d.kode); setNip(d.nip || ''); setKompetensi(d.kompetensi || '');
+    setErr(''); setHasil(null);
+    setOpen(true);
+  }
+
+  function tutup() { setOpen(false); kosongkan(); }
+
+  async function buat() {
+    setErr('');
+    if (!nama.trim() || !email.trim()) { setErr('Nama dan email wajib diisi.'); return; }
+    if (tipe === 'lecturer' && !kode.trim()) { setErr('Kode dosen wajib diisi.'); return; }
+    setBusy(true);
+    try {
+      if (editKode) {
+        // Edit profil dosen yang sudah ada — tulis langsung ke Firestore
+        // (bukan lewat Cloud Function, karena tidak ada akun Auth baru yang
+        // dibuat). Field login (uid/isActive/mustChangePassword) tetap
+        // dipertahankan oleh onEditDosen, hanya profil yang diperbarui di sini.
+        const existing = dosen.find((d) => d.kode === editKode) || {};
+        await onEditDosen({ ...existing, kode: editKode, nama: nama.trim(), email: email.trim(), nip: nip.trim(), kompetensi: kompetensi.trim() });
+        setOpen(false); kosongkan(); setHasil(null);
+      } else {
+        const res = await onCreate({ role: tipe, nama, email, kode, nip, kompetensi });
+        setOpen(false); kosongkan();
+        setHasil({ loginId: res.loginId, tempPassword: res.tempPassword });
+      }
+    } catch (e) {
+      setErr(e.message || 'Gagal menyimpan.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function reset(uid, key) {
+    if (!window.confirm('Reset password akun ini? Password lama tidak akan berlaku lagi.')) return;
+    setPesan({ key, teks: 'Memproses…' });
+    try {
+      const { tempPassword } = await onReset(uid);
+      setPesan({ key, teks: `Password sementara: ${tempPassword}` });
+    } catch (e) {
+      setPesan({ key, teks: 'Gagal reset: ' + (e.message || e) });
+    }
+  }
+
+  return (
+    <div className="card">
+      <p className="hint" style={{ marginTop: 0 }}>
+        Roster dosen &amp; admin kecil dan tetap — dibuat manual di sini, bukan pendaftaran
+        mandiri. Password awal dibuat otomatis (sementara) dan wajib diganti saat login pertama.
+      </p>
+
+      {hasil && (
+        <div className="hint" style={{ marginTop: 8 }}>
+          Akun dibuat: <strong>{hasil.loginId}</strong> — password sementara: <strong>{hasil.tempPassword}</strong>. Kabarkan ke yang bersangkutan; wajib diganti saat login pertama.
+        </div>
+      )}
+
+      <div className="modal-foot" style={{ paddingLeft: 0, paddingRight: 0, justifyContent: 'flex-start', gap: 8 }}>
+        <button className="btn btn-primary" onClick={() => mulaiTambah('lecturer')}>+ Tambah dosen</button>
+        <button className="btn" onClick={() => mulaiTambah('admin')}>+ Tambah admin</button>
+      </div>
+
+      {open && (
+        <Modal
+          title={editKode ? `Edit dosen ${editKode}` : `Tambah ${tipe === 'lecturer' ? 'dosen' : 'admin'}`}
+          onClose={tutup}
+          footer={
+            <>
+              <button className="btn" onClick={tutup} disabled={busy}>Batal</button>
+              <button className="btn btn-primary" onClick={buat} disabled={busy}>
+                {busy ? 'Memproses…' : editKode ? 'Simpan perubahan' : `Tambah ${tipe === 'lecturer' ? 'dosen' : 'admin'}`}
+              </button>
+            </>
+          }
+        >
+          {editKode && (
+            <p className="hint" style={{ marginTop: 0 }}>Akun login (password, status aktif) tidak berubah dari sini.</p>
+          )}
+          <div className="form-grid">
+            <Field label="Nama"><input value={nama} onChange={(e) => setNama(e.target.value)} /></Field>
+            <Field label="Email"><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
+            {tipe === 'lecturer' && (
+              <>
+                <Field label="Kode (unik, mis. ASN)"><input value={kode} disabled={!!editKode} onChange={(e) => setKode(e.target.value.toUpperCase())} /></Field>
+                <Field label="NIP"><input value={nip} onChange={(e) => setNip(e.target.value)} /></Field>
+                <Field label="Kompetensi" full><input value={kompetensi} onChange={(e) => setKompetensi(e.target.value)} /></Field>
+              </>
+            )}
+          </div>
+          {err && <div className="login-err" style={{ marginTop: 8 }}>{err}</div>}
+        </Modal>
+      )}
+
+      <div className="sched-title" style={{ marginTop: 20 }}>Dosen</div>
+      <div className="table-wrap">
+        <table className="tbl">
+          <thead><tr><th>Kode</th><th>Nama</th><th>Email</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            {dosen.map((d) => {
+              const key = 'd-' + d.kode;
+              return (
+                <tr key={d.kode}>
+                  <td>{d.kode}</td>
+                  <td>{d.nama}</td>
+                  <td className="cell-sub">{d.email || '-'}</td>
+                  <td><span className={'chip ' + (d.isActive === false ? 'chip-off' : 'chip-on')}>{d.isActive === false ? 'Nonaktif' : 'Aktif'}</span></td>
+                  <td className="cell-actions">
+                    {pesan && pesan.key === key ? <span className="hint">{pesan.teks}</span> : (
+                      <>
+                        <button className="link-btn" onClick={() => mulaiEdit(d)}>Edit</button>
+                        {d.uid && <button className="link-btn" onClick={() => reset(d.uid, key)}>Reset Password</button>}
+                        <button className="link-btn danger" onClick={() => onToggleDosenAktif(d.kode, d.isActive === false)}>
+                          {d.isActive === false ? 'Aktifkan' : 'Nonaktifkan'}
+                        </button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="sched-title" style={{ marginTop: 20 }}>Admin</div>
+      <div className="table-wrap">
+        <table className="tbl">
+          <thead><tr><th>Nama</th><th>Email</th><th></th></tr></thead>
+          <tbody>
+            {admin.map((a) => {
+              const key = 'a-' + a.uid;
+              return (
+                <tr key={a.uid}>
+                  <td>{a.nama}</td>
+                  <td className="cell-sub">{a.email}</td>
+                  <td className="cell-actions">
+                    {pesan && pesan.key === key ? <span className="hint">{pesan.teks}</span> : (
+                      <button className="link-btn" onClick={() => reset(a.uid, key)}>Reset Password</button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

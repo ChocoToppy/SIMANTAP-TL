@@ -94,12 +94,10 @@ export const MAHASISWA_AWAL = RAW_MAHASISWA
     },
   ]);
 
-// Akun login mahasiswa (prototipe). Password disimpan apa adanya (bukan keamanan nyata).
-export const AKUN_AWAL = [
-  { nim: '21080118120001', nama: 'Adinda Lestari', password: 'mahasiswa' },
-  { nim: '21080120120099', nama: 'Rangga Saputra', password: 'mahasiswa' },
-  { nim: '21080120120100', nama: 'Sinta Wulandari', password: 'mahasiswa' },
-];
+// Data cache lokal awal (sebelum Firestore selesai dimuat) — akun login
+// sesungguhnya sekarang di Firebase Authentication, bukan di sini. Daftar ini
+// hanya dipakai sebagai tampilan sementara; tidak ada password tersimpan.
+export const AKUN_AWAL = [];
 
 // Periode pendaftaran yang dibuka admin (muncul di dropdown mahasiswa).
 export const PERIODE_BUKA_AWAL = ['2021 Ganjil'];

@@ -208,23 +208,10 @@ export function buatId() {
   return 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
 
-// Password acak pendek untuk reset akun mahasiswa oleh admin (lihat Pengaturan
-// → Akun). Karakter ambigu (0/O, 1/l/I) dihindari supaya mudah dibacakan lewat
-// telepon/WA.
-export function buatPasswordAcak(len = 6) {
-  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-  let out = '';
-  for (let i = 0; i < len; i++) out += chars[Math.floor(Math.random() * chars.length)];
-  return out;
-}
-
-// ===================== Autentikasi & verifikasi (Rute A / lokal) =====================
-
-// Password admin untuk prototipe (ganti sesuai kebutuhan).
-export const ADMIN_PASSWORD = 'admin123';
-
-// Password bersama untuk login dosen (username = NIP).
-export const DOSEN_PASSWORD = 'dosen123';
+// ===================== Verifikasi pendaftaran =====================
+// Autentikasi (login/registrasi/reset password) kini ditangani Firebase
+// Authentication + Cloud Functions — lihat src/utils/auth.js dan
+// functions/index.js. Tidak ada lagi password bersama/hardcoded di sini.
 
 // Periode default untuk pendaftaran baru oleh mahasiswa.
 export const PERIODE_AKTIF = '2021 Ganjil';

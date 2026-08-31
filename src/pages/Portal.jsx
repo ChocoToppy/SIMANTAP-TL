@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, stagesFor, eventsFor, punyaKlasifikasi, punyaSyarat, rolesFor, syaratLabel, getJadwal, STAGES, KLASIFIKASI, BIDANG, KP_TEMA, HARI, bidangLabel, todayISO, parseISO, daysBetween, BULAN, formatTanggal, kondisi, isAktif, indexTahap, hitungBeban, hitungBebanProgram, hitungBebanRinci, SEMUA, filterByPeriode, daftarPeriode, buatId, ADMIN_PASSWORD, DOSEN_PASSWORD, PERIODE_AKTIF, TOPIK, VERIFIKASI, statusVerif, tambahHari, LABEL_PENDAFTARAN, ringkasPendaftaran, RUANG, menitJam, rentangJadwal, jamTampil, beririsan, dosenTerlibat, kumpulkanEvent, cariBentrok, pesanNotifikasi, waLink, mailtoLink, waMahasiswa, TEMPLATE_SURAT, tokenSurat, renderSurat, PEJABAT, KOP_SURAT, evKeyDok, dokTA, DURASI_EVENT, JAM_KERJA, durasiEvent, jamTambah, dalamJamKerja, tahapBerikut, eventAktif, BERKAS_SYARAT, berkasSyarat, bolehAjukanJadwal, KP_DOKUMEN, catatAktivitas, tanggalDibuat, aktivitasTerakhir, AKTIVITAS_LABEL, formatWaktu, normalizeUrl } from '../utils/helpers.js';
+import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, stagesFor, eventsFor, punyaKlasifikasi, punyaSyarat, rolesFor, syaratLabel, getJadwal, STAGES, KLASIFIKASI, BIDANG, KP_TEMA, HARI, bidangLabel, todayISO, parseISO, daysBetween, BULAN, formatTanggal, kondisi, isAktif, indexTahap, hitungBeban, hitungBebanProgram, hitungBebanRinci, SEMUA, filterByPeriode, daftarPeriode, buatId, PERIODE_AKTIF, TOPIK, VERIFIKASI, statusVerif, tambahHari, LABEL_PENDAFTARAN, ringkasPendaftaran, RUANG, menitJam, rentangJadwal, jamTampil, beririsan, dosenTerlibat, kumpulkanEvent, cariBentrok, pesanNotifikasi, waLink, mailtoLink, waMahasiswa, TEMPLATE_SURAT, tokenSurat, renderSurat, PEJABAT, KOP_SURAT, evKeyDok, dokTA, DURASI_EVENT, JAM_KERJA, durasiEvent, jamTambah, dalamJamKerja, tahapBerikut, eventAktif, BERKAS_SYARAT, berkasSyarat, bolehAjukanJadwal, KP_DOKUMEN, catatAktivitas, tanggalDibuat, aktivitasTerakhir, AKTIVITAS_LABEL, formatWaktu, normalizeUrl } from '../utils/helpers.js';
 import { DOSEN_AWAL, plusHari, RAW_MAHASISWA, MAHASISWA_AWAL, AKUN_AWAL, PERIODE_BUKA_AWAL } from '../data/seed.js';
 import { csvEscape, triggerDownload, downloadCSV, downloadDoc, cetakSuratPDF, cetakSuratPDFHtml, loadXLSX } from '../utils/exportUtils.js';
-import { Badge, StageBar, Field, Modal, Empty, ExportMenu, ColResizeHandle, TextSizeToggle, ThemeToggle, FileDropZone } from '../components/ui.jsx';
+import { Badge, StageBar, Field, Modal, Empty, ExportMenu, ColResizeHandle, TextSizeToggle, ThemeToggle, FileDropZone, RolePill } from '../components/ui.jsx';
 import { KpDocumentPanel } from '../components/kpDocuments.jsx';
 import { generateDocument, getTemplateConfig } from '../utils/documentGenerator.js';
 import { readFileForUpload } from '../utils/fileUpload.js';
@@ -71,7 +71,7 @@ export function Portal({ nim, nama, mahasiswa, allDosen, periodeBuka = [], pandu
           <button className="btn btn-primary" onClick={onOpenPanduan}>Panduan</button>
           <ThemeToggle />
           <TextSizeToggle />
-          <span className="hint">{nama} · {nim}</span>
+          <RolePill peran="mahasiswa" nama={nama} />
           <button className="btn ghost" onClick={onLogout}>Keluar</button>
         </div>
       </header>
@@ -159,7 +159,7 @@ export function PanduanPage({ nama, nim, panduan = [], onBack, onLogout }) {
         <div className="topbar-right">
           <ThemeToggle />
           <TextSizeToggle />
-          {nama && <span className="hint">{nama} · {nim}</span>}
+          <RolePill peran="mahasiswa" nama={nama} />
           <button className="btn ghost" onClick={onBack}>← Kembali</button>
           <button className="btn ghost" onClick={onLogout}>Keluar</button>
         </div>
@@ -793,7 +793,7 @@ export function DosenPortal({ dosen, allDosen, mahasiswa, periodeList = [], onGr
           <label className="check" style={{ margin: 0 }}>
             <input type="checkbox" checked={semua} onChange={(e) => setSemua(e.target.checked)} /><span>Termasuk lulus</span>
           </label>
-          <span className="hint">{dosen.nama} · {dosen.kode}</span>
+          <RolePill peran="dosen" nama={dosen.nama} sub={dosen.kode} />
           <button className="btn ghost" onClick={onLogout}>Keluar</button>
         </div>
       </header>
