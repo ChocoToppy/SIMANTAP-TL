@@ -60,7 +60,12 @@ export async function changeOwnPassword(newPassword, profileRef) {
 // perubahan role oleh admin langsung terbaca.
 export async function readClaims(user) {
   const result = await getIdTokenResult(user, true);
-  return { role: result.claims.role || null, kode: result.claims.kode || null, nim: result.claims.nim || null };
+  return {
+    role: result.claims.role || null,
+    kode: result.claims.kode || null,
+    nim: result.claims.nim || null,
+    super: !!result.claims.super,
+  };
 }
 
 // ----- Aksi admin (Pengaturan → Akun): semuanya lewat Cloud Functions, tidak
@@ -78,4 +83,37 @@ export async function adminResetPassword(uid) {
   const call = httpsCallable(functions, 'adminResetPassword');
   const res = await call({ uid });
   return res.data; // { ok, tempPassword }
+}
+
+export async function adminDeleteStudent(nim) {
+  const call = httpsCallable(functions, 'adminDeleteStudent');
+  const res = await call({ nim });
+  return res.data; // { ok, deletedMahasiswaIds }
+}
+
+export async function adminDeleteAdmin(uid) {
+  const call = httpsCallable(functions, 'adminDeleteAdmin');
+  const res = await call({ uid });
+  return res.data; // { ok }
+}
+
+export async function claimSuperAdmin() {
+  const call = httpsCallable(functions, 'claimSuperAdmin');
+  const res = await call();
+  return res.data; // { ok }
+}
+
+// payload: { nama, email? } — email hanya dipakai (dan hanya boleh berbeda
+// dari email saat ini) untuk super admin; admin biasa cukup kirim { nama }.
+export async function adminUpdateSelf(payload) {
+  const call = httpsCallable(functions, 'adminUpdateSelf');
+  const res = await call(payload);
+  return res.data; // { ok, emailBerubah }
+}
+
+// ----- Mahasiswa mengubah profil sendiri (nama, NIM, email aktif) -----
+export async function studentUpdateProfile({ nama, nim, email }) {
+  const call = httpsCallable(functions, 'studentUpdateProfile');
+  const res = await call({ nama, nim, email });
+  return res.data; // { ok, nim, nimBerubah }
 }

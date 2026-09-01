@@ -26,7 +26,7 @@ function panduanUntukProgram(panduan, programKey) {
   return panduan.filter((p) => p.program === programKey);
 }
 
-export function Portal({ nim, nama, mahasiswa, allDosen, periodeBuka = [], panduan = [], konten = {}, onSave, onLogout, onOpenPanduan }) {
+export function Portal({ nim, nama, mahasiswa, allDosen, periodeBuka = [], panduan = [], konten = {}, onSave, onLogout, onOpenPanduan, onOpenAkun }) {
   const mine = mahasiswa.filter((m) => m.owner === nim);
   const [tab, setTab] = useState('pengajuan');
   const [view, setView] = useState({ mode: 'list' });
@@ -71,6 +71,7 @@ export function Portal({ nim, nama, mahasiswa, allDosen, periodeBuka = [], pandu
           <button className="btn btn-primary" onClick={onOpenPanduan}>Panduan</button>
           <ThemeToggle />
           <TextSizeToggle />
+          <button className="btn ghost" onClick={onOpenAkun}>Akun</button>
           <RolePill peran="mahasiswa" nama={nama} />
           <button className="btn ghost" onClick={onLogout}>Keluar</button>
         </div>
@@ -187,6 +188,84 @@ export function PanduanPage({ nama, nim, panduan = [], onBack, onLogout }) {
               </div>
             ))
           )}
+        </div>
+      </main>
+      <footer className="foot">SIMANTAP © 2026 Universitas Diponegoro</footer>
+    </div>
+  );
+}
+
+// Halaman /akun — profil login mahasiswa sendiri (nama, NIM, email aktif).
+// Alamat sendiri, sama pola dengan /panduan & /pengaturan. Email di sini
+// HANYA kontak untuk admin mengirimkan password sementara secara manual saat
+// mahasiswa lupa password (lihat SeksiAkun di Pengaturan.jsx) — tidak ada
+// email verifikasi/reset otomatis. NIM boleh diubah (mis. salah ketik saat
+// daftar), tapi itu memindahkan seluruh identitas login & data KP mahasiswa
+// ini, jadi diproses lewat Cloud Function (studentUpdateProfile), bukan
+// tulis langsung ke Firestore.
+export function AkunPage({ nama, nim, email, onSimpan, onBack, onLogout }) {
+  const [form, setForm] = useState({ nama: nama || '', nim: nim || '', email: email || '' });
+  const [err, setErr] = useState('');
+  const [sukses, setSukses] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  function set(k, v) { setForm((f) => ({ ...f, [k]: v })); }
+
+  async function simpan() {
+    setErr(''); setSukses('');
+    if (!form.nama.trim() || !form.nim.trim() || !form.email.trim()) {
+      setErr('Nama, NIM, dan email wajib diisi.'); return;
+    }
+    setBusy(true);
+    try {
+      await onSimpan({ nama: form.nama.trim(), nim: form.nim.trim(), email: form.email.trim() });
+      setSukses('Profil tersimpan.');
+    } catch (e) {
+      setErr(e.message || 'Gagal menyimpan perubahan.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="app">
+      <header className="topbar">
+        <div className="brand">
+          <img className="brand-mark" src={logoTl} alt="TL Undip" />
+          <span className="brand-name">SIMANTAP</span>
+        </div>
+        <div className="topbar-right">
+          <ThemeToggle />
+          <TextSizeToggle />
+          <RolePill peran="mahasiswa" nama={nama} />
+          <button className="btn ghost" onClick={onBack}>← Kembali</button>
+          <button className="btn ghost" onClick={onLogout}>Keluar</button>
+        </div>
+      </header>
+      <div className="masthead-rule" />
+      <main className="content">
+        <div className="portal">
+          <div className="toolbar">
+            <h2 className="page-title">Akun Saya</h2>
+          </div>
+          <div className="card" style={{ maxWidth: 480 }}>
+            <p className="hint" style={{ marginTop: 0 }}>
+              Email di sini dipakai admin untuk mengirimkan password sementara
+              secara manual bila Anda lupa password — pastikan aktif dan bisa
+              Anda akses. Bila Anda lupa password DAN tidak tahu email aktif
+              yang tersimpan di sini, hubungi admin untuk direset dari sana.
+            </p>
+            <div className="form-grid">
+              <Field label="Nama" full><input value={form.nama} onChange={(e) => set('nama', e.target.value)} /></Field>
+              <Field label="NIM" full><input value={form.nim} onChange={(e) => set('nim', e.target.value)} /></Field>
+              <Field label="Email aktif" full><input type="email" value={form.email} onChange={(e) => set('email', e.target.value)} /></Field>
+            </div>
+            {err && <div className="login-err" style={{ marginTop: 8 }}>{err}</div>}
+            {sukses && <div className="hint" style={{ marginTop: 8 }}>{sukses}</div>}
+            <div className="modal-foot" style={{ paddingLeft: 0, paddingRight: 0 }}>
+              <button className="btn btn-primary" onClick={simpan} disabled={busy}>{busy ? 'Menyimpan…' : 'Simpan perubahan'}</button>
+            </div>
+          </div>
         </div>
       </main>
       <footer className="foot">SIMANTAP © 2026 Universitas Diponegoro</footer>

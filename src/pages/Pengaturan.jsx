@@ -26,7 +26,8 @@ export function Pengaturan({
   panduan, onSimpanPanduan,
   konten = {}, onSimpanKonten,
   akun = [], dosen = [], admin = [],
-  onResetPassword, onCreateUser, onToggleAkunAktif, onToggleDosenAktif, onEditDosen,
+  onResetPassword, onCreateUser, onToggleAkunAktif, onDeleteAkun, onToggleDosenAktif, onEditDosen,
+  isSuperAdmin = false, currentAdminUid, onDeleteAdmin, onClaimSuperAdmin, onUpdateSelfAdmin,
 }) {
   const [subTab, setSubTab] = useState(SUB_TABS[0].key);
   const aktif = SUB_TABS.find((t) => t.key === subTab) || SUB_TABS[0];
@@ -72,10 +73,11 @@ export function Pengaturan({
           <SeksiKonten konten={konten} onSimpan={onSimpanKonten} />
         )}
         {subTab === 'akun' && (
-          <SeksiAkun daftar={akun} onReset={onResetPassword} onToggleAktif={onToggleAkunAktif} />
+          <SeksiAkun daftar={akun} onReset={onResetPassword} onToggleAktif={onToggleAkunAktif} onDelete={onDeleteAkun} />
         )}
         {subTab === 'staf' && (
-          <SeksiStaf dosen={dosen} admin={admin} onReset={onResetPassword} onCreate={onCreateUser} onToggleDosenAktif={onToggleDosenAktif} onEditDosen={onEditDosen} />
+          <SeksiStaf dosen={dosen} admin={admin} onReset={onResetPassword} onCreate={onCreateUser} onToggleDosenAktif={onToggleDosenAktif} onEditDosen={onEditDosen}
+            isSuperAdmin={isSuperAdmin} currentAdminUid={currentAdminUid} onDeleteAdmin={onDeleteAdmin} onClaimSuperAdmin={onClaimSuperAdmin} onUpdateSelfAdmin={onUpdateSelfAdmin} />
         )}
       </div>
     </div>
@@ -133,12 +135,17 @@ function SeksiPeriode({ dibuka, periodeAktif, onBuka, onTutup, onSetAktif }) {
 }
 
 function SeksiPengumuman({ daftar, onSimpan }) {
+  const [open, setOpen] = useState(false);
   const [tanggal, setTanggal] = useState('');
   const [judul, setJudul] = useState('');
   const [isi, setIsi] = useState('');
   const [editId, setEditId] = useState(null);
 
   function kosongkan() { setTanggal(''); setJudul(''); setIsi(''); setEditId(null); }
+
+  function mulaiTambah() { kosongkan(); setOpen(true); }
+  function mulaiEdit(p) { setEditId(p.id); setTanggal(p.tanggal); setJudul(p.judul); setIsi(p.isi); setOpen(true); }
+  function tutup() { setOpen(false); kosongkan(); }
 
   function simpan() {
     if (!tanggal.trim() || !judul.trim()) return;
@@ -147,26 +154,39 @@ function SeksiPengumuman({ daftar, onSimpan }) {
     } else {
       onSimpan([{ id: buatId(), tanggal: tanggal.trim(), judul: judul.trim(), isi: isi.trim() }, ...daftar]);
     }
-    kosongkan();
+    tutup();
   }
 
-  function edit(p) { setEditId(p.id); setTanggal(p.tanggal); setJudul(p.judul); setIsi(p.isi); }
-  function hapus(id) { if (window.confirm('Hapus pengumuman ini?')) onSimpan(daftar.filter((p) => p.id !== id)); if (editId === id) kosongkan(); }
+  function hapus(id) { if (window.confirm('Hapus pengumuman ini?')) onSimpan(daftar.filter((p) => p.id !== id)); }
 
   return (
     <div className="card">
       <p className="hint" style={{ marginTop: 0 }}>
         Pengumuman ini tampil di halaman login, terbaru di atas.
       </p>
-      <div className="form-grid">
-        <Field label="Tanggal" full><input value={tanggal} onChange={(e) => setTanggal(e.target.value)} placeholder="mis. 17 Juli 2026" /></Field>
-        <Field label="Judul" full><input value={judul} onChange={(e) => setJudul(e.target.value)} /></Field>
-        <Field label="Isi" full><textarea rows={3} value={isi} onChange={(e) => setIsi(e.target.value)} /></Field>
+      <div className="modal-foot" style={{ paddingLeft: 0, paddingRight: 0, justifyContent: 'flex-start' }}>
+        <button className="btn btn-primary" onClick={mulaiTambah}>+ Tambah pengumuman</button>
       </div>
-      <div className="modal-foot" style={{ paddingLeft: 0, paddingRight: 0 }}>
-        {editId && <button className="btn" onClick={kosongkan}>Batal edit</button>}
-        <button className="btn btn-primary" onClick={simpan}>{editId ? 'Simpan perubahan' : 'Tambah pengumuman'}</button>
-      </div>
+
+      {open && (
+        <Modal
+          title={editId ? 'Edit pengumuman' : 'Tambah pengumuman'}
+          onClose={tutup}
+          footer={
+            <>
+              <button className="btn" onClick={tutup}>Batal</button>
+              <button className="btn btn-primary" onClick={simpan}>{editId ? 'Simpan perubahan' : 'Tambah pengumuman'}</button>
+            </>
+          }
+        >
+          <div className="form-grid">
+            <Field label="Tanggal" full><input value={tanggal} onChange={(e) => setTanggal(e.target.value)} placeholder="mis. 17 Juli 2026" /></Field>
+            <Field label="Judul" full><input value={judul} onChange={(e) => setJudul(e.target.value)} /></Field>
+            <Field label="Isi" full><textarea rows={3} value={isi} onChange={(e) => setIsi(e.target.value)} /></Field>
+          </div>
+        </Modal>
+      )}
+
       <div className="sched" style={{ marginTop: 12 }}>
         <div className="sched-title">Pengumuman saat ini</div>
         {daftar.length === 0 ? (
@@ -177,7 +197,7 @@ function SeksiPengumuman({ daftar, onSimpan }) {
               <li key={p.id} className="periode-item">
                 <span>{p.tanggal} — {p.judul}</span>
                 <span style={{ display: 'flex', gap: 8 }}>
-                  <button className="link-btn" onClick={() => edit(p)}>Edit</button>
+                  <button className="link-btn" onClick={() => mulaiEdit(p)}>Edit</button>
                   <button className="link-btn danger" onClick={() => hapus(p.id)}>Hapus</button>
                 </span>
               </li>
@@ -190,12 +210,17 @@ function SeksiPengumuman({ daftar, onSimpan }) {
 }
 
 function SeksiPanduan({ daftar, onSimpan }) {
+  const [open, setOpen] = useState(false);
   const [label, setLabel] = useState('');
   const [url, setUrl] = useState('');
   const [program, setProgram] = useState('');
   const [editId, setEditId] = useState(null);
 
   function kosongkan() { setLabel(''); setUrl(''); setProgram(''); setEditId(null); }
+
+  function mulaiTambah() { kosongkan(); setOpen(true); }
+  function mulaiEdit(p) { setEditId(p.id); setLabel(p.label); setUrl(p.url); setProgram(p.program || ''); setOpen(true); }
+  function tutup() { setOpen(false); kosongkan(); }
 
   function simpan() {
     if (!label.trim() || !url.trim()) return;
@@ -204,31 +229,44 @@ function SeksiPanduan({ daftar, onSimpan }) {
     } else {
       onSimpan([...daftar, { id: buatId(), label: label.trim(), url: url.trim(), program }]);
     }
-    kosongkan();
+    tutup();
   }
 
-  function edit(p) { setEditId(p.id); setLabel(p.label); setUrl(p.url); setProgram(p.program || ''); }
-  function hapus(id) { if (window.confirm('Hapus tautan panduan ini?')) onSimpan(daftar.filter((p) => p.id !== id)); if (editId === id) kosongkan(); }
+  function hapus(id) { if (window.confirm('Hapus tautan panduan ini?')) onSimpan(daftar.filter((p) => p.id !== id)); }
 
   return (
     <div className="card">
       <p className="hint" style={{ marginTop: 0 }}>
         Daftar unduhan (Panduan KP, Panduan TA, dst.) yang tampil di halaman Panduan Portal mahasiswa, dikelompokkan per program. Tautkan ke Google Drive atau sumber lain.
       </p>
-      <div className="form-grid">
-        <Field label="Label" full><input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="mis. Panduan KP" /></Field>
-        <Field label="Program">
-          <select value={program} onChange={(e) => setProgram(e.target.value)}>
-            <option value="">Umum (semua program)</option>
-            {PROGRAM_KEYS.map((p) => <option key={p} value={p}>{programLabel(p)}</option>)}
-          </select>
-        </Field>
-        <Field label="Tautan" full><input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://drive.google.com/..." /></Field>
+      <div className="modal-foot" style={{ paddingLeft: 0, paddingRight: 0, justifyContent: 'flex-start' }}>
+        <button className="btn btn-primary" onClick={mulaiTambah}>+ Tambah panduan</button>
       </div>
-      <div className="modal-foot" style={{ paddingLeft: 0, paddingRight: 0 }}>
-        {editId && <button className="btn" onClick={kosongkan}>Batal edit</button>}
-        <button className="btn btn-primary" onClick={simpan}>{editId ? 'Simpan perubahan' : 'Tambah panduan'}</button>
-      </div>
+
+      {open && (
+        <Modal
+          title={editId ? 'Edit panduan' : 'Tambah panduan'}
+          onClose={tutup}
+          footer={
+            <>
+              <button className="btn" onClick={tutup}>Batal</button>
+              <button className="btn btn-primary" onClick={simpan}>{editId ? 'Simpan perubahan' : 'Tambah panduan'}</button>
+            </>
+          }
+        >
+          <div className="form-grid">
+            <Field label="Label" full><input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="mis. Panduan KP" /></Field>
+            <Field label="Program">
+              <select value={program} onChange={(e) => setProgram(e.target.value)}>
+                <option value="">Umum (semua program)</option>
+                {PROGRAM_KEYS.map((p) => <option key={p} value={p}>{programLabel(p)}</option>)}
+              </select>
+            </Field>
+            <Field label="Tautan" full><input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://drive.google.com/..." /></Field>
+          </div>
+        </Modal>
+      )}
+
       <div className="sched" style={{ marginTop: 12 }}>
         <div className="sched-title">Panduan saat ini</div>
         {daftar.length === 0 ? (
@@ -239,7 +277,7 @@ function SeksiPanduan({ daftar, onSimpan }) {
               <li key={p.id} className="periode-item">
                 <span>{p.label} <span className="muted">— {p.program ? programLabel(p.program) : 'Umum'}</span></span>
                 <span style={{ display: 'flex', gap: 8 }}>
-                  <button className="link-btn" onClick={() => edit(p)}>Edit</button>
+                  <button className="link-btn" onClick={() => mulaiEdit(p)}>Edit</button>
                   <button className="link-btn danger" onClick={() => hapus(p.id)}>Hapus</button>
                 </span>
               </li>
@@ -399,7 +437,7 @@ function KontenBerkasCard({ ev, defaultList, override, onSimpan, onReset }) {
 // adminResetPassword). Satu-satunya aksi yang tersedia di sini adalah reset
 // ke password sementara baru; mahasiswa wajib menggantinya saat login
 // berikutnya (mustChangePassword).
-function SeksiAkun({ daftar, onReset, onToggleAktif }) {
+function SeksiAkun({ daftar, onReset, onToggleAktif, onDelete }) {
   const [q, setQ] = useState('');
   const [pesan, setPesan] = useState(null); // { nim, teks }
   const [busy, setBusy] = useState(null);
@@ -430,12 +468,29 @@ function SeksiAkun({ daftar, onReset, onToggleAktif }) {
     }
   }
 
+  async function hapus(a) {
+    if (!onDelete) return;
+    if (!window.confirm(`Hapus akun ${a.nama} (${a.nim}) secara permanen? Akun login dan seluruh data KP terkait akan ikut terhapus. Tindakan ini tidak bisa dibatalkan.`)) return;
+    setBusy(a.nim);
+    setPesan({ nim: a.nim, teks: 'Menghapus…' });
+    try {
+      await onDelete(a.nim);
+      setPesan(null);
+    } catch (e) {
+      setPesan({ nim: a.nim, teks: 'Gagal hapus: ' + (e.message || e) });
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <div className="card">
       <p className="hint" style={{ marginTop: 0 }}>
         Untuk troubleshooting saat mahasiswa lupa password — reset ke password sementara
         baru, lalu kabarkan sendiri ke mahasiswa (telepon/WA); mereka wajib menggantinya
         saat login berikutnya. Password tidak pernah bisa dilihat di sini — hanya "Reset".
+        "Hapus" menghapus akun secara permanen (login + data KP terkait) — gunakan untuk
+        membersihkan akun dummy/uji coba, bukan untuk akun mahasiswa aktif.
       </p>
       <input
         value={q}
@@ -478,9 +533,12 @@ function SeksiAkun({ daftar, onReset, onToggleAktif }) {
                     ) : (
                       <>
                         <button className="link-btn" disabled={busy === a.nim} onClick={() => reset(a)}>Reset Password</button>
-                        <button className="link-btn danger" onClick={() => onToggleAktif(a.nim, a.isActive === false)}>
+                        <button className="link-btn danger" disabled={busy === a.nim} onClick={() => onToggleAktif(a.nim, a.isActive === false)}>
                           {a.isActive === false ? 'Aktifkan' : 'Nonaktifkan'}
                         </button>
+                        {onDelete && (
+                          <button className="link-btn danger" disabled={busy === a.nim} onClick={() => hapus(a)}>Hapus</button>
+                        )}
                       </>
                     )}
                   </td>
@@ -495,7 +553,7 @@ function SeksiAkun({ daftar, onReset, onToggleAktif }) {
 }
 
 // ----- Kelola akun dosen & admin (roster kecil, dibuat manual oleh admin) -----
-function SeksiStaf({ dosen, admin, onReset, onCreate, onToggleDosenAktif, onEditDosen }) {
+function SeksiStaf({ dosen, admin, onReset, onCreate, onToggleDosenAktif, onEditDosen, isSuperAdmin = false, currentAdminUid, onDeleteAdmin, onClaimSuperAdmin, onUpdateSelfAdmin }) {
   const [open, setOpen] = useState(false); // form hanya tampil (sbg modal) saat true
   const [tipe, setTipe] = useState('lecturer'); // 'lecturer' | 'admin'
   const [editKode, setEditKode] = useState(null); // null = mode "buat baru"; else kode dosen yang diedit
@@ -565,6 +623,61 @@ function SeksiStaf({ dosen, admin, onReset, onCreate, onToggleDosenAktif, onEdit
     }
   }
 
+  async function hapusAdmin(a, key) {
+    if (!onDeleteAdmin) return;
+    if (!window.confirm(`Hapus akun admin ${a.nama} (${a.email}) secara permanen?`)) return;
+    setPesan({ key, teks: 'Menghapus…' });
+    try {
+      await onDeleteAdmin(a.uid);
+      setPesan(null);
+    } catch (e) {
+      setPesan({ key, teks: 'Gagal hapus: ' + (e.message || e) });
+    }
+  }
+
+  // ----- Edit profil sendiri (admin lain, bukan super, hanya boleh ubah nama) -----
+  const [selfEdit, setSelfEdit] = useState(false);
+  const [selfNama, setSelfNama] = useState('');
+  const [selfEmail, setSelfEmail] = useState('');
+  const [selfErr, setSelfErr] = useState('');
+  const [selfBusy, setSelfBusy] = useState(false);
+
+  function mulaiEditSelf(a) {
+    setSelfNama(a.nama || ''); setSelfEmail(a.email || ''); setSelfErr(''); setSelfEdit(true);
+  }
+  function tutupSelfEdit() { setSelfEdit(false); setSelfErr(''); }
+
+  async function simpanSelf() {
+    if (!onUpdateSelfAdmin) return;
+    setSelfErr('');
+    if (!selfNama.trim()) { setSelfErr('Nama wajib diisi.'); return; }
+    setSelfBusy(true);
+    try {
+      await onUpdateSelfAdmin(isSuperAdmin ? { nama: selfNama.trim(), email: selfEmail.trim() } : { nama: selfNama.trim() });
+      setSelfEdit(false);
+    } catch (e) {
+      setSelfErr(e.message || 'Gagal menyimpan.');
+    } finally {
+      setSelfBusy(false);
+    }
+  }
+
+  const adaSuperAdmin = admin.some((a) => a.superAdmin);
+  const [klaimBusy, setKlaimBusy] = useState(false);
+  const [klaimErr, setKlaimErr] = useState('');
+  async function klaimSuper() {
+    if (!onClaimSuperAdmin) return;
+    if (!window.confirm('Jadikan akun ini super admin? Hanya satu akun yang bisa jadi super admin, dan tindakan ini tidak bisa dibatalkan sendiri.')) return;
+    setKlaimBusy(true); setKlaimErr('');
+    try {
+      await onClaimSuperAdmin();
+    } catch (e) {
+      setKlaimErr(e.message || 'Gagal menjadikan super admin.');
+    } finally {
+      setKlaimBusy(false);
+    }
+  }
+
   return (
     <div className="card">
       <p className="hint" style={{ marginTop: 0 }}>
@@ -578,9 +691,19 @@ function SeksiStaf({ dosen, admin, onReset, onCreate, onToggleDosenAktif, onEdit
         </div>
       )}
 
+      {!adaSuperAdmin && onClaimSuperAdmin && (
+        <div className="hint" style={{ marginTop: 8 }}>
+          Belum ada super admin. Hanya super admin yang boleh menambah/menghapus akun admin lain.{' '}
+          <button className="link-btn" onClick={klaimSuper} disabled={klaimBusy}>
+            {klaimBusy ? 'Memproses…' : 'Jadikan akun ini super admin'}
+          </button>
+          {klaimErr && <div className="login-err" style={{ marginTop: 4 }}>{klaimErr}</div>}
+        </div>
+      )}
+
       <div className="modal-foot" style={{ paddingLeft: 0, paddingRight: 0, justifyContent: 'flex-start', gap: 8 }}>
         <button className="btn btn-primary" onClick={() => mulaiTambah('lecturer')}>+ Tambah dosen</button>
-        <button className="btn" onClick={() => mulaiTambah('admin')}>+ Tambah admin</button>
+        {isSuperAdmin && <button className="btn" onClick={() => mulaiTambah('admin')}>+ Tambah admin</button>}
       </div>
 
       {open && (
@@ -654,11 +777,19 @@ function SeksiStaf({ dosen, admin, onReset, onCreate, onToggleDosenAktif, onEdit
               const key = 'a-' + a.uid;
               return (
                 <tr key={a.uid}>
-                  <td>{a.nama}</td>
+                  <td>{a.nama} {a.superAdmin && <span className="chip chip-on">Super Admin</span>}</td>
                   <td className="cell-sub">{a.email}</td>
                   <td className="cell-actions">
                     {pesan && pesan.key === key ? <span className="hint">{pesan.teks}</span> : (
-                      <button className="link-btn" onClick={() => reset(a.uid, key)}>Reset Password</button>
+                      <>
+                        {a.uid === currentAdminUid && onUpdateSelfAdmin && (
+                          <button className="link-btn" onClick={() => mulaiEditSelf(a)}>Edit</button>
+                        )}
+                        <button className="link-btn" onClick={() => reset(a.uid, key)}>Reset Password</button>
+                        {isSuperAdmin && a.uid !== currentAdminUid && (
+                          <button className="link-btn danger" onClick={() => hapusAdmin(a, key)}>Hapus</button>
+                        )}
+                      </>
                     )}
                   </td>
                 </tr>
@@ -667,6 +798,30 @@ function SeksiStaf({ dosen, admin, onReset, onCreate, onToggleDosenAktif, onEdit
           </tbody>
         </table>
       </div>
+
+      {selfEdit && (
+        <Modal
+          title="Edit profil saya"
+          onClose={tutupSelfEdit}
+          footer={
+            <>
+              <button className="btn" onClick={tutupSelfEdit} disabled={selfBusy}>Batal</button>
+              <button className="btn btn-primary" onClick={simpanSelf} disabled={selfBusy}>{selfBusy ? 'Menyimpan…' : 'Simpan perubahan'}</button>
+            </>
+          }
+        >
+          <div className="form-grid">
+            <Field label="Nama" full><input value={selfNama} onChange={(e) => setSelfNama(e.target.value)} /></Field>
+            <Field label="Email" full>
+              <input type="email" value={selfEmail} onChange={(e) => setSelfEmail(e.target.value)} disabled={!isSuperAdmin} />
+            </Field>
+            {!isSuperAdmin && (
+              <p className="hint field-full" style={{ marginTop: -4 }}>Hanya super admin yang boleh mengubah email.</p>
+            )}
+          </div>
+          {selfErr && <div className="login-err" style={{ marginTop: 8 }}>{selfErr}</div>}
+        </Modal>
+      )}
     </div>
   );
 }

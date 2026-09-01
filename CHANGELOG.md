@@ -1,5 +1,51 @@
 # Changelog
 
+## 01-09-2026 — Peran Super Admin, akun mahasiswa mandiri, dan hapus akun
+
+### Peran Super Admin
+- Menambahkan peran Super Admin — satu-satunya yang boleh menambah atau menghapus akun admin lain (admin biasa masih bisa menambah/mengelola akun dosen seperti biasa).
+- Karena belum ada super admin sebelumnya, admin yang sudah ada bisa mengklaim status ini sendiri lewat tombol di tab Dosen & Admin; jalur ini otomatis terkunci begitu ada satu super admin, jadi tidak bisa diklaim ulang oleh admin lain.
+- Semua admin sekarang bisa mengubah nama tampilan akun mereka sendiri lewat tombol "Edit" di tab Dosen & Admin; khusus super admin, tombol yang sama juga bisa mengubah email login sendiri.
+- Baris admin di tabel Dosen & Admin menampilkan lencana "Super Admin".
+
+### Akun mahasiswa
+- Menambahkan tombol "Hapus" di tab Akun Mahasiswa (Pengaturan) — menghapus akun secara permanen: akun Firebase Auth, profil, dan seluruh data KP terkait sekaligus. Dipakai untuk membersihkan akun dummy/uji coba yang tertinggal di daftar.
+- Mahasiswa sekarang punya halaman akun sendiri di alamat `/akun` (tombol "Akun" di header Portal) untuk mengubah nama, NIM, dan email aktif sendiri. Email ini dipakai admin untuk mengirimkan password sementara secara manual bila mahasiswa lupa password (bukan email reset otomatis) — kalau mahasiswa juga lupa email yang terdaftar, tetap harus lewat admin.
+
+### Perbaikan
+- Memperbaiki layar "Memuat profil admin…" yang sebelumnya selalu muncul dengan kata "admin" untuk peran apa pun saat profil belum termuat penuh saat login (paling kelihatan saat mendaftar akun mahasiswa baru) — sekarang menyesuaikan peran yang sebenarnya sedang login.
+- Memperbaiki pesan error saat admin membuat akun admin/dosen baru dengan email yang sudah dipakai akun lain — sebelumnya gagal dengan error internal generik tanpa keterangan, sekarang menampilkan pesan yang jelas.
+
+### Kelola Panduan & Pengumuman (Pengaturan)
+- Form tambah/edit di tab Kelola Panduan dan Pengumuman sekarang muncul sebagai jendela modal (sama seperti tab Dosen & Admin), bukan selalu terbuka di atas daftar.
+
+## 31-08-2026 — Login & manajemen akun berbasis Firebase Authentication
+
+### Autentikasi
+- Mengganti total sistem login lama (password polos dibandingkan di sisi klien, password admin/dosen bersama yang di-hardcode, sesi disimpan di localStorage) dengan Firebase Authentication asli — password kini di-hash & dikelola sepenuhnya oleh Firebase, tidak pernah tersimpan atau bisa dilihat siapa pun, termasuk admin.
+- Tampilan login tidak berubah — mahasiswa tetap masuk pakai NIM, dosen pakai NIP, admin pakai email; di baliknya sistem mencocokkan identitas itu ke akun Firebase Auth yang sesuai.
+- Peran (mahasiswa/dosen/admin) kini ditentukan lewat custom claim di token login (bukan dugaan berdasarkan tombol yang diklik saat login seperti sebelumnya), diberikan lewat Cloud Functions saat akun dibuat — klien tidak pernah bisa mengatur perannya sendiri.
+- Pendaftaran mandiri mahasiswa sekarang meminta email aktif (dipakai untuk reset password sendiri) selain NIM/nama/password.
+- Menambahkan tautan "Lupa password?" di layar login mahasiswa/dosen (kirim email reset lewat Firebase, tanpa perlu hubungi admin).
+- Akun yang baru dibuat admin (dosen/admin lain) atau baru direset password-nya wajib mengganti password saat login pertama sebelum bisa memakai aplikasi.
+
+### Firestore & Storage rules
+- Mengganti aturan keamanan yang sebelumnya benar-benar terbuka (`allow read, write: if true` di semua koleksi) dengan aturan berlapis: cek peran (role) dulu, lalu cek kepemilikan data per dokumen — admin bebas akses semua, dosen hanya data mahasiswa yang dia bimbing/uji, mahasiswa hanya data miliknya sendiri.
+- Berkas di Firebase Storage (unggahan mahasiswa) sekarang tunduk aturan yang sama, dicek silang ke data mahasiswa/dosen/akun terkait di Firestore.
+- Akun yang dinonaktifkan admin langsung kehilangan akses seketika, tanpa perlu menunggu token login kedaluwarsa.
+
+### Pengaturan admin (halaman baru "Dosen & Admin")
+- Tab Akun (mahasiswa) tidak lagi menampilkan password sama sekali — hanya tombol "Reset Password" (password sementara baru, wajib diganti mahasiswa saat login berikutnya) dan tombol aktifkan/nonaktifkan akun.
+- Menambahkan tab baru "Dosen & Admin" — admin bisa membuat akun dosen atau admin lain, mengedit profil dosen (nama/email/NIP/kompetensi), reset password, serta aktifkan/nonaktifkan akun dosen. Form muncul sebagai jendela modal saat tombol "+ Tambah" atau "Edit" diklik, bukan selalu terbuka di atas halaman.
+- Setiap aksi reset password oleh admin (ke akun siapa pun) sekarang tercatat di log audit tersendiri.
+- Memperbaiki bug lama di tab Dosen (bukan yang baru): mengedit data dosen sebelumnya ikut menyimpan angka beban bimbingan/penguji terhitung (harusnya cuma tampilan) sebagai field asing ke Firestore.
+
+### Tampilan
+- Menambahkan lencana identitas berwarna di header (biru untuk mahasiswa, hijau untuk dosen, ungu untuk admin) yang menampilkan nama yang sedang login — sebelumnya mahasiswa/dosen menampilkan "nama · NIM/NIP" polos, dan admin tidak menampilkan siapa pun yang login sama sekali.
+
+### Migrasi
+- Akun mahasiswa lama dipindah otomatis ke Firebase Auth tanpa perlu reset password (password lama tetap berlaku). Akun dosen & admin (yang sebelumnya berbagi satu password) dipecah jadi akun individual dengan password sementara.
+
 ## 27-08-2026 — Ekspor Excel, tabel per program, dan halaman Panduan
 
 ### Ekspor & tabel Mahasiswa

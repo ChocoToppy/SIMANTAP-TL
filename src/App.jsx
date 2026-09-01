@@ -4,7 +4,7 @@ import { Mahasiswa } from './pages/Mahasiswa.jsx';
 import { Dosen } from './pages/Dosen.jsx';
 import { Pengaturan } from './pages/Pengaturan.jsx';
 import { Login } from './pages/Login.jsx';
-import { Portal, DosenPortal, PanduanPage } from './pages/Portal.jsx';
+import { Portal, DosenPortal, PanduanPage, AkunPage } from './pages/Portal.jsx';
 import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, stagesFor, eventsFor, punyaKlasifikasi, punyaSyarat, rolesFor, syaratLabel, getJadwal, STAGES, KLASIFIKASI, BIDANG, KP_TEMA, HARI, bidangLabel, todayISO, parseISO, daysBetween, BULAN, formatTanggal, kondisi, isAktif, indexTahap, hitungBeban, hitungBebanProgram, hitungBebanRinci, SEMUA, filterByPeriode, daftarPeriode, PERIODE_AKTIF, TOPIK, VERIFIKASI, statusVerif, tambahHari, LABEL_PENDAFTARAN, ringkasPendaftaran, RUANG, menitJam, rentangJadwal, jamTampil, beririsan, dosenTerlibat, kumpulkanEvent, cariBentrok, pesanNotifikasi, waLink, mailtoLink, waMahasiswa, TEMPLATE_SURAT, tokenSurat, renderSurat, PEJABAT, KOP_SURAT, evKeyDok, dokTA, DURASI_EVENT, JAM_KERJA, durasiEvent, jamTambah, dalamJamKerja, tahapBerikut, eventAktif, BERKAS_SYARAT, berkasSyarat, bolehAjukanJadwal, orphanedUploadPaths } from './utils/helpers.js';
 import { deleteUploadedFile, deleteUploadedFolder } from './utils/fileUpload.js';
 import { DOSEN_AWAL, plusHari, RAW_MAHASISWA, MAHASISWA_AWAL, AKUN_AWAL, PERIODE_BUKA_AWAL, PENGUMUMAN_AWAL, PERIODE_AKTIF_AWAL, PANDUAN_AWAL } from './data/seed.js';
@@ -12,7 +12,7 @@ import { Badge, StageBar, ExportMenu, TextSizeToggle, ThemeToggle, RolePill } fr
 import { db, auth } from './utils/firebase.js';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, query, where } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
-import { readClaims, logout, changeOwnPassword, adminCreateUser, adminResetPassword } from './utils/auth.js';
+import { readClaims, logout, changeOwnPassword, adminCreateUser, adminResetPassword, adminDeleteStudent, adminDeleteAdmin, claimSuperAdmin, adminUpdateSelf, studentUpdateProfile } from './utils/auth.js';
 import logoTl from './assets/logo-tl.png';
 import gearIcon from './assets/gear.png';
 
@@ -144,6 +144,17 @@ export default function App() {
     });
     return () => unsub();
   }, []);
+  // Dipanggil setelah aksi yang mengubah custom claim milik akun sendiri
+  // (mis. NIM berubah lewat studentUpdateProfile) supaya UI langsung memakai
+  // NIM baru tanpa perlu logout/login ulang.
+  async function refreshClaims() {
+    if (!auth.currentUser) return;
+    try {
+      setClaims(await readClaims(auth.currentUser));
+    } catch (e) {
+      console.error('Gagal me-refresh klaim:', e);
+    }
+  }
 
   const [tab, setTab] = useState('dashboard');
 
@@ -297,6 +308,14 @@ export default function App() {
     // seluruh folder sekaligus supaya tidak ada sisa berkas yatim di Storage.
     deleteUploadedFolder(`uploads/${id}`);
   }
+  // Hapus akun mahasiswa sepenuhnya: akun Auth, akun/{nim}, loginIndex/{nim},
+  // dan semua data KP terkait — dipakai untuk membersihkan akun dummy/uji
+  // coba dari daftar akun di halaman Pengaturan.
+  async function hapusAkun(nim) {
+    const { deletedMahasiswaIds } = await adminDeleteStudent(nim);
+    setMahasiswaList((prev) => prev.filter((x) => !deletedMahasiswaIds.includes(x.id)));
+    deletedMahasiswaIds.forEach((id) => deleteUploadedFolder(`uploads/${id}`));
+  }
   // Dosen hanya boleh mengubah nilai/hasil pada event yang mereka tangani sendiri —
   // jangan pakai simpanMahasiswa (itu menimpa seluruh record, termasuk field admin).
   function simpanNilaiKP(id, ev, hasil) {
@@ -413,6 +432,21 @@ export default function App() {
         />
       );
     }
+    if (route === '/akun') {
+      return (
+        <AkunPage
+          nama={namaMhs}
+          nim={nim}
+          email={akunProfil.email || ''}
+          onSimpan={async (profil) => {
+            const { nimBerubah } = await studentUpdateProfile(profil);
+            if (nimBerubah) await refreshClaims();
+          }}
+          onBack={() => navigate('/')}
+          onLogout={keluar}
+        />
+      );
+    }
     return (
       <Portal
         nim={nim}
@@ -425,13 +459,15 @@ export default function App() {
         onSave={simpanMahasiswa}
         onLogout={keluar}
         onOpenPanduan={() => navigate('/panduan')}
+        onOpenAkun={() => navigate('/akun')}
       />
     );
   }
 
   // ----- Login sebagai admin -----
   if (claims.role !== 'admin' || !profilAdmin) {
-    return <div className="login-wrap"><div className="login-container"><p className="hint">Memuat profil admin…</p></div></div>;
+    const labelPeran = claims.role === 'admin' ? 'admin' : claims.role === 'student' ? 'mahasiswa' : claims.role === 'lecturer' ? 'dosen' : 'akun';
+    return <div className="login-wrap"><div className="login-container"><p className="hint">Memuat profil {labelPeran}…</p></div></div>;
   }
 
   // ----- Halaman Pengaturan (admin) — alamat terpisah (/pengaturan), bukan tab -----
@@ -471,7 +507,13 @@ export default function App() {
             onResetPassword={adminResetPassword}
             onCreateUser={adminCreateUser}
             onEditDosen={simpanDosen}
+            isSuperAdmin={!!claims.super}
+            currentAdminUid={authUser.uid}
+            onDeleteAdmin={async (uid) => { await adminDeleteAdmin(uid); }}
+            onClaimSuperAdmin={async () => { await claimSuperAdmin(); await refreshClaims(); }}
+            onUpdateSelfAdmin={adminUpdateSelf}
             onToggleAkunAktif={(nim, isActive) => writeDoc('akun', nim, { ...(data.akun || []).find((a) => a.nim === nim), isActive }, 'akun')}
+            onDeleteAkun={hapusAkun}
             onToggleDosenAktif={(kode, isActive) => writeDoc('dosen', kode, { ...(data.dosen || []).find((d) => d.kode === kode), isActive }, 'dosen')}
           />
         </main>
