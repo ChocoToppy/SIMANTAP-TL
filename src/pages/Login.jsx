@@ -11,12 +11,19 @@ import logoTl from '../assets/logo-tl.png';
 
 function pesanErrorAuth(e) {
   const code = e && e.code;
-  if (e && e.message === 'NOT_FOUND') return 'Akun tidak ditemukan.';
+  const msg = (e && e.message) || '';
+  if (msg === 'NOT_FOUND') return 'Akun tidak ditemukan.';
   if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') return 'Kombinasi identitas/password salah.';
   if (code === 'auth/too-many-requests') return 'Terlalu banyak percobaan. Coba lagi beberapa saat lagi.';
   if (code === 'auth/email-already-in-use') return 'NIM/email ini sudah terdaftar. Silakan masuk.';
   if (code === 'functions/already-exists') return 'NIM sudah terdaftar. Silakan masuk.';
-  return (e && e.message) || 'Terjadi kesalahan. Coba lagi.';
+  // Auth/Firestore SDK mendeteksi perangkat sendiri tidak terhubung ke internet
+  // (bukan salah server) — pesan aslinya bahasa Inggris teknis ("client is
+  // offline"), ganti dengan yang jelas + actionable buat pengguna.
+  if (code === 'auth/network-request-failed' || code === 'unavailable' || /client is offline/i.test(msg)) {
+    return 'Tidak ada koneksi internet. Periksa jaringan Anda, lalu coba lagi.';
+  }
+  return msg || 'Terjadi kesalahan. Coba lagi.';
 }
 
 export function Login({ pengumuman = [], periodeAktif = '' }) {

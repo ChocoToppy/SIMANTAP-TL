@@ -2,19 +2,27 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, stagesFor, eventsFor, punyaKlasifikasi, punyaSyarat, rolesFor, syaratLabel, getJadwal, STAGES, KLASIFIKASI, BIDANG, KP_TEMA, HARI, bidangLabel, todayISO, parseISO, daysBetween, BULAN, formatTanggal, kondisi, isAktif, indexTahap, hitungBeban, hitungBebanProgram, hitungBebanRinci, SEMUA, filterByPeriode, daftarPeriode, buatId, PERIODE_AKTIF, TOPIK, VERIFIKASI, statusVerif, tambahHari, LABEL_PENDAFTARAN, ringkasPendaftaran, RUANG, menitJam, rentangJadwal, jamTampil, beririsan, dosenTerlibat, kumpulkanEvent, cariBentrok, pesanNotifikasi, waLink, mailtoLink, waMahasiswa, TEMPLATE_SURAT, tokenSurat, renderSurat, PEJABAT, KOP_SURAT, evKeyDok, dokTA, DURASI_EVENT, JAM_KERJA, durasiEvent, jamTambah, dalamJamKerja, tahapBerikut, eventAktif, BERKAS_SYARAT, berkasSyarat, bolehAjukanJadwal, KP_DOKUMEN, catatAktivitas, tanggalDibuat, aktivitasTerakhir, AKTIVITAS_LABEL, formatWaktu, normalizeUrl } from '../utils/helpers.js';
 import { DOSEN_AWAL, plusHari, RAW_MAHASISWA, MAHASISWA_AWAL, AKUN_AWAL, PERIODE_BUKA_AWAL } from '../data/seed.js';
 import { csvEscape, triggerDownload, downloadCSV, downloadDoc, cetakSuratPDF, cetakSuratPDFHtml, loadXLSX } from '../utils/exportUtils.js';
-import { Badge, StageBar, Field, Modal, Empty, ExportMenu, ColResizeHandle, TextSizeToggle, ThemeToggle, FileDropZone, RolePill } from '../components/ui.jsx';
+import { Badge, StageBar, StageListVertical, Field, Modal, Empty, ExportMenu, ColResizeHandle, TextSizeToggle, ThemeToggle, FileDropZone, RolePill, TabIcon } from '../components/ui.jsx';
 import { KpDocumentPanel } from '../components/kpDocuments.jsx';
 import { generateDocument, getTemplateConfig } from '../utils/documentGenerator.js';
 import { readFileForUpload } from '../utils/fileUpload.js';
 import { useColumnWidths } from '../utils/useColumnWidths.js';
 import logoTl from '../assets/logo-tl.png';
+import bukuPanduanIcon from '../assets/buku-panduan.png';
+import { programKeysTersedia } from '../utils/config.js';
 
 // ===================== Portal.jsx =====================
 // Portal.jsx — tampilan untuk mahasiswa (Rute A)
 
+// Program yang boleh dipilih mahasiswa saat mendaftar BARU pada build ini
+// (lihat src/utils/config.js) — dihitung sekali saat modul dimuat, bukan
+// per-render, karena tidak bergantung pada props/state apa pun.
+const PROGRAM_KEYS_PENDAFTARAN = programKeysTersedia(PROGRAM_KEYS);
+
 const PORTAL_TABS = [
   { key: 'pengajuan', label: 'Pengajuan' },
   { key: 'ruang', label: 'Penggunaan Ruang' },
+  { key: 'akun', label: 'Akun' },
 ];
 
 // Panduan yang ditampilkan langsung di kartu pengajuan (tombol di sebelah
@@ -26,9 +34,9 @@ function panduanUntukProgram(panduan, programKey) {
   return panduan.filter((p) => p.program === programKey);
 }
 
-export function Portal({ nim, nama, mahasiswa, allDosen, periodeBuka = [], panduan = [], konten = {}, onSave, onLogout, onOpenPanduan, onOpenAkun }) {
+export function Portal({ nim, nama, email, mahasiswa, allDosen, periodeBuka = [], panduan = [], konten = {}, onSave, onSimpanAkun, onLogout, onOpenPanduan, initialTab = 'pengajuan' }) {
   const mine = mahasiswa.filter((m) => m.owner === nim);
-  const [tab, setTab] = useState('pengajuan');
+  const [tab, setTab] = useState(initialTab);
   const [view, setView] = useState({ mode: 'list' });
 
   function simpan(rec) { onSave(rec); setView({ mode: 'list' }); }
@@ -62,25 +70,28 @@ export function Portal({ nim, nama, mahasiswa, allDosen, periodeBuka = [], pandu
 
   return (
     <div className="app">
-      <header className="topbar">
-        <div className="brand">
+      <header className="topbar topbar-identity">
+        <div className="brand brand-identity">
           <img className="brand-mark" src={logoTl} alt="TL Undip" />
-          <span className="brand-name">SIMANTAP</span>
+          <div className="brand-identity-text">
+            <div className="brand-identity-name" title={nama}>{(nama || '').trim().split(/\s+/).slice(0, 2).join(' ') || nama}</div>
+            <div className="brand-identity-nim">{nim}</div>
+          </div>
         </div>
         <div className="topbar-right">
           <button className="btn btn-primary" onClick={onOpenPanduan}>Panduan</button>
-          <ThemeToggle />
+          <ThemeToggle square />
           <TextSizeToggle />
-          <button className="btn ghost" onClick={onOpenAkun}>Akun</button>
-          <RolePill peran="mahasiswa" nama={nama} />
-          <button className="btn ghost" onClick={onLogout}>Keluar</button>
         </div>
       </header>
       <div className="masthead-rule" />
 
       <nav className="tabs">
         {PORTAL_TABS.map((t) => (
-          <button key={t.key} className={'tab' + (tab === t.key ? ' active' : '')} onClick={() => setTab(t.key)}>{t.label}</button>
+          <button key={t.key} className={'tab' + (tab === t.key ? ' active' : '')} onClick={() => setTab(t.key)}>
+            <TabIcon tabKey={t.key} />
+            <span className="tab-label">{t.label}</span>
+          </button>
         ))}
       </nav>
 
@@ -133,6 +144,8 @@ export function Portal({ nim, nama, mahasiswa, allDosen, periodeBuka = [], pandu
         )}
 
         {tab === 'ruang' && <PenggunaanRuangPortal mahasiswa={mahasiswa} />}
+
+        {tab === 'akun' && <AkunForm nama={nama} nim={nim} email={email} onSimpan={onSimpanAkun} onLogout={onLogout} />}
       </main>
     </div>
   );
@@ -153,6 +166,7 @@ export function PanduanPage({ nama, nim, panduan = [], onBack, onLogout }) {
   return (
     <div className="app">
       <header className="topbar">
+        <button className="btn btn-logout btn-sm" onClick={onLogout}>Logout</button>
         <div className="brand">
           <img className="brand-mark" src={logoTl} alt="TL Undip" />
           <span className="brand-name">SIMANTAP</span>
@@ -162,7 +176,6 @@ export function PanduanPage({ nama, nim, panduan = [], onBack, onLogout }) {
           <TextSizeToggle />
           <RolePill peran="mahasiswa" nama={nama} />
           <button className="btn ghost" onClick={onBack}>← Kembali</button>
-          <button className="btn ghost" onClick={onLogout}>Keluar</button>
         </div>
       </header>
       <div className="masthead-rule" />
@@ -195,15 +208,14 @@ export function PanduanPage({ nama, nim, panduan = [], onBack, onLogout }) {
   );
 }
 
-// Halaman /akun — profil login mahasiswa sendiri (nama, NIM, email aktif).
-// Alamat sendiri, sama pola dengan /panduan & /pengaturan. Email di sini
-// HANYA kontak untuk admin mengirimkan password sementara secara manual saat
-// mahasiswa lupa password (lihat SeksiAkun di Pengaturan.jsx) — tidak ada
-// email verifikasi/reset otomatis. NIM boleh diubah (mis. salah ketik saat
-// daftar), tapi itu memindahkan seluruh identitas login & data KP mahasiswa
-// ini, jadi diproses lewat Cloud Function (studentUpdateProfile), bukan
-// tulis langsung ke Firestore.
-export function AkunPage({ nama, nim, email, onSimpan, onBack, onLogout }) {
+// Isi tab "Akun" di Portal (bottom nav) — profil login mahasiswa sendiri
+// (nama, NIM, email aktif). Email di sini HANYA kontak untuk admin mengirimkan
+// password sementara secara manual saat mahasiswa lupa password (lihat
+// SeksiAkun di Pengaturan.jsx) — tidak ada email verifikasi/reset otomatis.
+// NIM boleh diubah (mis. salah ketik saat daftar), tapi itu memindahkan
+// seluruh identitas login & data KP mahasiswa ini, jadi diproses lewat Cloud
+// Function (studentUpdateProfile), bukan tulis langsung ke Firestore.
+function AkunForm({ nama, nim, email, onSimpan, onLogout }) {
   const [form, setForm] = useState({ nama: nama || '', nim: nim || '', email: email || '' });
   const [err, setErr] = useState('');
   const [sukses, setSukses] = useState('');
@@ -228,47 +240,30 @@ export function AkunPage({ nama, nim, email, onSimpan, onBack, onLogout }) {
   }
 
   return (
-    <div className="app">
-      <header className="topbar">
-        <div className="brand">
-          <img className="brand-mark" src={logoTl} alt="TL Undip" />
-          <span className="brand-name">SIMANTAP</span>
+    <div className="portal">
+      <div className="toolbar">
+        <h2 className="page-title">Akun Saya</h2>
+      </div>
+      <div className="card" style={{ maxWidth: 480 }}>
+        <p className="hint" style={{ marginTop: 0 }}>
+          Email di sini dipakai admin untuk mengirimkan password sementara
+          secara manual bila Anda lupa password — pastikan aktif dan bisa
+          Anda akses. Bila Anda lupa password DAN tidak tahu email aktif
+          yang tersimpan di sini, hubungi admin untuk direset dari sana.
+        </p>
+        <div className="form-grid">
+          <Field label="Nama" full><input value={form.nama} onChange={(e) => set('nama', e.target.value)} /></Field>
+          <Field label="NIM" full><input value={form.nim} onChange={(e) => set('nim', e.target.value)} /></Field>
+          <Field label="Email aktif" full><input type="email" value={form.email} onChange={(e) => set('email', e.target.value)} /></Field>
         </div>
-        <div className="topbar-right">
-          <ThemeToggle />
-          <TextSizeToggle />
-          <RolePill peran="mahasiswa" nama={nama} />
-          <button className="btn ghost" onClick={onBack}>← Kembali</button>
-          <button className="btn ghost" onClick={onLogout}>Keluar</button>
+        {err && <div className="login-err" style={{ marginTop: 8 }}>{err}</div>}
+        {sukses && <div className="hint" style={{ marginTop: 8 }}>{sukses}</div>}
+        <div className="modal-foot" style={{ paddingLeft: 0, paddingRight: 0 }}>
+          <button className="btn btn-primary" onClick={simpan} disabled={busy}>{busy ? 'Menyimpan…' : 'Simpan perubahan'}</button>
         </div>
-      </header>
-      <div className="masthead-rule" />
-      <main className="content">
-        <div className="portal">
-          <div className="toolbar">
-            <h2 className="page-title">Akun Saya</h2>
-          </div>
-          <div className="card" style={{ maxWidth: 480 }}>
-            <p className="hint" style={{ marginTop: 0 }}>
-              Email di sini dipakai admin untuk mengirimkan password sementara
-              secara manual bila Anda lupa password — pastikan aktif dan bisa
-              Anda akses. Bila Anda lupa password DAN tidak tahu email aktif
-              yang tersimpan di sini, hubungi admin untuk direset dari sana.
-            </p>
-            <div className="form-grid">
-              <Field label="Nama" full><input value={form.nama} onChange={(e) => set('nama', e.target.value)} /></Field>
-              <Field label="NIM" full><input value={form.nim} onChange={(e) => set('nim', e.target.value)} /></Field>
-              <Field label="Email aktif" full><input type="email" value={form.email} onChange={(e) => set('email', e.target.value)} /></Field>
-            </div>
-            {err && <div className="login-err" style={{ marginTop: 8 }}>{err}</div>}
-            {sukses && <div className="hint" style={{ marginTop: 8 }}>{sukses}</div>}
-            <div className="modal-foot" style={{ paddingLeft: 0, paddingRight: 0 }}>
-              <button className="btn btn-primary" onClick={simpan} disabled={busy}>{busy ? 'Menyimpan…' : 'Simpan perubahan'}</button>
-            </div>
-          </div>
-        </div>
-      </main>
-      <footer className="foot">SIMANTAP © 2026 Universitas Diponegoro</footer>
+      </div>
+      <div style={{ height: 1, background: 'var(--border)', margin: '20px 0 16px', maxWidth: 480 }} />
+      <button type="button" className="btn btn-logout" onClick={onLogout} style={{ maxWidth: 480, width: '100%' }}>Logout</button>
     </div>
   );
 }
@@ -361,14 +356,20 @@ function KartuPengajuan({ m, allDosen = [], konten = {}, panduan = [], onEdit, o
         <span className="kartu-prog">{programLabel(programOf(m))}</span>
         <div className="kartu-head-right">
           {panduanRelevan.map((p) => (
-            <a key={p.id} className="btn btn-primary btn-sm" href={normalizeUrl(p.url)} target="_blank" rel="noreferrer">{p.label}</a>
+            <React.Fragment key={p.id}>
+              <a className="btn btn-primary btn-sm panduan-link-desktop" href={normalizeUrl(p.url)} target="_blank" rel="noreferrer">{p.label}</a>
+              <a className="panduan-link-mobile" href={normalizeUrl(p.url)} target="_blank" rel="noreferrer" title={p.label} aria-label={p.label}>
+                <img src={bukuPanduanIcon} alt="" width={18} height={18} />
+              </a>
+            </React.Fragment>
           ))}
           <Badge tone={v.tone}>{v.label}</Badge>
         </div>
       </div>
       <div className="kartu-judul">{m.judul || <span className="muted">(judul belum diisi)</span>}</div>
       <div className="cell-sub">{m.nim} · {bidangLabel(m.bidang)}{m.klasifikasi ? ` · ${m.klasifikasi}` : ''}</div>
-      <div style={{ margin: '10px 0' }}><StageBar program={programOf(m)} tahap={m.tahap} /></div>
+      <div className="stage-desktop" style={{ margin: '10px 0' }}><StageBar program={programOf(m)} tahap={m.tahap} /></div>
+      <div className="stage-mobile" style={{ margin: '10px 0' }}><StageListVertical program={programOf(m)} tahap={m.tahap} /></div>
       {!terverifikasi && k.key !== 'lulus' && (
         <div className="cell-sub">Batas: {formatTanggal(m.batasAkhir)} · <Badge tone={k.tone}>{k.label}</Badge></div>
       )}
@@ -428,7 +429,7 @@ function KartuPengajuan({ m, allDosen = [], konten = {}, panduan = [], onEdit, o
         const isKPProgram = programOf(m) === 'KP';
         const suratSiap = isKPProgram ? pp.suratAdminTersedia : pp.suratAdmin;
         if (!pp.diminta && !suratSiap) {
-          return <div style={{ marginTop: 8 }}><button className="btn btn-amber" onClick={() => onPerpanjangan('minta')}>Ajukan perpanjangan</button></div>;
+          return <div style={{ marginTop: 8 }}><button className="btn btn-amber perpanjangan-btn" onClick={() => onPerpanjangan('minta')}>Ajukan perpanjangan</button></div>;
         }
         if (!suratSiap) {
           return <div className="callout" style={{ marginTop: 8 }}>Perpanjangan diajukan{pp.tanggalDiminta ? ` (${formatTanggal(pp.tanggalDiminta)})` : ''} — menunggu surat dari admin.</div>;
@@ -437,11 +438,11 @@ function KartuPengajuan({ m, allDosen = [], konten = {}, panduan = [], onEdit, o
           return (
             <div className="callout" style={{ marginTop: 8 }}>
               {isKPProgram ? (
-                <button className="btn" onClick={unduhPerpanjanganKP} disabled={dlBusy}>{dlBusy ? 'Menyiapkan PDF…' : 'Unduh surat perpanjangan KP (PDF)'}</button>
+                <button className="btn perpanjangan-btn" onClick={unduhPerpanjanganKP} disabled={dlBusy}>{dlBusy ? 'Menyiapkan PDF…' : 'Unduh surat perpanjangan KP (PDF)'}</button>
               ) : (
                 <>Surat perpanjangan dari admin: <a href={pp.suratAdmin.url || pp.suratAdmin.dataUrl} target="_blank" rel="noreferrer">{pp.suratAdmin.fileName}</a>.{' '}</>
               )}{' '}
-              <button className="btn" onClick={() => onPerpanjangan('final')}>Unggah surat final (ditandatangani)</button>
+              <button className="btn perpanjangan-btn" onClick={() => onPerpanjangan('final')}>Unggah surat final (ditandatangani)</button>
             </div>
           );
         }
@@ -473,7 +474,7 @@ function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], onCancel
   const baru = !awal;
   const [m, setM] = useState(() =>
     awal || {
-      id: buatId(), program: 'TA', nama, nim, owner: nim,
+      id: buatId(), program: PROGRAM_KEYS_PENDAFTARAN[0] || 'TA', nama, nim, owner: nim,
       judul: '', periode: periodeBuka[0] || '', angkatan: '', klasifikasi: 'Penelitian', bidang: 'U',
       pembimbing1: '', pembimbing2: '', penguji1: '', penguji2: '',
       tahap: 'Pendaftaran', tanggalMulai: todayISO(), batasAkhir: tambahHari(todayISO(), 180),
@@ -489,6 +490,11 @@ function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], onCancel
   const isKP = m.program === 'KP';
   const tampilSyarat = punyaSyarat(m.program);
   const labelMK = m.program === 'CAP' ? 'Capstone Design' : 'TA';
+  // Pilihan program = yang diizinkan build ini (lihat PROGRAM_KEYS_PENDAFTARAN);
+  // sertakan program lama kalau sedang edit data lama yang programnya sudah
+  // tidak ada di daftar itu (mis. dari sebelum lingkup ini dipersempit), spy
+  // select tidak kosong — tetap tidak bisa diganti karena disabled saat edit.
+  const programOpsi = PROGRAM_KEYS_PENDAFTARAN.includes(m.program) ? PROGRAM_KEYS_PENDAFTARAN : [...PROGRAM_KEYS_PENDAFTARAN, m.program];
   // Pilihan periode = yang dibuka admin; sertakan periode lama jika sedang diedit.
   const periodeOpsi = Array.from(new Set([...periodeBuka, ...(m.periode ? [m.periode] : [])]));
   const belumAdaPeriode = periodeOpsi.length === 0;
@@ -519,7 +525,7 @@ function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], onCancel
       <div className="form-grid">
         <Field label="Program">
           <select value={m.program} onChange={(e) => gantiProgram(e.target.value)} disabled={!baru}>
-            {PROGRAM_KEYS.map((k) => <option key={k} value={k}>{programLabel(k)}</option>)}
+            {programOpsi.map((k) => <option key={k} value={k}>{programLabel(k)}</option>)}
           </select>
         </Field>
         <Field label="Periode">
@@ -855,6 +861,7 @@ export function DosenPortal({ dosen, allDosen, mahasiswa, periodeList = [], onGr
   return (
     <div className="app">
       <header className="topbar">
+        <button className="btn btn-logout btn-sm" onClick={onLogout}>Logout</button>
         <div className="brand">
           <img className="brand-mark" src={logoTl} alt="TL Undip" />
           <span className="brand-name">SIMANTAP</span>
@@ -873,7 +880,6 @@ export function DosenPortal({ dosen, allDosen, mahasiswa, periodeList = [], onGr
             <input type="checkbox" checked={semua} onChange={(e) => setSemua(e.target.checked)} /><span>Termasuk lulus</span>
           </label>
           <RolePill peran="dosen" nama={dosen.nama} sub={dosen.kode} />
-          <button className="btn ghost" onClick={onLogout}>Keluar</button>
         </div>
       </header>
       <div className="masthead-rule" />

@@ -43,6 +43,11 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
   const [fDosen, setFDosen] = useState('');
   const [editing, setEditing] = useState(null);
   const [open, setOpen] = useState(false);
+  // Filter tambahan (di luar pencarian & status) diciutkan di layar sempit —
+  // supaya toolbar tidak jadi tumpukan dropdown yang berdesakan/terpotong.
+  // Di layar lebar, CSS selalu menampilkannya (lihat .toolbar-extra), jadi
+  // state ini cuma berpengaruh di mobile.
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [sortBy, setSortBy] = useState('nama'); // nama | tahap | deadline | dibuat
   const [sortDir, setSortDir] = useState('asc');
   function ubahSort(key) {
@@ -74,6 +79,10 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
   ], [dosenCols]);
   const tableWrapRef = useRef(null);
   const [colWidths, startResize, tableWidth] = useColumnWidths('simantap-col-mahasiswa', COLS, tableWrapRef);
+
+  // Cuma dipakai untuk lencana "Filter (n)" di tombol toggle mobile — angka
+  // filter tambahan (di luar pencarian) yang lagi aktif.
+  const filterAktifCount = [fStatus !== 'all', !!fAngkatan, !!fBidang, !!fVerif, !!fDosen].filter(Boolean).length;
 
   const angkatanList = useMemo(
     () => Array.from(new Set(mahasiswa.filter((m) => programOf(m) === programTab).map((m) => m.angkatan))).sort((a, b) => b - a),
@@ -225,32 +234,48 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
       </nav>
       <div className="toolbar">
         <input className="search" placeholder="Cari nama, NIM, atau judul…" value={q} onChange={(e) => setQ(e.target.value)} />
-        <select value={fStatus} onChange={(e) => setFStatus(e.target.value)}>
-          {STATUS_FILTER.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
-        </select>
-        <select value={fAngkatan} onChange={(e) => setFAngkatan(e.target.value)}>
-          <option value="">Semua angkatan</option>
-          {angkatanList.map((a) => <option key={a} value={a}>Angkatan {a}</option>)}
-        </select>
-        <select value={fBidang} onChange={(e) => setFBidang(e.target.value)}>
-          <option value="">Semua bidang</option>
-          {BIDANG.map((b) => <option key={b.kode} value={b.kode}>{b.label}</option>)}
-        </select>
-        <select value={fVerif} onChange={(e) => setFVerif(e.target.value)}>
-          <option value="">Semua verifikasi</option>
-          <option value="baru">Menunggu verifikasi</option>
-          <option value="terverifikasi">Terverifikasi</option>
-          <option value="perbaikan">Perlu perbaikan</option>
-        </select>
-        <select value={fDosen} onChange={(e) => setFDosen(e.target.value)}>
-          <option value="">Semua dosen</option>
-          {allDosen.map((d) => <option key={d.kode} value={d.kode}>{d.kode}</option>)}
-        </select>
-        <select value={groupMode} onChange={(e) => setGroupMode(e.target.value)} title="Kelompokkan tabel">
-          <option value="none">Tampilan: Normal</option>
-          <option value="periode">Kelompokkan per Periode</option>
-          <option value="angkatan">Kelompokkan per Angkatan</option>
-        </select>
+        <div className="toolbar-filter">
+          <button
+            type="button"
+            className={'btn toolbar-toggle' + (filtersOpen ? ' active' : '')}
+            onClick={() => setFiltersOpen((v) => !v)}
+          >
+            Filter{filterAktifCount > 0 ? ` (${filterAktifCount})` : ''} {filtersOpen ? '▴' : '▾'}
+          </button>
+          {filtersOpen && (
+            <>
+              <div className="toolbar-filter-backdrop" onClick={() => setFiltersOpen(false)} />
+              <div className="toolbar-extra">
+                <select value={fStatus} onChange={(e) => setFStatus(e.target.value)}>
+                  {STATUS_FILTER.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+                </select>
+                <select value={fAngkatan} onChange={(e) => setFAngkatan(e.target.value)}>
+                  <option value="">Semua angkatan</option>
+                  {angkatanList.map((a) => <option key={a} value={a}>Angkatan {a}</option>)}
+                </select>
+                <select value={fBidang} onChange={(e) => setFBidang(e.target.value)}>
+                  <option value="">Semua bidang</option>
+                  {BIDANG.map((b) => <option key={b.kode} value={b.kode}>{b.label}</option>)}
+                </select>
+                <select value={fVerif} onChange={(e) => setFVerif(e.target.value)}>
+                  <option value="">Semua verifikasi</option>
+                  <option value="baru">Menunggu verifikasi</option>
+                  <option value="terverifikasi">Terverifikasi</option>
+                  <option value="perbaikan">Perlu perbaikan</option>
+                </select>
+                <select value={fDosen} onChange={(e) => setFDosen(e.target.value)}>
+                  <option value="">Semua dosen</option>
+                  {allDosen.map((d) => <option key={d.kode} value={d.kode}>{d.kode}</option>)}
+                </select>
+                <select value={groupMode} onChange={(e) => setGroupMode(e.target.value)} title="Kelompokkan tabel">
+                  <option value="none">Tampilan: Normal</option>
+                  <option value="periode">Kelompokkan per Periode</option>
+                  <option value="angkatan">Kelompokkan per Angkatan</option>
+                </select>
+              </div>
+            </>
+          )}
+        </div>
         <ExportMenu label="Ekspor" onXLSX={() => ekspor('xlsx')} onCSV={() => ekspor('csv')} />
         <button className="btn btn-primary" onClick={tambah}>+ Tambah</button>
       </div>
@@ -264,7 +289,7 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
           {notif.kelompok > 0 && <span>👥 <strong>{notif.kelompok}</strong> jadwal terindikasi sidang kelompok. </span>}
         </div>
       )}
-      <div className="table-wrap card" ref={tableWrapRef}>
+      <div className="table-wrap card mhs-table-wrap" ref={tableWrapRef}>
         <table className="tbl tbl-resizable" style={{ width: tableWidth }}>
           <colgroup>
             {COLS.map((c, i) => (
@@ -332,6 +357,42 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
           </tbody>
         </table>
         {rows.length === 0 && <Empty>Tidak ada data yang cocok.</Empty>}
+      </div>
+
+      {/* Tampilan daftar (bukan tabel) untuk layar sempit — data & urutan sama
+          persis dengan tabel di atas (pageRows/grupRows), cuma ditata ulang
+          jadi baris bertumpuk supaya tidak perlu geser ke samping di HP. */}
+      <div className="mhs-mobile-rows">
+        {rows.length === 0 ? (
+          <Empty>Tidak ada data yang cocok.</Empty>
+        ) : (() => {
+          const barisMobile = ({ m, k }) => (
+            <div className="mhs-row" key={m.id} onClick={() => edit(m)}>
+              <div className="mhs-row-top">
+                <div className="mhs-row-name">{m.nama}</div>
+                <Badge tone={k.tone}>{k.label}</Badge>
+              </div>
+              <div className="mhs-row-sub">{m.nim} · {programLabel(programOf(m))} · {m.pembimbing1 || m.dosenWali || '—'}</div>
+              <StageBar program={programOf(m)} tahap={m.tahap} />
+              <div className="mhs-row-foot">
+                <span>{statusVerif(m).label}</span>
+                <span>Batas: {formatTanggal(m.batasAkhir)}</span>
+              </div>
+              <div className="mhs-row-actions">
+                <button type="button" className="link-btn danger mhs-row-del" onClick={(e) => { e.stopPropagation(); hapus(m); }}>Hapus</button>
+              </div>
+            </div>
+          );
+          if (grupRows) {
+            return grupRows.map((g) => (
+              <div key={g.label}>
+                <div className="mhs-mobile-group">{groupMode === 'angkatan' ? `Angkatan ${g.label}` : g.label}</div>
+                {g.items.map(barisMobile)}
+              </div>
+            ));
+          }
+          return pageRows.map(barisMobile);
+        })()}
       </div>
 
       {rows.length > 0 && (

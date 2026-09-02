@@ -1,5 +1,10 @@
 # Changelog
 
+## 02-09-2026 — Penambahan UI mobile-view untuk Mahasiswa
+- Menambahkan UI mobile view untuk mahasiswa, admin dan dosen belum memiliki mobile view yang optimal
+- Dist sekarang dibagi menjadi 2, production untuk deployment ke domain utama dan experimental untuk domain firebase
+-Fitur program KP sudah ready untuk deployment, mahasiswa hanya bisa mengakses fitur program KP pada deployment production
+
 ## 01-09-2026 — Peran Super Admin, akun mahasiswa mandiri, dan hapus akun
 
 ### Peran Super Admin

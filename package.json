@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:production": "vite build --mode kp-only",
+    "build:experimental": "vite build --mode full",
     "preview": "vite preview"
   },
   "dependencies": {

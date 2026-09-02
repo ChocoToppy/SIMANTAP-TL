@@ -191,6 +191,10 @@ html[data-theme="dark"] .btn:hover { background: rgba(241, 241, 238, 0.08); }
 html[data-theme="dark"] .btn.ghost:hover { background: rgba(241, 241, 238, 0.08); }
 .btn-amber { background: var(--amber-bg); border: 1px solid var(--amber); color: var(--amber-text); }
 .btn-amber:hover { background: var(--amber-border); border-color: var(--amber); }
+/* Tombol Keluar — merah solid + teks putih, dipakai di semua topbar (semua
+   peran, semua ukuran layar), supaya aksi keluar selalu jelas dan konsisten. */
+.btn-logout { background: var(--red); border-color: var(--red); color: #fff; }
+.btn-logout:hover { background: var(--red-text); border-color: var(--red-text); }
 .btn-sm { padding: 5px 10px; font-size: 0.74rem; }
 .btn:disabled { opacity: 0.4; cursor: default; pointer-events: none; }
 .push { margin-left: auto; }
@@ -412,6 +416,22 @@ html[data-theme="dark"] .gear-icon { filter: invert(1); }
 .icon-btn:hover { background: rgba(21, 32, 43, 0.07); color: var(--text); }
 html[data-theme="dark"] .icon-btn:hover { background: rgba(241, 241, 238, 0.1); }
 
+/* Tombol ikon kotak bergaris (mis. ThemeToggle square) — meniru referensi
+   desain mobile (bell/moon di kotak bergaris tipis). */
+.icon-btn-outline {
+  width: 36px; height: 36px; flex: none; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border-strong); border-radius: var(--radius); background: none; color: var(--blue);
+  cursor: pointer; transition: background 0.15s ease;
+}
+.icon-btn-outline:hover { background: rgba(21, 32, 43, 0.05); }
+html[data-theme="dark"] .icon-btn-outline:hover { background: rgba(241, 241, 238, 0.08); }
+
+/* Identitas mahasiswa di header Portal (ganti nama brand "SIMANTAP-TL" jadi
+   nama + NIM mahasiswa yang sedang masuk) — meniru referensi desain mobile. */
+.brand-identity-text { line-height: 1.15; }
+.brand-identity-name { font-size: 0.95rem; font-weight: 600; }
+.brand-identity-nim { font-size: 0.75rem; color: var(--muted); }
+
 /* ---------- Modal lebar dengan tab per-tahap + panel dokumen sticky (KP) ---------- */
 .modal-wide { max-width: 1100px; }
 .modal-kp-layout { display: flex; gap: 24px; align-items: flex-start; }
@@ -627,3 +647,210 @@ html[data-theme="dark"] .icon-btn:hover { background: rgba(241, 241, 238, 0.1); 
 /* ---------- Tambahan batch perbaikan ---------- */
 .th-sort { cursor: pointer; user-select: none; white-space: nowrap; transition: color 0.2s; }
 .th-sort:hover { color: var(--accent); }
+
+/* ==================================================================
+   Tampilan mobile — dipandu oleh mockup "SIMANTAP-TL Mobile" (import
+   Claude Design), diadaptasi ke markup & data aplikasi yang sebenarnya:
+   nav utama pindah jadi bar bawah, topbar dipadatkan, tabel mahasiswa
+   jadi daftar baris, tahapan jadi daftar vertikal ringkas, aksi utama
+   jadi tombol lebar bertumpuk. Palet & tipografi TIDAK berubah — sudah
+   sama persis dengan mockup (aksen hijau, Source Serif 4, radius tajam).
+   ================================================================== */
+
+/* Elemen yang cuma dipakai di salah satu tampilan (mobile/desktop) —
+   defaultnya (layar lebar) tampilkan versi desktop, sembunyikan versi
+   mobile; dibalik di media query 640px di bawah. */
+.tab-icon { display: none; }
+.stage-mobile { display: none; }
+.mhs-mobile-rows { display: none; }
+.panduan-link-mobile { display: none; }
+.kp-dok-tabs-mobile { display: none; }
+/* Grid item ("kartu") sengaja dikasih min-width:0 — tanpa ini, konten yang
+   tidak bisa menciut (mis. baris sub-tab dokumen KP yang belum digulir)
+   bisa memaksa seluruh kartu (dan grid-nya) melebar melebihi layar, membuat
+   sisi kanan kartu terpotong di HP. Berlaku untuk semua program, bukan cuma KP. */
+.kartu { min-width: 0; }
+/* Filter tambahan (Mahasiswa admin) diciutkan di balik tombol "Filter" di
+   SEMUA ukuran layar (bukan cuma mobile), muncul sebagai panel melayang di
+   TENGAH layar (bukan menempel di bawah tombolnya — tombol itu sendiri bisa
+   ada di mana saja di toolbar lebar, jadi panel yang menempel bisa kepotong
+   tepi layar) dengan latar gelap seperti modal, supaya tidak mendorong
+   konten di bawahnya turun. */
+.toolbar-toggle { display: inline-flex; align-items: center; gap: 4px; }
+.toolbar-filter { position: relative; }
+.toolbar-filter-backdrop {
+  position: fixed; inset: 0; z-index: 40;
+  background: rgba(21, 23, 26, 0.45);
+  backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
+  animation: fadeIn 0.2s ease-out;
+}
+.toolbar-extra {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 41;
+  display: flex; flex-direction: column; align-items: stretch; gap: 10px;
+  background: var(--bg); border: 1px solid var(--border-strong); border-radius: var(--radius);
+  box-shadow: var(--shadow-lg); padding: 20px;
+  width: min(360px, calc(100vw - 32px));
+  max-height: calc(100vh - 40px); overflow-y: auto;
+  animation: slideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.toolbar-extra select { width: 100%; }
+
+/* ---------- Daftar mahasiswa versi baris (pengganti tabel di layar sempit) ---------- */
+.mhs-mobile-group {
+  font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--blue-text); background: var(--blue-bg); border-top: 1px solid var(--blue-border);
+  border-bottom: 1px solid var(--blue-border); padding: 8px 4px; margin-top: 4px;
+}
+.mhs-mobile-rows { border-top: 3px solid var(--text); }
+.mhs-row {
+  padding: 12px 2px 14px; border-bottom: 1px solid var(--border); cursor: pointer;
+}
+.mhs-row-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.mhs-row-name { font-size: 0.95rem; font-weight: 600; }
+.mhs-row-sub { font-size: 0.75rem; color: var(--muted); margin: 3px 0 8px; }
+.mhs-row-foot { display: flex; justify-content: space-between; gap: 10px; font-size: 0.72rem; color: var(--muted-2); margin-top: 6px; }
+.mhs-row .stagebar { margin-top: 2px; }
+/* Baris sendiri di bawah, rata kanan — bukan menumpuk di atas badge status
+   (posisi absolute sebelumnya bertabrakan dengan badge di .mhs-row-top). */
+.mhs-row-actions { display: flex; justify-content: flex-end; margin-top: 6px; }
+.mhs-row-del { min-height: 32px; padding: 4px 8px; }
+
+/* ---------- Daftar tahapan vertikal ringkas (pengganti StageBar di layar sempit) ---------- */
+.stage-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.stage-list-item {
+  display: flex; align-items: center; gap: 11px; min-height: 27px; font-size: 0.85rem; color: var(--muted);
+}
+.stage-list-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--blue-bg); border: 1px solid var(--blue-border); }
+.stage-list-item.stage-done .stage-list-dot { background: var(--accent); border-color: var(--accent); }
+.stage-list-item.stage-done .stage-list-label { color: var(--muted); }
+.stage-list-item.stage-active { color: var(--text); font-weight: 600; }
+.stage-list-item.stage-active .stage-list-dot { background: var(--amber); border-color: var(--amber); }
+
+@media (max-width: 640px) {
+  html, body { overflow-x: hidden; }
+
+  /* ----- Nav utama pindah ke bar bawah (tab-bar), gaya app mobile ----- */
+  nav.tabs {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+    display: flex; justify-content: space-around; align-items: stretch;
+    margin: 0; gap: 0; background: var(--surface); border-top: 1px solid var(--border); border-bottom: none;
+    padding: 4px 4px calc(4px + env(safe-area-inset-bottom, 0px));
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.06);
+  }
+  nav.tabs .tab {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    min-height: 48px; margin: 0; padding: 4px 2px; border-bottom: none; text-transform: none; letter-spacing: 0;
+  }
+  nav.tabs .tab.active { color: var(--accent); }
+  nav.tabs .tab .tab-icon { display: block; }
+  nav.tabs .tab .tab-label { font-size: 0.62rem; font-weight: 600; }
+  main.content { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
+
+  /* ----- Topbar dipadatkan ----- */
+  .app { padding: 0 14px 24px; }
+  .topbar { padding-top: 12px; gap: 8px; }
+  .topbar-right { gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .topbar-right .btn { padding: 7px 11px; font-size: 0.76rem; }
+  .brand-mark { width: 32px; height: 32px; }
+  .brand-name { font-size: 1.02rem; }
+  .periode-pick span:first-child { display: none; }
+  .periode-pick select { min-width: 0; }
+  .role-pill-sub { display: none; }
+  .masthead-rule { margin-top: 10px; }
+  /* Ukuran teks (A A A) disembunyikan di HP — jarang dipakai di layar kecil,
+     dan menghemat ruang topbar yang sudah padat. */
+  .text-size-toggle { display: none; }
+
+  /* Header identitas Portal mahasiswa (logo + nama + NIM) — tetap satu baris:
+     nama/NIM menciut & terpotong (…) kalau kepanjangan, bukan membuat baris
+     kedua, supaya Panduan + tombol mode malam di kanan selalu tetap terlihat. */
+  .topbar-identity { flex-wrap: nowrap; }
+  .topbar-identity .brand-identity { flex: 1 1 auto; min-width: 0; gap: 8px; }
+  .topbar-identity .brand-identity-text { min-width: 0; }
+  .topbar-identity .brand-identity-name,
+  .topbar-identity .brand-identity-nim {
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .topbar-identity .brand-identity-name { font-size: 0.82rem; }
+  .topbar-identity .brand-identity-nim { font-size: 0.66rem; }
+  .topbar-identity .topbar-right { flex: none; flex-wrap: nowrap; gap: 6px; }
+  .topbar-identity .topbar-right .btn-primary { padding: 6px 10px; font-size: 0.72rem; }
+
+  /* ----- Login ----- */
+  .login-wrap { padding: 16px 12px; min-height: 100dvh; }
+  .login-topbar { position: static; width: 100%; justify-content: flex-end; margin-bottom: 10px; }
+  .periode-aktif-banner { width: 100%; }
+  .login-card, .login-announcements { padding: 20px; }
+  .login-title { font-size: 1.4rem; }
+  .login-brand .brand-mark { width: 52px; height: 52px; }
+  .login-container { gap: 16px; }
+
+  /* ----- Daftar mahasiswa: tabel jadi baris, filter jadi baris chip yang bisa digeser ----- */
+  .mhs-table-wrap { display: none; }
+  .mhs-mobile-rows { display: block; }
+  .program-tabs { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; -webkit-overflow-scrolling: touch; }
+  .program-tab { flex: none; }
+  .toolbar { gap: 8px; }
+  .toolbar .search { min-width: 0; flex-basis: 100%; }
+  .toolbar-filter { flex: 1; }
+  .toolbar-toggle { width: 100%; justify-content: center; }
+  .toolbar .exp-wrap { flex: 1; margin-left: 0; }
+  .toolbar .exp-wrap > .btn { width: 100%; justify-content: center; }
+  .toolbar > .btn-primary { flex: 1 1 100%; }
+  .pagination { flex-direction: column; align-items: stretch; gap: 8px; }
+  .pagination-controls { justify-content: center; }
+
+  /* ----- Kartu pengajuan mahasiswa: tahapan jadi daftar vertikal, aksi jadi tombol lebar ----- */
+  .stage-desktop { display: none; }
+  .stage-mobile { display: block; }
+  .kartu-aksi { flex-direction: column; align-items: stretch; }
+  .kartu-aksi .btn { width: 100%; min-height: 44px; text-align: center; }
+  .kartu-aksi .btn-primary { order: -1; }
+  .cards { gap: 14px; }
+  /* Alur "Ajukan perpanjangan" (tombol pemicu + tombol unduh/unggah surat di
+     dalam callout) — jadi lebar penuh & bertumpuk, sama seperti aksi lain di
+     kartu, bukan tombol kecil terjepit di tengah kalimat. */
+  .perpanjangan-btn { display: block; width: 100%; min-height: 44px; text-align: center; margin-top: 8px; }
+  .portal-form { padding: 20px 16px; }
+  /* Tombol "Panduan <Program>" per kartu jadi ikon buku saja (bukan tombol
+     teks penuh) di HP — ruang di baris judul kartu sempit. */
+  .panduan-link-desktop { display: none; }
+  .panduan-link-mobile {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 30px; height: 30px; flex: none;
+    border: 1px solid var(--border-strong); border-radius: var(--radius);
+  }
+  .panduan-link-mobile img { display: block; }
+
+  /* ----- Sub-tab (mis. tahapan dokumen KP: Pendaftaran/Bimbingan/Seminar…) —
+     digulir ke samping, bukan dibiarkan meluber ke luar layar. Berlaku untuk
+     semua .tabs non-navigasi-utama (nav.tabs sudah jadi bar bawah, lihat di
+     atas) di mana pun dipakai (panel dokumen KP, modal admin, dst). ----- */
+  div.tabs { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  div.tabs .tab { flex: none; }
+  /* Tahapan dokumen KP jadi dropdown di HP (bukan tab yang digulir ke
+     samping) — semua tahapan langsung terlihat sekali tap, tanpa geser.
+     Dikasih gaya menonjol (latar & pinggiran beda dari .kp-dok-body di
+     sekitarnya, bukan select polos) supaya jelas ini kontrol yang bisa
+     ditekan, bukan sekadar label. */
+  .kp-dok-tabs-desktop { display: none; }
+  .kp-dok-tabs-mobile {
+    display: block; width: 100%; margin-bottom: 14px;
+    background: var(--bg); border: 1.5px solid var(--accent); border-radius: var(--radius-sm);
+    color: var(--text); font-family: var(--font-heading); font-weight: 700; font-size: 0.95rem;
+    padding: 11px 14px; box-shadow: var(--shadow-sm);
+  }
+  .kp-dok-tabs-mobile:focus { outline: none; box-shadow: 0 0 0 3px var(--accent-weak); }
+
+  /* ----- Panel dokumen KP: tombol berkas jadi lebar penuh ----- */
+  .kp-dok-body { padding: 14px 12px; }
+  .kp-dok-item .btn { width: 100%; }
+
+  /* ----- Beban dosen (Portal dosen) & metrik lain: 1 kolom di layar sangat sempit ----- */
+  .metrics { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 420px) {
+  .metrics { grid-template-columns: 1fr 1fr; }
+  .metric-value { font-size: 1.9rem; }
+}

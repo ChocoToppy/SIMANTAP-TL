@@ -50,7 +50,15 @@ export function KpDocumentPanel({ m, dosenByKode = {}, konten = {}, canUpload = 
       )}
       {expanded && (
         <div className="kp-dok-body">
-          <div className="tabs" style={{ marginBottom: 12 }}>
+          <select
+            className="kp-dok-tabs-mobile"
+            value={aktif.stage}
+            onChange={(e) => setStageTab(e.target.value)}
+            aria-label="Pilih tahapan dokumen"
+          >
+            {grup.map(({ stage }) => <option key={stage} value={stage}>{stage}</option>)}
+          </select>
+          <div className="tabs kp-dok-tabs-desktop" style={{ marginBottom: 12 }}>
             {grup.map(({ stage }) => (
               <button key={stage} type="button" className={'tab' + (aktif.stage === stage ? ' active' : '')} onClick={() => setStageTab(stage)}>{stage}</button>
             ))}

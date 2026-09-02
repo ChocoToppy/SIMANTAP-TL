@@ -37,19 +37,55 @@ export function TextSizeToggle() {
   );
 }
 
-// Pengatur mode terang/gelap.
-export function ThemeToggle() {
+function MoonIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" />
+    </svg>
+  );
+}
+function SunIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="5" />
+      <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+    </svg>
+  );
+}
+
+// Pengatur mode terang/gelap. `square`: gaya ikon kotak bergaris (dipakai di
+// header Portal mahasiswa mobile, meniru referensi desain) — defaultnya tetap
+// tombol ghost lama (dipakai di topbar admin/dosen/lainnya, tidak diubah).
+export function ThemeToggle({ square = false }) {
   const [theme, setThemeState] = useState(getTheme);
   function toggle() {
     const next = theme === 'dark' ? 'light' : 'dark';
     setThemeState(next);
     setTheme(next);
   }
+  const label = theme === 'dark' ? 'Mode terang' : 'Mode gelap';
+  if (square) {
+    return (
+      <button type="button" className="icon-btn-outline" onClick={toggle} title={label} aria-label={label}>
+        {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+      </button>
+    );
+  }
   return (
-    <button type="button" className="btn ghost theme-toggle" onClick={toggle} title={theme === 'dark' ? 'Mode terang' : 'Mode gelap'}>
+    <button type="button" className="btn ghost theme-toggle" onClick={toggle} title={label}>
       {theme === 'dark' ? '☀️' : '🌙'}
     </button>
   );
+}
+
+// Status satu tahap relatif terhadap tahap saat ini — 'done' | 'active' | 'upcoming'.
+// Dipakai bersama oleh StageBar (bilah horizontal) dan StageListVertical (daftar
+// vertikal ringkas, tampilan layar sempit) supaya logikanya selalu konsisten.
+export function stageStatus(stages, tahap, i) {
+  const idx = stages.indexOf(tahap);
+  if (tahap === 'Lulus' || i < idx) return 'done';
+  if (i === idx) return 'active';
+  return 'upcoming';
 }
 
 // Indikator tahap: bilah tersegmen — hijau untuk tahap yang sudah dilewati,
@@ -57,18 +93,56 @@ export function ThemeToggle() {
 export function StageBar({ program, tahap }) {
   const stages = stagesFor(program);
   const total = Math.max(1, stages.length - 1); // tanpa "Lulus"
-  const idx = stages.indexOf(tahap);
-  const lulus = tahap === 'Lulus';
   return (
     <div className="stagebar" title={tahap}>
       <div className="stagebar-track">
         {Array.from({ length: total }).map((_, i) => {
-          const cls = lulus || i < idx ? 'seg seg-done' : i === idx ? 'seg seg-active' : 'seg';
-          return <span key={i} className={cls} />;
+          const status = stageStatus(stages, tahap, i);
+          return <span key={i} className={'seg' + (status === 'done' ? ' seg-done' : status === 'active' ? ' seg-active' : '')} />;
         })}
       </div>
       <span className="stagebar-label">{tahap}</span>
     </div>
+  );
+}
+
+// Versi vertikal ringkas dari StageBar untuk layar sempit (mobile) — daftar
+// semua tahap dengan titik status per tahap. Sengaja TANPA tanggal per-tahap:
+// data itu tidak tersimpan per-tahap saat ini (hanya tahap aktif yang dilacak),
+// jadi ini murni tampilan ulang StageBar, bukan fitur baru.
+export function StageListVertical({ program, tahap }) {
+  const stages = stagesFor(program);
+  return (
+    <ul className="stage-list" aria-label={`Tahapan saat ini: ${tahap}`}>
+      {stages.map((s, i) => (
+        <li key={s} className={'stage-list-item stage-' + stageStatus(stages, tahap, i)}>
+          <span className="stage-list-dot" aria-hidden="true" />
+          <span className="stage-list-label">{s}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+// Ikon SVG kecil untuk nav bawah (tampilan mobile) — inline, tanpa dependensi
+// pustaka ikon (konsisten dengan pendekatan proyek ini: emoji/glyph polos, no
+// icon library). Set minimal, satu per kunci tab yang dipakai App.jsx/Portal.jsx.
+const TAB_ICON_PATHS = {
+  dashboard: 'M4 12h4v8H4v-8Zm6-8h4v16h-4V4Zm6 4h4v12h-4V8Z',
+  mahasiswa: 'M12 3 3 8l9 5 7-3.9V16h2V8L12 3Zm-5 9.2V16c0 2.2 3.3 4 5 4s5-1.8 5-4v-2.8l-5 2.7-5-2.7Z',
+  dosen: 'M4 4h16v12H8l-4 4V4Zm3 3v2h10V7H7Zm0 4v2h7v-2H7Z',
+  pengajuan: 'M9 2h6v2h3v18H6V4h3V2Zm2 2v1h2V4h-2ZM8 9h8v2H8V9Zm0 4h8v2H8v-2Zm0 4h5v2H8v-2Z',
+  ruang: 'M4 3h16v18H4V3Zm2 2v14h12V5H6Zm2 2h3v3H8V7Zm5 0h3v3h-3V7Zm-5 5h3v3H8v-3Zm5 0h3v3h-3v-3Z',
+  akun: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-4.4 0-8 2.2-8 5v1h16v-1c0-2.8-3.6-5-8-5Z',
+};
+
+export function TabIcon({ tabKey }) {
+  const d = TAB_ICON_PATHS[tabKey];
+  if (!d) return null;
+  return (
+    <svg className="tab-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d={d} />
+    </svg>
   );
 }
 
@@ -98,6 +172,49 @@ export function Modal({ title, onClose, children, footer, wide }) {
 
 export function Empty({ children }) {
   return <div className="empty">{children}</div>;
+}
+
+// Layar "Memuat…" (menunggu Firebase Auth/Firestore) — dipakai di App.jsx
+// sebelum sesi/profil diketahui. Kalau ini tidak kunjung selesai (server
+// lambat, atau internet mati sama sekali seperti navigator.onLine === false),
+// tampilkan pesan yang jelas + tombol "Coba lagi", bukan spinner selamanya —
+// pengguna dulu bingung dikira aplikasi macet padahal cuma koneksi bermasalah.
+export function Muat({ children = 'Memuat…' }) {
+  const [status, setStatus] = useState(() => (
+    typeof navigator !== 'undefined' && navigator.onLine === false ? 'offline' : 'loading'
+  ));
+  useEffect(() => {
+    if (status === 'offline') return;
+    const timer = setTimeout(() => setStatus((s) => (s === 'loading' ? 'lambat' : s)), 9000);
+    const keOffline = () => setStatus('offline');
+    const keOnline = () => setStatus('loading');
+    window.addEventListener('offline', keOffline);
+    window.addEventListener('online', keOnline);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('offline', keOffline);
+      window.removeEventListener('online', keOnline);
+    };
+  }, [status]);
+
+  if (status === 'loading') {
+    return <div className="login-wrap"><div className="login-container"><p className="hint">{children}</p></div></div>;
+  }
+
+  return (
+    <div className="login-wrap">
+      <div className="login-container">
+        <div className="login-card" style={{ textAlign: 'center' }}>
+          <p className="login-err">
+            {status === 'offline'
+              ? 'Tidak ada koneksi internet. Periksa jaringan Anda, lalu coba lagi.'
+              : 'Koneksi ke server lambat atau gagal. Periksa internet Anda, lalu coba lagi.'}
+          </p>
+          <button type="button" className="btn btn-primary block" onClick={() => window.location.reload()}>Coba lagi</button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // Kotak unggah berkas drag-&-drop (klik untuk telusuri berkas juga bisa) —

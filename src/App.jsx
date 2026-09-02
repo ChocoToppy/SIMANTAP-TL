@@ -4,11 +4,11 @@ import { Mahasiswa } from './pages/Mahasiswa.jsx';
 import { Dosen } from './pages/Dosen.jsx';
 import { Pengaturan } from './pages/Pengaturan.jsx';
 import { Login } from './pages/Login.jsx';
-import { Portal, DosenPortal, PanduanPage, AkunPage } from './pages/Portal.jsx';
+import { Portal, DosenPortal, PanduanPage } from './pages/Portal.jsx';
 import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, stagesFor, eventsFor, punyaKlasifikasi, punyaSyarat, rolesFor, syaratLabel, getJadwal, STAGES, KLASIFIKASI, BIDANG, KP_TEMA, HARI, bidangLabel, todayISO, parseISO, daysBetween, BULAN, formatTanggal, kondisi, isAktif, indexTahap, hitungBeban, hitungBebanProgram, hitungBebanRinci, SEMUA, filterByPeriode, daftarPeriode, PERIODE_AKTIF, TOPIK, VERIFIKASI, statusVerif, tambahHari, LABEL_PENDAFTARAN, ringkasPendaftaran, RUANG, menitJam, rentangJadwal, jamTampil, beririsan, dosenTerlibat, kumpulkanEvent, cariBentrok, pesanNotifikasi, waLink, mailtoLink, waMahasiswa, TEMPLATE_SURAT, tokenSurat, renderSurat, PEJABAT, KOP_SURAT, evKeyDok, dokTA, DURASI_EVENT, JAM_KERJA, durasiEvent, jamTambah, dalamJamKerja, tahapBerikut, eventAktif, BERKAS_SYARAT, berkasSyarat, bolehAjukanJadwal, orphanedUploadPaths } from './utils/helpers.js';
 import { deleteUploadedFile, deleteUploadedFolder } from './utils/fileUpload.js';
 import { DOSEN_AWAL, plusHari, RAW_MAHASISWA, MAHASISWA_AWAL, AKUN_AWAL, PERIODE_BUKA_AWAL, PENGUMUMAN_AWAL, PERIODE_AKTIF_AWAL, PANDUAN_AWAL } from './data/seed.js';
-import { Badge, StageBar, ExportMenu, TextSizeToggle, ThemeToggle, RolePill } from './components/ui.jsx';
+import { Badge, StageBar, ExportMenu, TextSizeToggle, ThemeToggle, RolePill, TabIcon, Muat } from './components/ui.jsx';
 import { db, auth } from './utils/firebase.js';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, query, where } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -110,7 +110,7 @@ function GantiPasswordWajib({ onSelesai, onLogout }) {
               <input type="password" value={p2} onChange={(e) => setP2(e.target.value)} /></label>
             {err && <div className="login-err">{err}</div>}
             <button className="btn btn-primary block" onClick={simpan} disabled={loading}>{loading ? 'Menyimpan…' : 'Simpan & lanjutkan'}</button>
-            <button className="btn ghost block" onClick={onLogout}>Keluar</button>
+            <button className="btn btn-logout block" onClick={onLogout}>Logout</button>
           </div>
         </div>
       </div>
@@ -373,7 +373,7 @@ export default function App() {
 
   // ----- Belum diketahui status login (Firebase Auth belum selesai cek) -----
   if (authUser === undefined) {
-    return <div className="login-wrap"><div className="login-container"><p className="hint">Memuat…</p></div></div>;
+    return <Muat>Memuat…</Muat>;
   }
 
   // ----- Belum login -----
@@ -400,7 +400,7 @@ export default function App() {
   // ----- Login sebagai dosen -----
   if (claims.role === 'lecturer') {
     const ds = profilDosen;
-    if (!ds) return <div className="login-wrap"><div className="login-container"><p className="hint">Memuat profil dosen…</p></div></div>;
+    if (!ds) return <Muat>Memuat profil dosen…</Muat>;
     return (
       <DosenPortal
         dosen={ds}
@@ -416,7 +416,7 @@ export default function App() {
   // ----- Login sebagai mahasiswa -----
   if (claims.role === 'student') {
     const akunProfil = profilAkun;
-    if (!akunProfil) return <div className="login-wrap"><div className="login-container"><p className="hint">Memuat profil mahasiswa…</p></div></div>;
+    if (!akunProfil) return <Muat>Memuat profil mahasiswa…</Muat>;
     const nim = akunProfil.nim;
     const namaMhs = akunProfil.nama || nim;
     // Alamat sendiri (/panduan), sama pola dengan /pengaturan di bawah —
@@ -432,34 +432,24 @@ export default function App() {
         />
       );
     }
-    if (route === '/akun') {
-      return (
-        <AkunPage
-          nama={namaMhs}
-          nim={nim}
-          email={akunProfil.email || ''}
-          onSimpan={async (profil) => {
-            const { nimBerubah } = await studentUpdateProfile(profil);
-            if (nimBerubah) await refreshClaims();
-          }}
-          onBack={() => navigate('/')}
-          onLogout={keluar}
-        />
-      );
-    }
     return (
       <Portal
         nim={nim}
         nama={namaMhs}
+        email={akunProfil.email || ''}
         mahasiswa={data.mahasiswa}
         allDosen={data.dosen}
         periodeBuka={periodeBuka}
         panduan={data.panduan || []}
         konten={data.konten || {}}
         onSave={simpanMahasiswa}
+        onSimpanAkun={async (profil) => {
+          const { nimBerubah } = await studentUpdateProfile(profil);
+          if (nimBerubah) await refreshClaims();
+        }}
         onLogout={keluar}
         onOpenPanduan={() => navigate('/panduan')}
-        onOpenAkun={() => navigate('/akun')}
+        initialTab={route === '/akun' ? 'akun' : 'pengajuan'}
       />
     );
   }
@@ -467,7 +457,7 @@ export default function App() {
   // ----- Login sebagai admin -----
   if (claims.role !== 'admin' || !profilAdmin) {
     const labelPeran = claims.role === 'admin' ? 'admin' : claims.role === 'student' ? 'mahasiswa' : claims.role === 'lecturer' ? 'dosen' : 'akun';
-    return <div className="login-wrap"><div className="login-container"><p className="hint">Memuat profil {labelPeran}…</p></div></div>;
+    return <Muat>{`Memuat profil ${labelPeran}…`}</Muat>;
   }
 
   // ----- Halaman Pengaturan (admin) — alamat terpisah (/pengaturan), bukan tab -----
@@ -475,6 +465,7 @@ export default function App() {
     return (
       <div className="app">
         <header className="topbar">
+          <button className="btn btn-logout btn-sm" onClick={keluar}>Logout</button>
           <div className="brand">
             <img className="brand-mark" src={logoTl} alt="TL Undip" />
             <span className="brand-name">SIMANTAP</span>
@@ -484,7 +475,6 @@ export default function App() {
             <TextSizeToggle />
             <RolePill peran="admin" nama={profilAdmin.nama} />
             <button className="btn ghost" onClick={() => navigate('/')}>← Kembali</button>
-            <button className="btn ghost" onClick={keluar}>Keluar</button>
           </div>
         </header>
         <div className="masthead-rule" />
@@ -531,6 +521,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
+        <button className="btn btn-logout btn-sm" onClick={keluar}>Logout</button>
         <div className="brand">
           <img className="brand-mark" src={logoTl} alt="TL Undip" />
           <span className="brand-name">SIMANTAP</span>
@@ -549,14 +540,16 @@ export default function App() {
             <img src={gearIcon} alt="" width={20} height={20} className="gear-icon" />
           </button>
           <RolePill peran="admin" nama={profilAdmin.nama} />
-          <button className="btn ghost" onClick={keluar}>Keluar</button>
         </div>
       </header>
       <div className="masthead-rule" />
 
       <nav className="tabs">
         {TABS.map((t) => (
-          <button key={t.key} className={'tab' + (tab === t.key ? ' active' : '')} onClick={() => setTab(t.key)}>{t.label}</button>
+          <button key={t.key} className={'tab' + (tab === t.key ? ' active' : '')} onClick={() => setTab(t.key)}>
+            <TabIcon tabKey={t.key} />
+            <span className="tab-label">{t.label}</span>
+          </button>
         ))}
       </nav>
 
