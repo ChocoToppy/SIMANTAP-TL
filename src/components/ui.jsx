@@ -179,7 +179,7 @@ export function Empty({ children }) {
 // lambat, atau internet mati sama sekali seperti navigator.onLine === false),
 // tampilkan pesan yang jelas + tombol "Coba lagi", bukan spinner selamanya —
 // pengguna dulu bingung dikira aplikasi macet padahal cuma koneksi bermasalah.
-export function Muat({ children = 'Memuat…' }) {
+export function Muat({ children = 'Memuat…', onLogout }) {
   const [status, setStatus] = useState(() => (
     typeof navigator !== 'undefined' && navigator.onLine === false ? 'offline' : 'loading'
   ));
@@ -211,6 +211,10 @@ export function Muat({ children = 'Memuat…' }) {
               : 'Koneksi ke server lambat atau gagal. Periksa internet Anda, lalu coba lagi.'}
           </p>
           <button type="button" className="btn btn-primary block" onClick={() => window.location.reload()}>Coba lagi</button>
+          {onLogout && (
+            <button type="button" className="btn ghost block" style={{ marginTop: 8 }}
+              onClick={() => { onLogout(); window.location.reload(); }}>Keluar &amp; masuk akun lain</button>
+          )}
         </div>
       </div>
     </div>

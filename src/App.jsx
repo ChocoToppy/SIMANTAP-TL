@@ -400,7 +400,7 @@ export default function App() {
   // ----- Login sebagai dosen -----
   if (claims.role === 'lecturer') {
     const ds = profilDosen;
-    if (!ds) return <Muat>Memuat profil dosen…</Muat>;
+    if (!ds) return <Muat onLogout={keluar}>Memuat profil dosen…</Muat>;
     return (
       <DosenPortal
         dosen={ds}
@@ -416,7 +416,7 @@ export default function App() {
   // ----- Login sebagai mahasiswa -----
   if (claims.role === 'student') {
     const akunProfil = profilAkun;
-    if (!akunProfil) return <Muat>Memuat profil mahasiswa…</Muat>;
+    if (!akunProfil) return <Muat onLogout={keluar}>Memuat profil mahasiswa…</Muat>;
     const nim = akunProfil.nim;
     const namaMhs = akunProfil.nama || nim;
     // Alamat sendiri (/panduan), sama pola dengan /pengaturan di bawah —
@@ -457,7 +457,7 @@ export default function App() {
   // ----- Login sebagai admin -----
   if (claims.role !== 'admin' || !profilAdmin) {
     const labelPeran = claims.role === 'admin' ? 'admin' : claims.role === 'student' ? 'mahasiswa' : claims.role === 'lecturer' ? 'dosen' : 'akun';
-    return <Muat>{`Memuat profil ${labelPeran}…`}</Muat>;
+    return <Muat onLogout={keluar}>{`Memuat profil ${labelPeran}…`}</Muat>;
   }
 
   // ----- Halaman Pengaturan (admin) — alamat terpisah (/pengaturan), bukan tab -----

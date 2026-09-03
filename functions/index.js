@@ -41,9 +41,20 @@ async function writeAuditLog(entry) {
 // Jaring pengaman: mahasiswa mendaftar sendiri lewat Firebase Auth (email +
 // password), jadi begitu akunnya dibuat, langsung diberi klaim role='student'.
 // completeStudentRegistration (di bawah) akan menegaskan ulang klaim ini dan
-// menulis profil Firestore-nya; adminCreateUser akan MENIMPA klaim ini untuk
-// akun dosen/admin yang dibuat admin.
+// menulis profil Firestore-nya.
+//
+// PENTING: trigger ini juga menyala untuk akun yang dibuat admin lewat
+// adminCreateUser (trigger Auth onCreate menyala untuk SEMUA pembuatan akun,
+// apa pun caranya). adminCreateUser menyetel klaim role='admin'/'lecturer'
+// sendiri di dalam pemanggilan yang sama, tapi trigger latar belakang ini
+// berjalan terpisah dan bisa menyala BELAKANGAN (ada jeda cold start/event
+// propagation) — kalau tetap menimpa tanpa syarat, klaim admin/dosen yang
+// baru saja diset bisa balik jadi 'student' beberapa saat kemudian. Karena
+// itu di sini cek dulu: kalau akun sudah punya klaim role (berarti dibuat
+// lewat adminCreateUser), jangan sentuh.
 exports.onUserCreate = functions.auth.user().onCreate(async (user) => {
+  const current = await auth.getUser(user.uid);
+  if (current.customClaims && current.customClaims.role) return;
   await auth.setCustomUserClaims(user.uid, { role: 'student' });
 });
 
