@@ -1,9 +1,51 @@
-# Deploying to cPanel (main hosting)
+# Deployment & Git guide
 
-Firebase Hosting deploys via `firebase deploy`. The cPanel-hosted site
-deploys via SSH instead of manual zip/upload/extract.
+There are two independent deploy targets:
+- **Firebase Hosting** (`simantap-tl.web.app`) via `firebase deploy`
+- **cPanel** (`simantaptlundip.com`) via `npm run deploy` (see below)
 
-## Day-to-day usage
+Plus GitHub for source control.
+
+## First-time setup on a brand new device
+
+1. Install Git for Windows (bundles Git Credential Manager) and Node.js.
+2. Clone the repo:
+   ```bash
+   git clone https://github.com/ChocoToppy/SIMANTAP-TL.git
+   cd SIMANTAP-TL
+   npm install
+   ```
+3. One-time git identity:
+   ```bash
+   git config --global user.name "Your Name"
+   git config --global user.email "you@example.com"
+   ```
+4. GitHub auth: the remote is HTTPS, so no SSH key is needed. The first
+   `git push` or `git pull` opens a browser window to log into GitHub;
+   Credential Manager caches the token afterward.
+5. Firebase auth (only needed if deploying to Firebase Hosting from this
+   device): `npx firebase login` (once — opens a browser login).
+6. cPanel deploy (only needed if deploying to cPanel from this device):
+   see "Setting up a new device" under cPanel Deployment below — needs
+   its own SSH key authorized in cPanel.
+
+## Day-to-day
+
+```bash
+git pull                        # get latest changes
+# ...make changes...
+git add -A
+git commit -m "message"
+git push                        # pushes current branch to its tracked remote
+
+npx firebase deploy --only hosting   # deploy to Firebase Hosting
+npm run deploy                       # deploy to cPanel (kp-only build)
+npm run deploy:experimental          # deploy to cPanel (full build)
+```
+
+## cPanel deployment
+
+Deploys via SSH instead of manual zip/upload/extract.
 
 ```bash
 npm run deploy                # build:production (kp-only mode) + push to cPanel
@@ -23,7 +65,7 @@ Connection details (see `scripts/deploy-cpanel.mjs`):
 - Remote path: `/home/simantap/public_html/`
 - Auth: SSH key at `~/.ssh/simantap_cpanel` (private key, local only)
 
-## Setting up a new device
+### Setting up a new device for cPanel deploy
 
 The private key never leaves the machine it was created on, so a new
 device needs its own key pair authorized in cPanel.
@@ -46,7 +88,7 @@ device needs its own key pair authorized in cPanel.
 If a device is lost or retired, revoke just its key in cPanel's Public
 Keys list — no need to touch anything on other devices.
 
-## Why not rsync?
+### Why not rsync?
 
 The cPanel server is shared hosting with no root access, and has no
 `rsync` binary and no rsync daemon — installing one isn't an option.
