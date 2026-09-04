@@ -8,7 +8,9 @@
     "build": "vite build",
     "build:production": "vite build --mode kp-only",
     "build:experimental": "vite build --mode full",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy": "node scripts/deploy-cpanel.mjs production",
+    "deploy:experimental": "node scripts/deploy-cpanel.mjs experimental"
   },
   "dependencies": {
     "docxtemplater": "^3.69.3",

@@ -89,9 +89,22 @@ export const BIDANG = [
   { kode: 'MIX', label: 'Mixed' },
 ];
 
-// Tema khusus Kerja Praktik (sesuai Form Permohonan KP).
-export const KP_TEMA = ['SML', 'K3', 'SPAM', 'PBPAB', 'PBPAM', 'Persampahan', 'B3', 'Proper', 'Pencemaran Udara']
-  .map((x) => ({ kode: x, label: x }));
+// Tema khusus Kerja Praktik (sesuai Ketentuan Khusus KP).
+export const KP_TEMA = [
+  { kode: 'PBPAM', label: 'Perencanaan Bangunan Pengolahan Air Minum' },
+  { kode: 'SPAM', label: 'Sistem Penyediaan Air Minum' },
+  { kode: 'K3', label: 'Kesehatan dan Keselamatan Kerja' },
+  { kode: 'B3', label: 'Pengelolaan Limbah Bahan Berbahaya dan Beracun (B3)' },
+  { kode: 'Drainase', label: 'Drainase / Penyaluran Air Buangan' },
+  { kode: 'PengolahanSampah', label: 'Pengolahan Sampah' },
+  { kode: 'SML', label: 'Sistem Manajemen Lingkungan' },
+  { kode: 'TeknologiBersih', label: 'Teknologi Bersih' },
+  { kode: 'ManajemenSampah', label: 'Manajemen Sampah' },
+  { kode: 'KualitasLingkungan', label: 'Pengelolaan Kualitas Lingkungan / Energi Terbarukan' },
+  { kode: 'PencemaranUdara', label: 'Pengendalian Pencemaran Udara' },
+  { kode: 'PemantauanUdara', label: 'Pemantauan Kualitas Udara' },
+  { kode: 'Plumbing', label: 'Plumbing' },
+];
 
 // Hari (untuk jadwal seminar KP).
 export const HARI = ['Senin', 'Selasa', 'Rabu', 'Kamis', "Jum'at", 'Sabtu', 'Minggu'];
