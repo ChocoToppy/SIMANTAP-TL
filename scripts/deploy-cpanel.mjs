@@ -16,7 +16,7 @@ const buildScript = mode === 'experimental' ? 'build:experimental' : 'build:prod
 
 function run(cmd) {
   console.log(`$ ${cmd}`);
-  execSync(cmd, { stdio: 'inherit', shell: '/bin/bash' });
+  execSync(cmd, { stdio: 'inherit' });
 }
 
 console.log(`Deploying ${mode} build...`);

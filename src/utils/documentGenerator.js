@@ -123,6 +123,20 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
         }
       };
 
+    case 'Kelayakan Magang':
+      return {
+        template: 'Magang/kelayakan-magang.docx',
+        filename: `Kelayakan_Magang_${m.nama}.docx`,
+        data: {
+          nama_mhs: m.nama,
+          nim: m.nim,
+          nama_dosen_wali: wali.nama_dosen_wali,
+          // Nama tag ini ("nio", bukan "nip") sesuai berkas .docx apa adanya —
+          // lihat public/doc-templates/Magang/kelayakan-magang.docx.
+          nio_dosen_wali: wali.nip_dosen_wali,
+        }
+      };
+
     case 'Kelayakan Proposal KP':
       return {
         template: 'KP/kelayakan-proposal-kp.docx',

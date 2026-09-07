@@ -36,7 +36,7 @@ export const PROGRAMS = {
   },
   MG: {
     label: 'Magang',
-    stages: ['Pendaftaran', 'Expo', 'Lulus'],
+    stages: ['Pendaftaran', 'Bimbingan', 'Expo', 'Lulus'],
     events: ['Expo'],
     klasifikasi: false,
     syarat: false,
@@ -101,9 +101,10 @@ export const KP_TEMA = [
   { kode: 'TeknologiBersih', label: 'Teknologi Bersih' },
   { kode: 'ManajemenSampah', label: 'Manajemen Sampah' },
   { kode: 'KualitasLingkungan', label: 'Pengelolaan Kualitas Lingkungan / Energi Terbarukan' },
-  { kode: 'PencemaranUdara', label: 'Pengendalian Pencemaran Udara' },
+  //{ kode: 'PencemaranUdara', label: 'Pengendalian Pencemaran Udara' },
   { kode: 'PemantauanUdara', label: 'Pemantauan Kualitas Udara' },
-  { kode: 'Plumbing', label: 'Plumbing' },
+  { kode: 'PengolahanAirLimbah', label: 'Perancangan Bangunan Pengolahan Air Limbah' },
+  //{ kode: 'Plumbing', label: 'Plumbing' }, 
 ];
 
 // Hari (untuk jadwal seminar KP).
@@ -777,13 +778,6 @@ export function bolehAjukanJadwal(m) {
 // syarat kelayakan tiap dokumen tidak dobel-tulis di beberapa tempat.
 export const KP_DOKUMEN = [
   {
-    key: 'permohonan', stage: 'Pendaftaran', label: 'Permohonan KP', docType: null,
-    syarat: 'Ajukan melalui formulir eksternal, lalu unggah berkas hasil pengajuan di sini.',
-    eligible: (m) => statusVerif(m).key === 'terverifikasi',
-    linkEksternal: 'https://mandala.undip.ac.id/',
-    linkLabel: 'Untuk membuat formulir Permohonan KP silahkan kunjungi Mandala UNDIP',
-  },
-  {
     key: 'kelayakanKP', stage: 'Pendaftaran', label: 'Surat Kelayakan KP', docType: 'Kelayakan KP',
     syarat: 'Tersedia setelah pendaftaran diverifikasi admin. Unduh, tanda tangani, lalu unggah kembali.',
     eligible: (m) => statusVerif(m).key === 'terverifikasi',
@@ -794,15 +788,23 @@ export const KP_DOKUMEN = [
     eligible: (m) => statusVerif(m).key === 'terverifikasi',
   },
   {
-    key: 'stPembimbing', stage: 'Pendaftaran', label: 'ST Pembimbing KP', docType: 'ST Pembimbing KP',
-    syarat: 'Tersedia setelah admin menetapkan dosen pembimbing.',
-    eligible: (m) => statusVerif(m).key === 'terverifikasi' && !!m.pembimbing1,
-    studentUpload: false,
+    key: 'permohonan', stage: 'Pendaftaran', label: 'Permohonan KP', docType: null,
+    syarat: 'Tersedia setelah pendaftaran diverifikasi admin.',
+    catatan: 'Unggah berkas permohonan dari perusahaan tempat Anda diterima KP.',
+    eligible: (m) => statusVerif(m).key === 'terverifikasi',
+    linkEksternal: 'https://mandala.undip.ac.id/',
+    linkLabel: 'Untuk membuat formulir Permohonan KP silahkan kunjungi Mandala UNDIP',
   },
   {
-    key: 'suratBalasan', stage: 'Bimbingan', label: 'Surat Balasan Perusahaan', docType: null,
-    syarat: 'Unggah bukti diterima magang/KP dari perusahaan setelah menerima ST Pembimbing.',
-    eligible: (m) => statusVerif(m).key === 'terverifikasi' && !!m.pembimbing1,
+    key: 'suratBalasan', stage: 'Pendaftaran', label: 'Surat Balasan Perusahaan', docType: null,
+    syarat: 'Unggah bukti diterima magang/KP dari perusahaan setelah pendaftaran diverifikasi admin.',
+    eligible: (m) => statusVerif(m).key === 'terverifikasi',
+  },
+  {
+    key: 'stPembimbing', stage: 'Bimbingan', label: 'ST Pembimbing KP', docType: 'ST Pembimbing KP',
+    syarat: 'Tersedia setelah surat balasan perusahaan diunggah dan admin menetapkan dosen pembimbing.',
+    eligible: (m) => tahapIndex('KP', m.tahap) >= tahapIndex('KP', 'Bimbingan') && !!m.pembimbing1,
+    studentUpload: false,
   },
   {
     key: 'persetujuanSmkp', stage: 'Bimbingan', label: 'Persetujuan SMKP', docType: 'Persetujuan SMKP',
@@ -817,38 +819,84 @@ export const KP_DOKUMEN = [
   },
 ];
 
-// Status tiap dokumen KP untuk seorang mahasiswa: kelayakan + berkas yang sudah diunggah.
-// `konten` (opsional) = override teks admin dari halaman Pengaturan → Konten
-// (lihat KONTEN_DEFAULT/config.konten) — label/syarat bawaan tetap dipakai
-// untuk field yang belum di-override.
-export function kpDokumenStatus(m, konten = {}) {
+// Deskripsi dokumen per-tahap untuk Magang — sama pola dengan KP_DOKUMEN di
+// atas. Key dibuat unik (bukan 'permohonan'/'suratBalasan' polos) supaya
+// override teks admin (konten.dokumen[key]) tidak tabrakan dengan punya KP.
+export const MAGANG_DOKUMEN = [
+  {
+    key: 'kelayakanMagang', stage: 'Pendaftaran', label: 'Surat Kelayakan Magang', docType: 'Kelayakan Magang',
+    syarat: 'Tersedia setelah pendaftaran diverifikasi admin. Unduh, tanda tangani, lalu unggah kembali.',
+    eligible: (m) => statusVerif(m).key === 'terverifikasi',
+  },
+  {
+    key: 'permohonanMagang', stage: 'Pendaftaran', label: 'Permohonan Magang', docType: null,
+    syarat: 'Tersedia setelah pendaftaran diverifikasi admin.',
+    catatan: 'Unggah berkas permohonan dari perusahaan/instansi tempat Anda diterima Magang.',
+    eligible: (m) => statusVerif(m).key === 'terverifikasi',
+    linkEksternal: 'https://mandala.undip.ac.id/',
+    linkLabel: 'Untuk membuat formulir Permohonan Magang silahkan kunjungi Mandala UNDIP',
+  },
+  {
+    key: 'suratBalasanMagang', stage: 'Bimbingan', label: 'Surat Balasan Perusahaan', docType: null,
+    syarat: 'Unggah bukti diterima magang dari perusahaan/instansi setelah admin memindahkan Anda ke tahap Bimbingan.',
+    eligible: (m) => tahapIndex('MG', m.tahap) >= tahapIndex('MG', 'Bimbingan'),
+  },
+  {
+    // Sama seperti baSeminar KP: diisi admin, bukan mahasiswa. docType masih
+    // null karena berkas template BA Expo Magang belum dibuat — begitu
+    // template-nya siap, isi docType di sini + tambah case-nya di
+    // documentGenerator.js supaya tombol "Unduh (PDF)" muncul.
+    key: 'baExpo', stage: 'Expo', label: 'Berita Acara Expo Magang', docType: null,
+    syarat: 'Tersedia setelah jadwal Expo dikonfirmasi admin.',
+    eligible: (m) => { const j = getJadwal(m, 'Expo'); return !!(j.dikonfirmasi && j.tanggal); },
+    studentUpload: false, adminUpload: true,
+  },
+];
+
+// Satu sumber kebenaran KP_DOKUMEN/MAGANG_DOKUMEN + field Storage tempat
+// berkasnya disimpan pada record mahasiswa, dikunci per kode program.
+const DOKUMEN_CONFIG = { KP: KP_DOKUMEN, MG: MAGANG_DOKUMEN };
+const DOKUMEN_FIELD = { KP: 'dokumenKP', MG: 'dokumenMagang' };
+export function dokumenConfigFor(program) { return DOKUMEN_CONFIG[program] || null; }
+export function dokumenFieldFor(program) { return DOKUMEN_FIELD[program] || null; }
+
+// Status tiap dokumen (KP/Magang) untuk seorang mahasiswa: kelayakan + berkas
+// yang sudah diunggah. `konten` (opsional) = override teks admin dari halaman
+// Pengaturan → Konten (lihat KONTEN_DEFAULT/config.konten) — label/syarat
+// bawaan tetap dipakai untuk field yang belum di-override.
+export function dokumenStatus(program, m, konten = {}) {
+  const list = DOKUMEN_CONFIG[program];
+  if (!list) return [];
+  const field = DOKUMEN_FIELD[program];
   const override = (konten && konten.dokumen) || {};
-  return KP_DOKUMEN.map((d) => {
+  return list.map((d) => {
     const o = override[d.key] || {};
     return {
       ...d,
       label: o.label || d.label,
       syarat: o.syarat || d.syarat,
       eligible: d.eligible(m),
-      upload: (m.dokumenKP || {})[d.key] || null,
+      upload: (m[field] || {})[d.key] || null,
     };
   });
 }
 
-// Kelompokkan status dokumen KP per tahap, urutan sesuai PROGRAMS.KP.stages.
-export function kpDokumenPerTahap(m, konten = {}) {
-  const status = kpDokumenStatus(m, konten);
-  return stagesFor('KP')
+// Kelompokkan status dokumen per tahap, urutan sesuai PROGRAMS[program].stages.
+export function dokumenPerTahap(program, m, konten = {}) {
+  const status = dokumenStatus(program, m, konten);
+  return stagesFor(program)
     .map((stage) => ({ stage, dokumen: status.filter((d) => d.stage === stage) }))
     .filter((g) => g.dokumen.length > 0);
 }
 
-// Semua path Storage yang tercatat pada satu record mahasiswa (dokumen KP +
-// surat perpanjangan) — dipakai untuk membersihkan berkas yatim di Storage
-// saat sebuah record diubah/disimpan (lihat orphanedUploadPaths di bawah).
+// Semua path Storage yang tercatat pada satu record mahasiswa (dokumen
+// KP/Magang + surat perpanjangan) — dipakai untuk membersihkan berkas yatim
+// di Storage saat sebuah record diubah/disimpan (lihat orphanedUploadPaths
+// di bawah).
 export function collectUploadPaths(m) {
   const paths = new Set();
   Object.values((m && m.dokumenKP) || {}).forEach((u) => { if (u && u.path) paths.add(u.path); });
+  Object.values((m && m.dokumenMagang) || {}).forEach((u) => { if (u && u.path) paths.add(u.path); });
   const pp = (m && m.perpanjangan) || {};
   if (pp.suratAdmin && pp.suratAdmin.path) paths.add(pp.suratAdmin.path);
   if (pp.suratFinal && pp.suratFinal.path) paths.add(pp.suratFinal.path);

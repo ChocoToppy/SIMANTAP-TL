@@ -32,6 +32,19 @@ kelayakan-kp
 {nama_dosen_wali}
 {nip_dosen_wali}
 
+kelayakan-magang (public/doc-templates/Magang/kelayakan-magang.docx)
+
+{nama_mhs}
+{nim}
+{nama_dosen_wali}
+{nio_dosen_wali} - typo in the template itself for nip_dosen_wali, kept as-is (see documentGenerator.js 'Kelayakan Magang' case)
+
+Magang pendaftaran also has a Permohonan upload (external form filled at
+Mandala UNDIP, same pattern as KP's now-removed permohonan-kp template — see
+MAGANG_DOKUMEN.permohonanMagang in src/utils/helpers.js) and a Bimbingan-stage
+Surat Balasan Perusahaan upload (MAGANG_DOKUMEN.suratBalasanMagang) — neither
+generates a document, both are plain student file uploads.
+
 kelayakan-proposal-kp
 
 {nama_mhs}
@@ -48,8 +61,9 @@ persetujuan-smkp
 {tgl_cetak}
 {nama_dosen1}
 {nip1}
-{nama_dosen_wali}
-{nip_dosen_wali}
+
+{nama_dosen_wali} NOT YET in this template — add if it should show wali dosen
+{nip_dosen_wali} NOT YET in this template — add if it should show wali dosen
 
 perpanjangan-kp
 
@@ -85,6 +99,7 @@ seminar-kp-ba
 {judul_kp}
 {hari_smkp}
 {tanggal_smkp}
+{tgl_smkp}
 {waktu_smkp}
 {tempat_smkp}
 {tgl_cetak}

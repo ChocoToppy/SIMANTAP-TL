@@ -43,6 +43,12 @@ npm run deploy                       # deploy to cPanel (kp-only build)
 npm run deploy:experimental          # deploy to cPanel (full build)
 ```
 
+## Dist Files
+
+...bash
+npm run build:production - KP Only (for simantaptlundip.com for now)
+npm run build:experimental - all (for simantap-tl.web.app)
+
 ## cPanel deployment
 
 Deploys via SSH instead of manual zip/upload/extract.
