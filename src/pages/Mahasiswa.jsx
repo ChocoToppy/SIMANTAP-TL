@@ -32,7 +32,7 @@ function kolomDosenProgram(programKey) {
   return cols;
 }
 
-export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeList, konten = {}, onSave, onDelete }) {
+export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeList, daftarAngkatan = [], konten = {}, onSave, onDelete }) {
   const [q, setQ] = useState('');
   // Satu tabel = satu program (kolomnya beda-beda tiap program, jadi tidak
   // dicampur lagi) — defaultnya KP karena itu yang aktif jalan sekarang.
@@ -381,6 +381,7 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
           allMahasiswa={allMahasiswa || mahasiswa}
           periode={periode}
           periodeList={periodeList}
+          daftarAngkatan={daftarAngkatan}
           konten={konten}
           defaultProgram={programTab}
           onCancel={() => setOpen(false)}

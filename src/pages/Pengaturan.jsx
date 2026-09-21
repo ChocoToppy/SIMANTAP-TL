@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { SeksiPeriode } from './pengaturan/SeksiPeriode.jsx';
+import { SeksiAngkatan } from './pengaturan/SeksiAngkatan.jsx';
 import { SeksiPengumuman } from './pengaturan/SeksiPengumuman.jsx';
 import { SeksiPanduan } from './pengaturan/SeksiPanduan.jsx';
 import { SeksiKonten } from './pengaturan/SeksiKonten.jsx';
@@ -20,6 +21,7 @@ import { SeksiStaf } from './pengaturan/SeksiStaf.jsx';
 
 const SUB_TABS = [
   { key: 'periode', label: 'Periode', icon: '🗓️' },
+  { key: 'angkatan', label: 'Angkatan', icon: '🎓' },
   { key: 'pengumuman', label: 'Pengumuman', icon: '📢' },
   { key: 'panduan', label: 'Kelola Panduan', icon: '📘' },
   { key: 'konten', label: 'Konten', icon: '📝' },
@@ -35,6 +37,7 @@ export function Pengaturan({
   akun = [], dosen = [], admin = [],
   onResetPassword, onCreateUser, onToggleAkunAktif, onDeleteAkun, onToggleDosenAktif, onEditDosen,
   isSuperAdmin = false, currentAdminUid, onDeleteAdmin, onClaimSuperAdmin, onUpdateSelfAdmin,
+  angkatan = [], onTambahAngkatan, onToggleAngkatanAktif,
 }) {
   const [subTab, setSubTab] = useState(SUB_TABS[0].key);
   const aktif = SUB_TABS.find((t) => t.key === subTab) || SUB_TABS[0];
@@ -69,6 +72,9 @@ export function Pengaturan({
             onTutup={onTutupPeriode}
             onSetAktif={onSetPeriodeAktif}
           />
+        )}
+        {subTab === 'angkatan' && (
+          <SeksiAngkatan daftar={angkatan} onTambah={onTambahAngkatan} onToggleAktif={onToggleAngkatanAktif} />
         )}
         {subTab === 'pengumuman' && (
           <SeksiPengumuman daftar={pengumuman} onSimpan={onSimpanPengumuman} />

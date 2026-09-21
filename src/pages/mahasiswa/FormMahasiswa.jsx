@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { PROGRAMS, programOf, stagesFor, eventsFor, rolesFor, syaratLabel, SEMUA, buatId, todayISO, RUANG, jamTampil, cariBentrok, waMahasiswa, tahapBerikut, tahapSebelumnya, eventAktif, HARI, berkasSyarat, catatAktivitas, formatTanggal, normalizeUrl, dokumenFieldFor } from '../../utils/helpers.js';
+import { PROGRAMS, programOf, stagesFor, eventsFor, rolesFor, syaratLabel, SEMUA, buatId, todayISO, RUANG, jamTampil, cariBentrok, waMahasiswa, tahapBerikut, tahapSebelumnya, eventAktif, HARI, berkasSyarat, catatAktivitas, formatTanggal, normalizeUrl, dokumenFieldFor, dosenAktifUntuk } from '../../utils/helpers.js';
 import { Field } from '../../components/ui.jsx';
 import { generateDocument, getTemplateConfig } from '../../utils/documentGenerator.js';
 import { readFileForUpload } from '../../utils/fileUpload.js';
@@ -11,7 +11,7 @@ import { FormMahasiswaGeneric } from './FormMahasiswaGeneric.jsx';
 // state & handler; tata letaknya sendiri (yang beda jauh untuk KP vs program
 // lain) dirender oleh FormMahasiswaKP.jsx / FormMahasiswaGeneric.jsx sebagai
 // komponen presentasional yang menerima semuanya lewat props.
-export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, periodeList, konten = {}, defaultProgram = 'TA', onCancel, onSave }) {
+export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, periodeList, daftarAngkatan = [], konten = {}, defaultProgram = 'TA', onCancel, onSave }) {
   const baru = !awal;
   const [err, setErr] = useState('');
   const [m, setM] = useState(() => {
@@ -143,10 +143,11 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
     onSave(baru ? catatAktivitas(calon, 'dibuat') : calon);
   }
 
+  const dosenPilihan = dosenAktifUntuk(allDosen, m.pembimbing1, m.pembimbing2, m.penguji1, m.penguji2, m.dosenWali);
   const dosenOpts = (
     <>
       <option value="">—</option>
-      {allDosen.map((d) => <option key={d.kode} value={d.kode}>{d.kode} — {d.nama}</option>)}
+      {dosenPilihan.map((d) => <option key={d.kode} value={d.kode}>{d.kode} — {d.nama}</option>)}
     </>
   );
 
@@ -318,7 +319,7 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
   if (m.program === 'KP' || m.program === 'MG') {
     return (
       <FormMahasiswaKP
-        m={m} setM={setM} set={set} gantiProgram={gantiProgram} setTahap={setTahap} periodeList={periodeList}
+        m={m} setM={setM} set={set} gantiProgram={gantiProgram} setTahap={setTahap} periodeList={periodeList} daftarAngkatan={daftarAngkatan}
         roles={roles} pembimbing1Label={pembimbing1Label} penguji1Label={penguji1Label} dosenOpts={dosenOpts} stages={stages}
         alurTahapBlok={alurTahapBlok} notifikasiBlok={notifikasiBlok} peringatanBlok={peringatanBlok}
         tahapTab={tahapTab} setTahapTab={setTahapTab} p={p} events={events} jadwalBlok={jadwalBlok}
@@ -332,7 +333,7 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
 
   return (
     <FormMahasiswaGeneric
-      m={m} setM={setM} set={set} gantiProgram={gantiProgram} periodeList={periodeList}
+      m={m} setM={setM} set={set} gantiProgram={gantiProgram} periodeList={periodeList} daftarAngkatan={daftarAngkatan}
       roles={roles} pembimbing1Label={pembimbing1Label} penguji1Label={penguji1Label} dosenOpts={dosenOpts} stages={stages} events={events} jadwalBlok={jadwalBlok}
       alurTahapBlok={alurTahapBlok} notifikasiBlok={notifikasiBlok} peringatanBlok={peringatanBlok} p={p}
       dosenByKode={dosenByKode} ppBusy={ppBusy} ppErr={ppErr} berikanSuratPerpanjangan={berikanSuratPerpanjangan}

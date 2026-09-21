@@ -9,7 +9,7 @@ import { RiwayatAktivitas } from './AktivitasCells.jsx';
 // Semua state/handler dikelola di FormMahasiswa.jsx, komponen ini murni
 // presentasional (props saja).
 export function FormMahasiswaGeneric({
-  m, setM, set, gantiProgram, periodeList,
+  m, setM, set, gantiProgram, periodeList, daftarAngkatan = [],
   roles, pembimbing1Label, penguji1Label, dosenOpts, stages, events, jadwalBlok,
   alurTahapBlok, notifikasiBlok, peringatanBlok, p,
   dosenByKode, ppBusy, ppErr, berikanSuratPerpanjangan,
@@ -70,7 +70,12 @@ export function FormMahasiswaGeneric({
 
         <Field label="Nama" full><input value={m.nama} onChange={(e) => set('nama', e.target.value)} /></Field>
         <Field label="NIM"><input value={m.nim} onChange={(e) => set('nim', e.target.value)} /></Field>
-        <Field label="Angkatan"><input value={m.angkatan} onChange={(e) => set('angkatan', e.target.value)} placeholder="mis. 18" /></Field>
+        <Field label="Angkatan">
+          <input value={m.angkatan} onChange={(e) => set('angkatan', e.target.value)} placeholder="mis. 2024" list="angkatan-list" />
+          <datalist id="angkatan-list">
+            {daftarAngkatan.map((a) => <option key={a} value={a} />)}
+          </datalist>
+        </Field>
         <Field label="Judul" full><textarea rows={2} value={m.judul} onChange={(e) => set('judul', e.target.value)} /></Field>
 
         {punyaKlasifikasi(m.program) && (

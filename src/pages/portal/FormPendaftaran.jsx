@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { buatId, todayISO, tambahHari, punyaSyarat, punyaKlasifikasi, catatAktivitas, KP_TEMA, KLASIFIKASI, BIDANG, programLabel } from '../../utils/helpers.js';
+import { buatId, todayISO, tambahHari, punyaSyarat, punyaKlasifikasi, catatAktivitas, KP_TEMA, KLASIFIKASI, BIDANG, programLabel, dosenAktifUntuk } from '../../utils/helpers.js';
 import { Field } from '../../components/ui.jsx';
 import { PROGRAM_KEYS_PENDAFTARAN } from './shared.js';
 
-export function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], onCancel, onSave }) {
+export function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], angkatanAktif = [], onCancel, onSave }) {
   const baru = !awal;
   const [m, setM] = useState(() =>
     awal || {
@@ -31,6 +31,10 @@ export function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], o
   // Pilihan periode = yang dibuka admin; sertakan periode lama jika sedang diedit.
   const periodeOpsi = Array.from(new Set([...periodeBuka, ...(m.periode ? [m.periode] : [])]));
   const belumAdaPeriode = periodeOpsi.length === 0;
+  // Pilihan angkatan = yang diaktifkan admin; sertakan angkatan lama jika sedang diedit.
+  const angkatanOpsi = Array.from(new Set([...angkatanAktif, ...(m.angkatan ? [String(m.angkatan)] : [])]));
+  const dosenWaliOpsi = dosenAktifUntuk(allDosen, m.dosenWali);
+  const dosenPersetujuanOpsi = dosenAktifUntuk(allDosen, p.namaPersetujuanDosen);
 
   function gantiProgram(prog) {
     setM((prev) => {
@@ -68,14 +72,19 @@ export function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], o
           </select>
         </Field>
         <Field label="Nama"><input value={m.nama ?? nama} onChange={(e) => set('nama', e.target.value)} title="Perbaiki jika ada salah ketik pada nama akun" /></Field>
-        <Field label="Angkatan"><input value={m.angkatan} onChange={(e) => set('angkatan', e.target.value)} placeholder="mis. 20" /></Field>
+        <Field label="Angkatan">
+          <select value={m.angkatan ? String(m.angkatan) : ''} onChange={(e) => set('angkatan', e.target.value)}>
+            <option value="">— pilih angkatan —</option>
+            {angkatanOpsi.map((a) => <option key={a} value={a}>{a}</option>)}
+          </select>
+        </Field>
         <Field label={isKPStyle ? (isKP ? 'Judul Kerja Praktik (sementara)' : 'Judul Magang (sementara)') : 'Judul'} full>
           <textarea rows={2} value={m.judul} onChange={(e) => set('judul', e.target.value)} placeholder="Jangan pakai huruf kapital semua" />
         </Field>
         <Field label="Dosen Wali">
           <select value={m.dosenWali || ''} onChange={(e) => set('dosenWali', e.target.value)}>
             <option value="">—</option>
-            {allDosen.map((d) => <option key={d.kode} value={d.kode}>{d.kode} — {d.nama}</option>)}
+            {dosenWaliOpsi.map((d) => <option key={d.kode} value={d.kode}>{d.kode} — {d.nama}</option>)}
           </select>
         </Field>
 
@@ -139,7 +148,7 @@ export function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], o
             <Field label="Nama persetujuan projek dosen (opsional)" full>
               <select value={p.namaPersetujuanDosen || ''} onChange={(e) => setP('namaPersetujuanDosen', e.target.value)}>
                 <option value="">—</option>
-                {allDosen.map((d) => <option key={d.kode} value={d.kode}>{d.kode} — {d.nama}</option>)}
+                {dosenPersetujuanOpsi.map((d) => <option key={d.kode} value={d.kode}>{d.kode} — {d.nama}</option>)}
               </select>
             </Field>
             <Field label="Link berkas (Surat UGB, persetujuan dosen, transkrip, IRS, proposal) — Google Drive, opsional" full>

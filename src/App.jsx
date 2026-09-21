@@ -10,7 +10,7 @@ import { PanduanPage } from './pages/PanduanPage.jsx';
 import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, stagesFor, eventsFor, punyaKlasifikasi, punyaSyarat, rolesFor, syaratLabel, getJadwal, STAGES, KLASIFIKASI, BIDANG, KP_TEMA, HARI, bidangLabel, todayISO, parseISO, daysBetween, BULAN, formatTanggal, kondisi, isAktif, indexTahap, hitungBeban, hitungBebanProgram, hitungBebanRinci, SEMUA, filterByPeriode, daftarPeriode, PERIODE_AKTIF, TOPIK, VERIFIKASI, statusVerif, tambahHari, LABEL_PENDAFTARAN, ringkasPendaftaran, RUANG, menitJam, rentangJadwal, jamTampil, beririsan, dosenTerlibat, kumpulkanEvent, cariBentrok, pesanNotifikasi, waLink, mailtoLink, waMahasiswa, TEMPLATE_SURAT, tokenSurat, renderSurat, PEJABAT, KOP_SURAT, evKeyDok, dokTA, DURASI_EVENT, JAM_KERJA, durasiEvent, jamTambah, dalamJamKerja, tahapBerikut, eventAktif, BERKAS_SYARAT, berkasSyarat, bolehAjukanJadwal, orphanedUploadPaths } from './utils/helpers.js';
 import { deleteUploadedFile, deleteUploadedFolder } from './utils/fileUpload.js';
 import { DOSEN_AWAL, plusHari, RAW_MAHASISWA, MAHASISWA_AWAL, AKUN_AWAL, PERIODE_BUKA_AWAL, PENGUMUMAN_AWAL, PERIODE_AKTIF_AWAL, PANDUAN_AWAL } from './data/seed.js';
-import { Badge, StageBar, ExportMenu, TextSizeToggle, ThemeToggle, RolePill, TabIcon, Muat } from './components/ui.jsx';
+import { Badge, StageBar, ExportMenu, TextSizeToggle, ThemeToggle, RolePill, TabIcon, Muat, PasswordField } from './components/ui.jsx';
 import { db, auth } from './utils/firebase.js';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, query, where } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -107,9 +107,9 @@ function GantiPasswordWajib({ onSelesai, onLogout }) {
           </div>
           <div className="login-form">
             <label className="field"><span className="field-label">Password baru</span>
-              <input type="password" value={p1} onChange={(e) => setP1(e.target.value)} /></label>
+              <PasswordField value={p1} onChange={(e) => setP1(e.target.value)} /></label>
             <label className="field"><span className="field-label">Konfirmasi password baru</span>
-              <input type="password" value={p2} onChange={(e) => setP2(e.target.value)} /></label>
+              <PasswordField value={p2} onChange={(e) => setP2(e.target.value)} /></label>
             {err && <div className="login-err">{err}</div>}
             <button className="btn btn-primary block" onClick={simpan} disabled={loading}>{loading ? 'Menyimpan…' : 'Simpan & lanjutkan'}</button>
             <button className="btn btn-logout block" onClick={onLogout}>Logout</button>
@@ -125,6 +125,7 @@ export default function App() {
   const [dosenList, setDosenList] = useState(() => load().dosen);
   const [akunList, setAkunList] = useState(() => load().akun);
   const [adminList, setAdminList] = useState([]);
+  const [angkatanList, setAngkatanList] = useState([]);
   const [config, setConfig] = useState(() => {
     const l = load();
     return { periodeBuka: l.periodeBuka, pengumuman: l.pengumuman, periodeAktif: l.periodeAktif, panduan: l.panduan };
@@ -183,8 +184,8 @@ export default function App() {
   // Digabung untuk dipakai komponen di bawah (Login/Portal/Mahasiswa/Dosen dst.)
   // supaya tidak perlu mengubah semua pemakaian data.mahasiswa/data.dosen/dst.
   const data = useMemo(() => ({
-    mahasiswa: mahasiswaList, dosen: dosenList, akun: akunList, ...config,
-  }), [mahasiswaList, dosenList, akunList, config]);
+    mahasiswa: mahasiswaList, dosen: dosenList, akun: akunList, angkatan: angkatanList, ...config,
+  }), [mahasiswaList, dosenList, akunList, angkatanList, config]);
 
   useEffect(() => { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {} }, [data]);
 
@@ -242,6 +243,12 @@ export default function App() {
     return () => unsub();
   }, [authUser]);
   useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'angkatan'), (snap) => {
+      setAngkatanList(snap.docs.map((d) => ({ ...d.data(), id: d.id })));
+    }, () => setAngkatanList([]));
+    return () => unsub();
+  }, [authUser]);
+  useEffect(() => {
     if (claims?.role === 'admin') {
       const unsub = onSnapshot(collection(db, 'akun'), (snap) => {
         setAkunList(snap.docs.map((d) => ({ ...d.data(), nim: d.id })));
@@ -279,6 +286,14 @@ export default function App() {
     const set = new Set([...daftarPeriode(data.mahasiswa), ...periodeBuka]);
     return Array.from(set).sort();
   }, [data.mahasiswa, periodeBuka]);
+  // Angkatan aktif = pilihan yang muncul di form pendaftaran mahasiswa (strict
+  // select); daftarAngkatan (semua, termasuk yang diarsipkan) dipakai sebagai
+  // saran datalist di form edit admin — lihat SeksiAngkatan.jsx untuk arsip.
+  const angkatanAktif = useMemo(
+    () => (data.angkatan || []).filter((a) => a.isActive !== false).map((a) => a.label).sort(),
+    [data.angkatan]
+  );
+  const daftarAngkatan = useMemo(() => (data.angkatan || []).map((a) => a.label).sort(), [data.angkatan]);
   const [periode, setPeriode] = useState(() => {
     const list = daftarPeriode(load().mahasiswa);
     return list.length ? list[list.length - 1] : SEMUA;
@@ -372,6 +387,12 @@ export default function App() {
   function simpanKonten(next) {
     simpanConfig({ ...config, konten: next });
   }
+  function tambahAngkatan(label) {
+    const v = (label || '').trim();
+    if (!v) return;
+    if ((data.angkatan || []).some((a) => a.id === v)) return;
+    writeDoc('angkatan', v, { label: v, isActive: true }, 'angkatan');
+  }
 
   // ----- Belum diketahui status login (Firebase Auth belum selesai cek) -----
   if (authUser === undefined) {
@@ -442,6 +463,7 @@ export default function App() {
         mahasiswa={data.mahasiswa}
         allDosen={data.dosen}
         periodeBuka={periodeBuka}
+        angkatanAktif={angkatanAktif}
         panduan={data.panduan || []}
         konten={data.konten || {}}
         onSave={simpanMahasiswa}
@@ -496,6 +518,9 @@ export default function App() {
             akun={data.akun || []}
             dosen={data.dosen || []}
             admin={adminList}
+            angkatan={data.angkatan || []}
+            onTambahAngkatan={tambahAngkatan}
+            onToggleAngkatanAktif={(id, isActive) => writeDoc('angkatan', id, { ...(data.angkatan || []).find((a) => a.id === id), isActive }, 'angkatan')}
             onResetPassword={adminResetPassword}
             onCreateUser={adminCreateUser}
             onEditDosen={simpanDosen}
@@ -558,7 +583,7 @@ export default function App() {
       <main className="content">
         {tab === 'dashboard' && <Dashboard mahasiswa={mhsPeriode} dosen={data.dosen} />}
         {tab === 'mahasiswa' && (
-          <Mahasiswa mahasiswa={mhsPeriode} allMahasiswa={data.mahasiswa} allDosen={data.dosen} periode={periode} periodeList={periodeList} konten={data.konten || {}} onSave={simpanMahasiswa} onDelete={hapusMahasiswa} />
+          <Mahasiswa mahasiswa={mhsPeriode} allMahasiswa={data.mahasiswa} allDosen={data.dosen} periode={periode} periodeList={periodeList} daftarAngkatan={daftarAngkatan} konten={data.konten || {}} onSave={simpanMahasiswa} onDelete={hapusMahasiswa} />
         )}
         {tab === 'dosen' && (
           <Dosen dosen={data.dosen} mahasiswa={mhsPeriode} periodeLabel={periode === SEMUA ? 'semua periode' : periode} onSave={simpanDosen} onDelete={hapusDosen} />

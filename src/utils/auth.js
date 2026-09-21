@@ -6,6 +6,8 @@
 import {
   signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut,
   sendPasswordResetEmail, updatePassword, getIdTokenResult,
+  setPersistence, browserLocalPersistence, browserSessionPersistence,
+  reauthenticateWithCredential, EmailAuthProvider,
 } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
@@ -21,9 +23,12 @@ async function resolveEmail(identifier) {
 }
 
 // tipe: 'mahasiswa' (NIM) | 'dosen' (NIP) | 'admin' (email langsung)
-export async function loginWithIdentifier(tipe, identifier, password) {
+// remember: true → sesi login bertahan lintas restart browser (localStorage);
+// false (default) → sesi hilang begitu tab/browser ditutup (sessionStorage).
+export async function loginWithIdentifier(tipe, identifier, password, remember = false) {
   const email = tipe === 'admin' ? identifier.trim() : await resolveEmail(identifier);
   if (!email) throw new Error('NOT_FOUND');
+  await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
   await signInWithEmailAndPassword(auth, email, password);
 }
 
@@ -49,10 +54,26 @@ export function sendReset(email) {
 }
 
 // Dipanggil dari layar "wajib ganti password" setelah login dengan password
-// sementara (baru dibuat admin, atau hasil reset admin).
+// sementara (baru dibuat admin, atau hasil reset admin). Sesi baru saja login
+// (fresh), jadi Firebase tidak menuntut reauthenticate di sini.
 export async function changeOwnPassword(newPassword, profileRef) {
   await updatePassword(auth.currentUser, newPassword);
   await updateDoc(profileRef, { mustChangePassword: false });
+}
+
+// Ganti password sukarela (dari halaman Akun Saya, bukan alur wajib di atas).
+// TIDAK PERNAH ada cara membaca/menampilkan password lama — Firebase hanya
+// menyimpan hash, bukan plaintext, jadi "lihat password saya sendiri" secara
+// teknis mustahil bagi siapa pun termasuk admin. Sebagai gantinya: pengguna
+// harus membuktikan tahu password lama (reauthenticate) sebelum boleh
+// mengganti — ini juga wajib secara teknis karena updatePassword() akan
+// ditolak Firebase ('auth/requires-recent-login') kalau sesi login sudah
+// tidak "segar", yang hampir pasti terjadi kalau pengguna sudah lama login.
+export async function changePasswordSelf(currentPassword, newPassword) {
+  const user = auth.currentUser;
+  const cred = EmailAuthProvider.credential(user.email, currentPassword);
+  await reauthenticateWithCredential(user, cred);
+  await updatePassword(user, newPassword);
 }
 
 // Ambil { role, kode? } dari custom claims token — dipanggil setelah login

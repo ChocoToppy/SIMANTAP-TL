@@ -218,6 +218,14 @@ export function daftarPeriode(mahasiswa) {
   const set = new Set(mahasiswa.map((m) => m.periode).filter(Boolean));
   return Array.from(set).sort();
 }
+// Dosen aktif untuk pilihan dropdown (pembimbing/penguji/wali), tapi tetap
+// sertakan dosen yang sedang terpasang di salah satu field (`current`) walau
+// sudah dinonaktifkan — supaya penugasan lama tidak mendadak hilang dari
+// tampilan hanya karena dosennya diarsipkan admin.
+export function dosenAktifUntuk(allDosen, ...current) {
+  const terpasang = new Set(current.filter(Boolean));
+  return (allDosen || []).filter((d) => d.isActive !== false || terpasang.has(d.kode));
+}
 export function buatId() {
   return 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }

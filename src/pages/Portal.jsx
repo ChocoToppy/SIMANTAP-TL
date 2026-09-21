@@ -23,7 +23,7 @@ const PORTAL_TABS = [
   { key: 'akun', label: 'Akun' },
 ];
 
-export function Portal({ nim, nama, email, mahasiswa, allDosen, periodeBuka = [], panduan = [], konten = {}, onSave, onSimpanAkun, onLogout, onOpenPanduan, initialTab = 'pengajuan' }) {
+export function Portal({ nim, nama, email, mahasiswa, allDosen, periodeBuka = [], angkatanAktif = [], panduan = [], konten = {}, onSave, onSimpanAkun, onLogout, onOpenPanduan, initialTab = 'pengajuan' }) {
   const mine = mahasiswa.filter((m) => m.owner === nim);
   const [tab, setTab] = useState(initialTab);
   const [view, setView] = useState({ mode: 'list' });
@@ -119,6 +119,7 @@ export function Portal({ nim, nama, email, mahasiswa, allDosen, periodeBuka = []
                 nama={nama}
                 allDosen={allDosen}
                 periodeBuka={periodeBuka}
+                angkatanAktif={angkatanAktif}
                 onCancel={() => setView({ mode: 'list' })}
                 onSave={simpan}
               />

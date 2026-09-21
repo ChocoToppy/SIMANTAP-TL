@@ -24,6 +24,11 @@ website; the student portal only has an upload zone for the resulting file (see
 KP_DOKUMEN.permohonan in src/utils/helpers.js). No tags are rendered by the app for this
 template anymore.
 
+Magang
+
+kelayakan-magang
+
+
 kelayakan-kp
 
 {nama_mhs}
@@ -31,19 +36,6 @@ kelayakan-kp
 {tgl_cetak}
 {nama_dosen_wali}
 {nip_dosen_wali}
-
-kelayakan-magang (public/doc-templates/Magang/kelayakan-magang.docx)
-
-{nama_mhs}
-{nim}
-{nama_dosen_wali}
-{nio_dosen_wali} - typo in the template itself for nip_dosen_wali, kept as-is (see documentGenerator.js 'Kelayakan Magang' case)
-
-Magang pendaftaran also has a Permohonan upload (external form filled at
-Mandala UNDIP, same pattern as KP's now-removed permohonan-kp template — see
-MAGANG_DOKUMEN.permohonanMagang in src/utils/helpers.js) and a Bimbingan-stage
-Surat Balasan Perusahaan upload (MAGANG_DOKUMEN.suratBalasanMagang) — neither
-generates a document, both are plain student file uploads.
 
 kelayakan-proposal-kp
 

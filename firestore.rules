@@ -96,5 +96,12 @@ service cloud.firestore {
       allow read: if true; // ditampilkan di halaman login publik
       allow write: if isAdmin();
     }
+
+    // ----- Daftar angkatan yang bisa dipilih saat pendaftaran (arsip, bukan
+    // hapus, spy data mahasiswa lama tetap konsisten — lihat SeksiAngkatan.jsx) -----
+    match /angkatan/{id} {
+      allow read: if isSignedIn(); // mahasiswa perlu lihat pilihan saat mendaftar
+      allow write: if isAdmin();
+    }
   }
 }

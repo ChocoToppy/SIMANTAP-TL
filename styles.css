@@ -211,6 +211,20 @@ input:focus, select:focus, textarea:focus {
 input:disabled { background: var(--surface-2); color: var(--muted); cursor: not-allowed; }
 textarea { resize: vertical; }
 
+.password-field { position: relative; }
+.password-field input { padding-right: 38px; }
+.password-toggle {
+  position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+  display: flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; padding: 0; border: none; background: transparent;
+  color: var(--muted); cursor: pointer; border-radius: var(--radius-sm);
+}
+.password-toggle:hover { color: var(--text); background: var(--surface-2); }
+/* Matikan tombol "reveal password" bawaan Edge/IE — kita sudah punya sendiri
+   di .password-toggle, dua ikon numpuk kalau ini tidak dimatikan. */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear { display: none; }
+
 /* ---------- Cards ---------- */
 .card {
   background: var(--surface); border: 1px solid var(--border);
@@ -461,6 +475,14 @@ html[data-theme="dark"] .icon-btn-outline:hover { background: rgba(241, 241, 238
   .pengaturan-layout { flex-direction: column; gap: 20px; }
   .pengaturan-side { position: static; flex-basis: auto; width: 100%; }
   .pengaturan-nav { flex-direction: row; flex-wrap: wrap; }
+}
+
+/* ---------- Akun Saya (portal mahasiswa): profil & ganti password berdampingan ---------- */
+.akun-cards-row { display: flex; align-items: stretch; gap: 16px; max-width: 980px; }
+.akun-cards-row .card { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; }
+.akun-cards-row .modal-foot { margin-top: auto; }
+@media (max-width: 720px) {
+  .akun-cards-row { flex-direction: column; }
 }
 
 /* ---------- Form ---------- */
