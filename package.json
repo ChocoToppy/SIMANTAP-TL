@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:production": "vite build --mode kp-only",
+    "build:production": "vite build --mode prod",
     "build:experimental": "vite build --mode full",
     "preview": "vite preview",
     "deploy": "node scripts/deploy-cpanel.mjs production",

@@ -58,6 +58,25 @@ export const PROGRAM_KEYS = ['TA', 'KP', 'CAP', 'MG', 'S2'];
 
 export function programOf(m) { return PROGRAMS[m.program] ? m.program : 'TA'; }
 export function programLabel(k) { return PROGRAMS[k] ? PROGRAMS[k].label : k; }
+// Magang punya 2 jenis (Magang biasa / Mata Kuliah Terapan) yang berbagi
+// field & alur yang sama persis — satu-satunya beda tampilan adalah label
+// field "Judul" berganti jadi "Nama Mata Kuliah" untuk MKT.
+export function jenisMagangOf(m) { return m.jenisMagang === 'MKT' ? 'MKT' : 'Magang'; }
+// Nama program yang dipakai di judul panel dokumen, tombol cetak, dsb — beda
+// dari kartu-prog (badge utama di Portal, sengaja tetap "Magang" + chip MKT
+// terpisah, lihat KartuPengajuan.jsx) karena teks-teks ini spesifik per
+// dokumen/aksi dan harus jelas menyebut MKT, bukan cuma "Magang".
+export function programDisplayLabel(m) {
+  if (programOf(m) === 'MG' && jenisMagangOf(m) === 'MKT') return 'MKT';
+  return programLabel(programOf(m));
+}
+export function judulLabelFor(m, opts = {}) {
+  const { sementara = false } = opts;
+  if (programOf(m) === 'MG' && jenisMagangOf(m) === 'MKT') return 'Nama Mata Kuliah';
+  if (programOf(m) === 'KP') return sementara ? 'Judul Kerja Praktik (sementara)' : 'Judul';
+  if (programOf(m) === 'MG') return sementara ? 'Judul Magang (sementara)' : 'Judul';
+  return 'Judul';
+}
 export function stagesFor(program) { return (PROGRAMS[program] || PROGRAMS.TA).stages; }
 export function eventsFor(program) { return (PROGRAMS[program] || PROGRAMS.TA).events; }
 export function punyaKlasifikasi(program) { return (PROGRAMS[program] || PROGRAMS.TA).klasifikasi; }
@@ -402,7 +421,7 @@ export function cariBentrok(semuaMahasiswa, calonM) {
 // ===================== Notifikasi (komposer WA / email) =====================
 
 export function pesanNotifikasi(m) {
-  const prog = programLabel(programOf(m));
+  const prog = programDisplayLabel(m);
   const j = (m.jadwal && m.jadwal[m.tahap]) || {};
   const jt = jamTampil(j);
   const jadwalTxt = j.tanggal
@@ -750,6 +769,35 @@ export function eventAktif(m) {
   return eventsFor(programOf(m)).includes(t) ? t : null;
 }
 
+// Key dokumen "Persetujuan" yang membuka tombol "Ajukan jadwal" event utama
+// (Seminar KP untuk KP, Expo untuk Magang/MKT) begitu mahasiswa
+// mengunggahnya — dicek murni dari keberadaan berkasnya, TIDAK dari tahap
+// saat ini, supaya begitu terunggah tombolnya tetap ada (persisten) baik
+// sebelum admin resmi memindahkan tahap dari "Bimbingan" MAUPUN sesudah
+// mahasiswa lulus (jejak riwayat jadwal tetap terlihat). Hanya berlaku
+// untuk program dengan satu event tunggal (KP, Magang/MKT); TA/CAP/S2
+// (event berjenjang: sempro -> semhas -> sidang) tidak punya jalur ini.
+const PERSETUJUAN_AWAL_KEY = {
+  KP: () => 'persetujuanSmkp',
+  MG: (m) => (jenisMagangOf(m) === 'MKT' ? 'persetujuanSmkpMkt' : 'persetujuanSmMagang'),
+};
+export function bolehUsulEventAwal(m) {
+  const prog = programOf(m);
+  const evs = eventsFor(prog);
+  if (evs.length !== 1) return false;
+  const keyFn = PERSETUJUAN_AWAL_KEY[prog];
+  if (!keyFn) return false;
+  const field = dokumenFieldFor(prog);
+  return !!field && !!((m[field] || {})[keyFn(m)]);
+}
+
+// eventAktif() diperluas dengan jalur pintas di atas — dipakai Portal
+// mahasiswa untuk menampilkan tombol "Ajukan jadwal" begitu dokumen
+// Persetujuan diunggah, bukan hanya setelah admin resmi memindahkan tahap.
+export function eventAktifAwal(m) {
+  return eventAktif(m) || (bolehUsulEventAwal(m) ? eventsFor(programOf(m))[0] : null);
+}
+
 // Deskripsi dokumen yang harus diunggah per kegiatan (bisa diubah di sini).
 // Tiap array = satu item; dirender sebagai daftar bernomor di UI.
 export const BERKAS_SYARAT = {
@@ -827,12 +875,18 @@ export const KP_DOKUMEN = [
   },
 ];
 
-// Deskripsi dokumen per-tahap untuk Magang — sama pola dengan KP_DOKUMEN di
-// atas. Key dibuat unik (bukan 'permohonan'/'suratBalasan' polos) supaya
-// override teks admin (konten.dokumen[key]) tidak tabrakan dengan punya KP.
+// Deskripsi dokumen per-tahap untuk Magang — sama pola & tahapan dengan
+// KP_DOKUMEN di atas (Pendaftaran → Bimbingan → Expo). Key dibuat unik
+// (bukan 'permohonan'/'suratBalasan' polos) supaya override teks admin
+// (konten.dokumen[key]) tidak tabrakan dengan punya KP.
 export const MAGANG_DOKUMEN = [
   {
     key: 'kelayakanMagang', stage: 'Pendaftaran', label: 'Surat Kelayakan Magang', docType: 'Kelayakan Magang',
+    syarat: 'Tersedia setelah pendaftaran diverifikasi admin. Unduh, tanda tangani, lalu unggah kembali.',
+    eligible: (m) => statusVerif(m).key === 'terverifikasi',
+  },
+  {
+    key: 'kelayakanProposalMagang', stage: 'Pendaftaran', label: 'Surat Kelayakan Proposal Magang', docType: 'Kelayakan Proposal Magang',
     syarat: 'Tersedia setelah pendaftaran diverifikasi admin. Unduh, tanda tangani, lalu unggah kembali.',
     eligible: (m) => statusVerif(m).key === 'terverifikasi',
   },
@@ -845,27 +899,117 @@ export const MAGANG_DOKUMEN = [
     linkLabel: 'Untuk membuat formulir Permohonan Magang silahkan kunjungi Mandala UNDIP',
   },
   {
-    key: 'suratBalasanMagang', stage: 'Bimbingan', label: 'Surat Balasan Perusahaan', docType: null,
-    syarat: 'Unggah bukti diterima magang dari perusahaan/instansi setelah admin memindahkan Anda ke tahap Bimbingan.',
+    key: 'suratBalasanMagang', stage: 'Pendaftaran', label: 'Surat Balasan Perusahaan', docType: null,
+    syarat: 'Unggah bukti diterima magang dari perusahaan/instansi setelah pendaftaran diverifikasi admin.',
+    eligible: (m) => statusVerif(m).key === 'terverifikasi',
+  },
+  {
+    key: 'stPembimbingMagang', stage: 'Bimbingan', label: 'ST Pembimbing Magang', docType: 'ST Pembimbing Magang',
+    syarat: 'Tersedia setelah surat balasan perusahaan diunggah dan admin menetapkan dosen pembimbing.',
+    eligible: (m) => tahapIndex('MG', m.tahap) >= tahapIndex('MG', 'Bimbingan') && !!m.pembimbing1,
+    studentUpload: false,
+  },
+  {
+    key: 'persetujuanSmMagang', stage: 'Bimbingan', label: 'Persetujuan Expo Magang', docType: 'Persetujuan Expo Magang',
+    syarat: 'Tersedia sejak tahap Bimbingan dimulai. Unduh, tanda tangani, lalu unggah kembali.',
     eligible: (m) => tahapIndex('MG', m.tahap) >= tahapIndex('MG', 'Bimbingan'),
   },
   {
-    // Sama seperti baSeminar KP: diisi admin, bukan mahasiswa. docType masih
-    // null karena berkas template BA Expo Magang belum dibuat — begitu
-    // template-nya siap, isi docType di sini + tambah case-nya di
-    // documentGenerator.js supaya tombol "Unduh (PDF)" muncul.
-    key: 'baExpo', stage: 'Expo', label: 'Berita Acara Expo Magang', docType: null,
+    key: 'kuesionerMagang', stage: 'Bimbingan', label: 'Formulir Kuesioner Magang', docType: null,
+    syarat: 'Unggah formulir kuesioner magang yang sudah diisi setelah tahap Bimbingan dimulai.',
+    eligible: (m) => tahapIndex('MG', m.tahap) >= tahapIndex('MG', 'Bimbingan'),
+  },
+  {
+    key: 'monevMagang', stage: 'Bimbingan', label: 'Dokumen Monev', docType: null,
+    syarat: 'Tautan Dokumen Monev belum diatur admin.',
+    eligible: (m) => statusVerif(m).key === 'terverifikasi',
+    studentUpload: false, adminUpload: false,
+    linkEksternal: '', linkLabel: 'Dokumen Monev', linkConfigurable: true, linkButton: true,
+  },
+  {
+    // Sama seperti baSeminar KP: diisi admin, bukan mahasiswa.
+    key: 'baExpo', stage: 'Expo', label: 'Berita Acara Expo Magang', docType: 'BA Expo Magang',
     syarat: 'Tersedia setelah jadwal Expo dikonfirmasi admin.',
     eligible: (m) => { const j = getJadwal(m, 'Expo'); return !!(j.dikonfirmasi && j.tanggal); },
     studentUpload: false, adminUpload: true,
   },
 ];
 
-// Satu sumber kebenaran KP_DOKUMEN/MAGANG_DOKUMEN + field Storage tempat
-// berkasnya disimpan pada record mahasiswa, dikunci per kode program.
+// Deskripsi dokumen per-tahap untuk Mata Kuliah Terapan (MKT) — sub-jenis
+// Magang yang berbagi alur & docType (lihat documentGenerator.js, yang
+// memilih berkas -magang.docx vs -mkt.docx otomatis dari m.jenisMagang) tapi
+// punya berkas .docx & label sendiri, jadi array + key admin-override-nya
+// dipisah dari MAGANG_DOKUMEN supaya admin bisa menulis teks berbeda untuk
+// tiap jenis di Pengaturan → Konten.
+export const MKT_DOKUMEN = [
+  {
+    key: 'kelayakanMkt', stage: 'Pendaftaran', label: 'Surat Kelayakan MKT', docType: 'Kelayakan Magang',
+    syarat: 'Tersedia setelah pendaftaran diverifikasi admin. Unduh, tanda tangani, lalu unggah kembali.',
+    eligible: (m) => statusVerif(m).key === 'terverifikasi',
+  },
+  {
+    key: 'kelayakanProposalMkt', stage: 'Pendaftaran', label: 'Surat Kelayakan Proposal MKT', docType: 'Kelayakan Proposal Magang',
+    syarat: 'Tersedia setelah pendaftaran diverifikasi admin. Unduh, tanda tangani, lalu unggah kembali.',
+    eligible: (m) => statusVerif(m).key === 'terverifikasi',
+  },
+  {
+    key: 'permohonanMkt', stage: 'Pendaftaran', label: 'Permohonan MKT', docType: null,
+    syarat: 'Tersedia setelah pendaftaran diverifikasi admin.',
+    catatan: 'Unggah berkas permohonan dari perusahaan/instansi tempat Anda diterima MKT.',
+    eligible: (m) => statusVerif(m).key === 'terverifikasi',
+    linkEksternal: 'https://mandala.undip.ac.id/',
+    linkLabel: 'Untuk membuat formulir Permohonan MKT silahkan kunjungi Mandala UNDIP',
+  },
+  {
+    key: 'suratBalasanMkt', stage: 'Pendaftaran', label: 'Surat Balasan Perusahaan', docType: null,
+    syarat: 'Unggah bukti diterima MKT dari perusahaan/instansi setelah pendaftaran diverifikasi admin.',
+    eligible: (m) => statusVerif(m).key === 'terverifikasi',
+  },
+  {
+    key: 'stPembimbingMkt', stage: 'Bimbingan', label: 'ST Pembimbing MKT', docType: 'ST Pembimbing Magang',
+    syarat: 'Tersedia setelah surat balasan perusahaan diunggah dan admin menetapkan dosen pembimbing.',
+    eligible: (m) => tahapIndex('MG', m.tahap) >= tahapIndex('MG', 'Bimbingan') && !!m.pembimbing1,
+    studentUpload: false,
+  },
+  {
+    key: 'persetujuanSmkpMkt', stage: 'Bimbingan', label: 'Seminar Expo MKT', docType: 'Persetujuan Expo Magang',
+    syarat: 'Tersedia sejak tahap Bimbingan dimulai. Unduh, tanda tangani, lalu unggah kembali.',
+    eligible: (m) => tahapIndex('MG', m.tahap) >= tahapIndex('MG', 'Bimbingan'),
+  },
+  {
+    key: 'kuesionerMkt', stage: 'Bimbingan', label: 'Formulir Kuesioner MKT', docType: null,
+    syarat: 'Unggah formulir kuesioner MKT yang sudah diisi setelah tahap Bimbingan dimulai.',
+    eligible: (m) => tahapIndex('MG', m.tahap) >= tahapIndex('MG', 'Bimbingan'),
+  },
+  {
+    key: 'monevMkt', stage: 'Bimbingan', label: 'Dokumen Monev MKT', docType: null,
+    syarat: 'Tautan Dokumen Monev MKT belum diatur admin.',
+    eligible: (m) => statusVerif(m).key === 'terverifikasi',
+    studentUpload: false, adminUpload: false,
+    linkEksternal: '', linkLabel: 'Dokumen Monev MKT', linkConfigurable: true, linkButton: true,
+  },
+  {
+    key: 'baExpoMkt', stage: 'Expo', label: 'Berita Acara Expo MKT', docType: 'BA Expo Magang',
+    syarat: 'Tersedia setelah jadwal Expo dikonfirmasi admin.',
+    eligible: (m) => { const j = getJadwal(m, 'Expo'); return !!(j.dikonfirmasi && j.tanggal); },
+    studentUpload: false, adminUpload: true,
+  },
+];
+
+// Satu sumber kebenaran KP_DOKUMEN/MAGANG_DOKUMEN/MKT_DOKUMEN + field Storage
+// tempat berkasnya disimpan pada record mahasiswa, dikunci per kode program.
+// Magang & MKT berbagi field Storage yang sama (dokumenMagang) — key-nya
+// sudah unik per jenis (mis. kelayakanMagang vs kelayakanMkt) jadi tidak
+// tabrakan meski disimpan di objek yang sama.
 const DOKUMEN_CONFIG = { KP: KP_DOKUMEN, MG: MAGANG_DOKUMEN };
 const DOKUMEN_FIELD = { KP: 'dokumenKP', MG: 'dokumenMagang' };
-export function dokumenConfigFor(program) { return DOKUMEN_CONFIG[program] || null; }
+// m opsional: kalau program === 'MG' dan m.jenisMagang === 'MKT', pakai
+// MKT_DOKUMEN alih-alih MAGANG_DOKUMEN. Tanpa m (mis. dipanggil hanya dengan
+// key+program dari kode lama), jatuh ke default MAGANG_DOKUMEN.
+export function dokumenConfigFor(program, m) {
+  if (program === 'MG' && m && jenisMagangOf(m) === 'MKT') return MKT_DOKUMEN;
+  return DOKUMEN_CONFIG[program] || null;
+}
 export function dokumenFieldFor(program) { return DOKUMEN_FIELD[program] || null; }
 
 // Status tiap dokumen (KP/Magang) untuk seorang mahasiswa: kelayakan + berkas
@@ -873,7 +1017,7 @@ export function dokumenFieldFor(program) { return DOKUMEN_FIELD[program] || null
 // Pengaturan → Konten (lihat KONTEN_DEFAULT/config.konten) — label/syarat
 // bawaan tetap dipakai untuk field yang belum di-override.
 export function dokumenStatus(program, m, konten = {}) {
-  const list = DOKUMEN_CONFIG[program];
+  const list = dokumenConfigFor(program, m);
   if (!list) return [];
   const field = DOKUMEN_FIELD[program];
   const override = (konten && konten.dokumen) || {};
@@ -883,6 +1027,10 @@ export function dokumenStatus(program, m, konten = {}) {
       ...d,
       label: o.label || d.label,
       syarat: o.syarat || d.syarat,
+      ...(d.linkConfigurable ? {
+        linkEksternal: o.linkEksternal || d.linkEksternal,
+        linkLabel: o.linkLabel || d.linkLabel,
+      } : {}),
       eligible: d.eligible(m),
       upload: (m[field] || {})[d.key] || null,
     };

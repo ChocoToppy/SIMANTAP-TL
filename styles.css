@@ -507,6 +507,7 @@ html[data-theme="dark"] .icon-btn-outline:hover { background: rgba(241, 241, 238
 }
 .chip-on { background: var(--green-bg); color: var(--green-text); border-color: var(--green-border); }
 .chip-off { background: var(--red-bg); color: var(--red-text); border-color: var(--red-border); }
+.chip-mkt { background: var(--blue-bg); color: var(--blue-text); border-color: var(--blue-border); }
 
 /* ---------- Lencana identitas login (mahasiswa/dosen/admin) ---------- */
 /* "Pulau" kecil di topbar yang menampilkan siapa yang sedang login — warna

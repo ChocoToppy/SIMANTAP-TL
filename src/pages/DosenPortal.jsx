@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { SEMUA, filterByPeriode, hitungBebanRinci, aktivitasTerakhir, tanggalDibuat, kondisi, bidangLabel, programOf, programLabel, getJadwal, AKTIVITAS_LABEL, formatWaktu } from '../utils/helpers.js';
+import { SEMUA, filterByPeriode, hitungBebanRinci, aktivitasTerakhir, tanggalDibuat, kondisi, bidangLabel, programOf, programLabel, getJadwal, AKTIVITAS_LABEL, formatWaktu, jenisMagangOf } from '../utils/helpers.js';
 import { Badge, StageBar, Empty, ColResizeHandle, TextSizeToggle, ThemeToggle, RolePill } from '../components/ui.jsx';
 import { generateDocument, getTemplateConfig } from '../utils/documentGenerator.js';
 import { useColumnWidths } from '../utils/useColumnWidths.js';
@@ -141,7 +141,10 @@ export function DosenPortal({ dosen, allDosen, mahasiswa, periodeList = [], onGr
                           <div className="cell-name">{m.nama}</div>
                           <div className="cell-sub">{m.nim} · {bidangLabel(m.bidang)}</div>
                         </td>
-                        <td className="cell-sub">{programLabel(programOf(m))}</td>
+                        <td className="cell-sub">
+                          {programLabel(programOf(m))}
+                          {programOf(m) === 'MG' && jenisMagangOf(m) === 'MKT' && <span className="chip chip-mkt" style={{ marginLeft: 6 }}>MKT</span>}
+                        </td>
                         <td><Badge tone={peran.includes('Pembimbing') ? 'blue' : 'amber'}>{peran || '—'}</Badge></td>
                         <td style={{ minWidth: 160 }}><StageBar program={programOf(m)} tahap={m.tahap} /></td>
                         <td><Badge tone={k.tone}>{k.label}</Badge></td>

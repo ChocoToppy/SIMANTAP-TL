@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, punyaKlasifikasi, BIDANG, formatTanggal, kondisi, SEMUA, statusVerif, cariBentrok, eventAktif, bidangLabel, tanggalDibuat, hitungNomorUrut } from '../utils/helpers.js';
+import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, punyaKlasifikasi, BIDANG, formatTanggal, kondisi, SEMUA, statusVerif, cariBentrok, eventAktif, bidangLabel, tanggalDibuat, hitungNomorUrut, jenisMagangOf } from '../utils/helpers.js';
 import { Badge, StageBar, ExportMenu, ColResizeHandle, Empty } from '../components/ui.jsx';
 import { useColumnWidths } from '../utils/useColumnWidths.js';
 import { AktivitasMini, JadwalMini } from './mahasiswa/AktivitasCells.jsx';
@@ -281,6 +281,7 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
                     <div className="cell-name">{m.nama}</div>
                     <div className="cell-sub">
                       {m.nim} · {bidangLabel(m.bidang)} · {programLabel(programOf(m))}
+                      {programOf(m) === 'MG' && jenisMagangOf(m) === 'MKT' && <span className="chip chip-mkt" style={{ marginLeft: 6 }}>MKT</span>}
                       {m.klasifikasi && punyaKlasifikasi(programOf(m)) ? ` · ${m.klasifikasi}` : ''}
                     </div>
                     <div style={{ marginTop: 4 }}><Badge tone={statusVerif(m).tone}>{statusVerif(m).label}</Badge></div>
@@ -333,7 +334,11 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
                 <div className="mhs-row-name">{m.nama}</div>
                 <Badge tone={k.tone}>{k.label}</Badge>
               </div>
-              <div className="mhs-row-sub">{m.nim} · {programLabel(programOf(m))} · {m.pembimbing1 || m.dosenWali || '—'}</div>
+              <div className="mhs-row-sub">
+                {m.nim} · {programLabel(programOf(m))}
+                {programOf(m) === 'MG' && jenisMagangOf(m) === 'MKT' && <span className="chip chip-mkt" style={{ marginLeft: 6 }}>MKT</span>}
+                {' '}· {m.pembimbing1 || m.dosenWali || '—'}
+              </div>
               <StageBar program={programOf(m)} tahap={m.tahap} />
               <div className="mhs-row-foot">
                 <span>{statusVerif(m).label}</span>

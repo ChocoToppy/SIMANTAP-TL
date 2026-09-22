@@ -23,4 +23,12 @@ console.log(`Deploying ${mode} build...`);
 run(`npm run ${buildScript}`);
 run(`scp -i ${SSH_KEY} -P ${PORT} -r dist/. ${HOST}:${REMOTE_PATH}`);
 
+// scp -r run from a Windows/Git-Bash OpenSSH client creates any NEW remote
+// directories with group permissions stripped (e.g. "rwx---rwx" instead of
+// "rwxr-xr-x"). LiteSpeed serves requests as a process in the "nobody"
+// group, so a directory with no group-execute bit can't be traversed at
+// all -> the whole site 404s even though every file is actually present.
+// Restore normal directory perms after every deploy so this can't recur.
+run(`ssh -i ${SSH_KEY} -p ${PORT} ${HOST} "find ${REMOTE_PATH} -type d -exec chmod 755 {} \\;"`);
+
 console.log('Deploy complete.');

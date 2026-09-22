@@ -24,10 +24,151 @@ website; the student portal only has an upload zone for the resulting file (see
 KP_DOKUMEN.permohonan in src/utils/helpers.js). No tags are rendered by the app for this
 template anymore.
 
-Magang
+Magang / Mata Kuliah Terapan (MKT)
 
-kelayakan-magang
+Magang and MKT (Mata Kuliah Terapan) are the same program with two twin
+template files per document (…-magang.docx / …-mkt.docx) — documentGenerator.js
+picks the right file automatically from the student's jenisMagang field. UNLIKE
+KP, the Magang/MKT pair of each document does NOT share tag names — every
+tag below that contains "magang"/"mkt" is suffixed per file (e.g. judul_magang
+in the -magang.docx file vs judul_mkt in the -mkt.docx file); documentGenerator.js
+builds both automatically from a single `sfx = jenisMagang === 'MKT' ? 'mkt' : 'magang'`.
+Tags without that suffix (no_surat, nama_mhs, nim, nama_dosen1, nip1, tgl_cetak,
+nama_dosen_wali, nip_dosen_wali) are named the same in both files.
 
+kelayakan-magang / kelayakan-mkt
+
+{nama_mhs}
+{nim}
+{nama_dosen_wali}
+{nip_dosen_wali}
+
+kelayakan-proposal-magang
+
+{nama_mhs}
+{nim}
+{tema_magang}
+{judul_kp} — NOTE: this file's judul tag is literally {judul_kp}, not
+  {judul_magang} (looks like a leftover from the KP template it was copied
+  from). documentGenerator.js sends both judul_magang AND judul_kp so it
+  works either way — fix the tag in the .docx to {judul_magang} whenever
+  convenient and the alias can be dropped.
+
+kelayakan-proposal-mkt
+
+{nama_mhs}
+{nim}
+{tema_mkt}
+{judul_mkt}
+
+pembimbing-magang-st
+
+{no_surat}
+{nama_dosen1}
+{nip1}
+{nama_mhs}
+{nim}
+{judul_magang}
+{mulai_magang}
+{akhir_magang}
+{tgl_cetak}
+
+pembimbing-mkt-st
+
+{no_surat}
+{nama_dosen1}
+{nip1}
+{nama_mhs}
+{nim}
+{judul_mkt}
+{mulai_mkt}
+{akhir_mkt}
+{tgl_cetak}
+
+persetujuan-expo-magang
+
+{nama_mhs}
+{nim}
+{judul_magang}
+{tgl_cetak}
+{nama_dosen1}
+{nip1}
+
+persetujuan-expo-mkt
+
+{nama_mhs}
+{nim}
+{judul_mkt}
+{tgl_cetak}
+{nama_dosen1}
+{nip1}
+
+seminar-magang-ba
+
+{no_surat}
+{nama_mhs}
+{nim}
+{judul_magang}
+{hari_smmagang}
+{tanggal_smmagang}
+{tgl_smmagang}
+{waktu_smmagang}
+{tempat_smmagang}
+{nama_dosen1}
+{nip1}
+
+seminar-mkt-ba
+
+{no_surat}
+{nama_mhs}
+{nim}
+{judul_mkt}
+{hari_smmkt}
+{tanggal_smmkt}
+{tgl_smmkt}
+{waktu_smmkt}
+{tempat_smmkt}
+{nama_dosen1}
+{nip1}
+
+perpanjangan-magang
+
+{no_surat}
+{nama_mhs}
+{nim}
+{judul_magang}
+{mulai_magang}
+{akhir_magang}
+{mulai_ppmagang}
+{akhir_ppmagang}
+{tgl_cetak}
+{nama_dosen1}
+{nip1}
+
+perpanjangan-mkt
+
+{no_surat}
+{nama_mhs}
+{nim}
+{judul_mkt}
+{mulai_mkt}
+{akhir_mkt}
+{mulai_ppmkt}
+{akhir_ppmkt}
+{tgl_cetak}
+{nama_dosen1}
+{nip1}
+
+NOTE: none of the seven Magang/MKT template pairs above currently render
+{nama_dosen_wali}/{nip_dosen_wali} except kelayakan-magang/kelayakan-mkt —
+documentGenerator.js still sends ...wali in every case (harmless unused
+data) in case you add those tags to any of the other files later.
+
+permohonan-magang (not used) / permohonan-mkt (not used)
+
+Not used by the app — filling this form happens on an external website
+(Mandala UNDIP), same as permohonan-kp below. No tags rendered by the app
+for these templates.
 
 kelayakan-kp
 

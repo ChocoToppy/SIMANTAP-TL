@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { statusVerif, kondisi, programOf, eventAktif, bolehAjukanJadwal, formatTanggal, jamTampil, bidangLabel, programLabel, normalizeUrl } from '../../utils/helpers.js';
+import { statusVerif, kondisi, programOf, eventAktifAwal, bolehAjukanJadwal, formatTanggal, jamTampil, bidangLabel, programLabel, programDisplayLabel, jenisMagangOf, normalizeUrl, judulLabelFor } from '../../utils/helpers.js';
 import { Badge, StageBar, StageListVertical } from '../../components/ui.jsx';
 import { KpDocumentPanel } from '../../components/kpDocuments.jsx';
 import { generateDocument, getTemplateConfig } from '../../utils/documentGenerator.js';
@@ -12,10 +12,11 @@ export function KartuPengajuan({ m, allDosen = [], konten = {}, panduan = [], on
   const terverifikasi = v.key === 'terverifikasi';
   const isKP = programOf(m) === 'KP';
   const isMG = programOf(m) === 'MG';
-  // KP: begitu Persetujuan SMKP diunggah, mahasiswa sudah boleh mengajukan jadwal Seminar
-  // KP meski admin belum memindahkan tahap dari "Bimbingan" ke "Seminar KP" secara resmi.
-  const bolehUsulSeminarKPAwal = isKP && m.tahap === 'Bimbingan' && !!((m.dokumenKP || {}).persetujuanSmkp);
-  const evA = eventAktif(m) || (bolehUsulSeminarKPAwal ? 'Seminar KP' : null); // kegiatan yang dijadwalkan dari tahap ini
+  // KP & Magang/MKT: begitu dokumen Persetujuan tahap Bimbingan diunggah,
+  // mahasiswa sudah boleh mengajukan jadwal event utamanya (Seminar KP /
+  // Expo) meski admin belum memindahkan tahap dari "Bimbingan" secara resmi
+  // — lihat eventAktifAwal/bolehUsulEventAwal di helpers.js.
+  const evA = eventAktifAwal(m); // kegiatan yang dijadwalkan dari tahap ini
   const jEv = evA ? ((m.jadwal || {})[evA] || {}) : {};
   const dikonfirmasi = !!jEv.dikonfirmasi;
   const adaUsulan = !!(jEv.tanggal || jEv.berkasLink || jEv.jamMulai);
@@ -31,7 +32,8 @@ export function KartuPengajuan({ m, allDosen = [], konten = {}, panduan = [], on
   const panduanRelevan = panduanUntukProgram(panduan, programOf(m));
   const [dlBusy, setDlBusy] = useState(false);
   async function unduhPerpanjanganKP() {
-    const config = getTemplateConfig('Perpanjangan KP', m, dosenByKode, {});
+    const docType = programOf(m) === 'KP' ? 'Perpanjangan KP' : 'Perpanjangan Magang';
+    const config = getTemplateConfig(docType, m, dosenByKode, {});
     if (!config) return;
     setDlBusy(true);
     try {
@@ -44,7 +46,10 @@ export function KartuPengajuan({ m, allDosen = [], konten = {}, panduan = [], on
   return (
     <div className="card kartu">
       <div className="kartu-head">
-        <span className="kartu-prog">{programLabel(programOf(m))}</span>
+        <span className="kartu-prog">
+          {programLabel(programOf(m))}
+          {isMG && jenisMagangOf(m) === 'MKT' && <span className="chip chip-mkt" style={{ marginLeft: 6 }}>MKT</span>}
+        </span>
         <div className="kartu-head-right">
           {panduanRelevan.map((p) => (
             <React.Fragment key={p.id}>
@@ -57,7 +62,7 @@ export function KartuPengajuan({ m, allDosen = [], konten = {}, panduan = [], on
           <Badge tone={v.tone}>{v.label}</Badge>
         </div>
       </div>
-      <div className="kartu-judul">{m.judul || <span className="muted">(judul belum diisi)</span>}</div>
+      <div className="kartu-judul">{m.judul || <span className="muted">({judulLabelFor(m).toLowerCase()} belum diisi)</span>}</div>
       <div className="cell-sub">{m.nim} · {bidangLabel(m.bidang)}{m.klasifikasi ? ` · ${m.klasifikasi}` : ''}</div>
       <div className="stage-desktop" style={{ margin: '10px 0' }}><StageBar program={programOf(m)} tahap={m.tahap} /></div>
       <div className="stage-mobile" style={{ margin: '10px 0' }}><StageListVertical program={programOf(m)} tahap={m.tahap} /></div>
@@ -111,14 +116,14 @@ export function KartuPengajuan({ m, allDosen = [], konten = {}, panduan = [], on
 
     {/* Dokumen KP/Magang per tahap: unduh (PDF) & unggah berkas ditandatangani/dinilai */}
       {(isKP || isMG) && (
-        <KpDocumentPanel m={m} program={programOf(m)} title={`Dokumen ${programLabel(programOf(m))}`} dosenByKode={dosenByKode} konten={konten} canUpload onUpload={onUploadDokumenKP} onDeleteUpload={onDeleteDokumenKP} />
+        <KpDocumentPanel m={m} program={programOf(m)} title={`Dokumen ${programDisplayLabel(m)}`} dosenByKode={dosenByKode} konten={konten} canUpload onUpload={onUploadDokumenKP} onDeleteUpload={onDeleteDokumenKP} />
       )}
 
       {/* Perpanjangan (KP / TA / Magang) */}
       {['TA', 'KP', 'MG'].includes(programOf(m)) && terverifikasi && k.key !== 'lulus' && (() => {
         const pp = m.perpanjangan || {};
-        const isKPProgram = programOf(m) === 'KP';
-        const suratSiap = isKPProgram ? pp.suratAdminTersedia : pp.suratAdmin;
+        const autoGen = ['KP', 'MG'].includes(programOf(m));
+        const suratSiap = autoGen ? pp.suratAdminTersedia : pp.suratAdmin;
         if (!pp.diminta && !suratSiap) {
           return <div style={{ marginTop: 8 }}><button className="btn btn-amber perpanjangan-btn" onClick={() => onPerpanjangan('minta')}>Ajukan perpanjangan</button></div>;
         }
@@ -128,8 +133,8 @@ export function KartuPengajuan({ m, allDosen = [], konten = {}, panduan = [], on
         if (!pp.suratFinal && !pp.suratFinalLink) {
           return (
             <div className="callout" style={{ marginTop: 8 }}>
-              {isKPProgram ? (
-                <button className="btn perpanjangan-btn" onClick={unduhPerpanjanganKP} disabled={dlBusy}>{dlBusy ? 'Menyiapkan PDF…' : 'Unduh surat perpanjangan KP (PDF)'}</button>
+              {autoGen ? (
+                <button className="btn perpanjangan-btn" onClick={unduhPerpanjanganKP} disabled={dlBusy}>{dlBusy ? 'Menyiapkan PDF…' : `Unduh surat perpanjangan ${programDisplayLabel(m)} (PDF)`}</button>
               ) : (
                 <>Surat perpanjangan dari admin: <a href={pp.suratAdmin.url || pp.suratAdmin.dataUrl} target="_blank" rel="noreferrer">{pp.suratAdmin.fileName}</a>.{' '}</>
               )}{' '}
@@ -149,12 +154,16 @@ export function KartuPengajuan({ m, allDosen = [], konten = {}, panduan = [], on
             {jEv.berkasLink ? 'Perbarui draft & berkas sidang' : 'Unggah draft & berkas sidang'}
           </button>
         )}
-        {terverifikasi && evA && bolehAjukan && !sidang && !disetujui && (
-          <button className="btn btn-primary" onClick={() => onJadwal(evA)}>
-            {adaUsulan ? `Revisi usulan ${evA}` : `Ajukan jadwal ${evA}`}
+        {terverifikasi && evA && bolehAjukan && !sidang && (
+          <button
+            className="btn btn-primary"
+            onClick={() => onJadwal(evA)}
+            disabled={disetujui}
+            title={disetujui ? 'Jadwal sudah dikunci admin — hubungi admin untuk perubahan.' : undefined}
+          >
+            {disetujui ? `🔒 Jadwal ${evA} terkunci` : (adaUsulan ? `Revisi usulan ${evA}` : `Ajukan jadwal ${evA}`)}
           </button>
         )}
-        {terverifikasi && evA && !sidang && disetujui && <span className="hint">Jadwal sudah disetujui admin. Menunggu pelaksanaan &amp; hasil.</span>}
         {terverifikasi && !evA && k.key !== 'lulus' && <span className="hint">Menunggu proses admin.</span>}
       </div>
     </div>

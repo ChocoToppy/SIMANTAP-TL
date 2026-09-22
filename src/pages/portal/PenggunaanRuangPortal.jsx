@@ -1,5 +1,5 @@
 import React from 'react';
-import { kumpulkanEvent, formatTanggal, programLabel, programOf } from '../../utils/helpers.js';
+import { kumpulkanEvent, formatTanggal, programDisplayLabel } from '../../utils/helpers.js';
 import { Badge, Empty } from '../../components/ui.jsx';
 
 // Jadwal seminar/sidang/expo & pemakaian ruang seluruh mahasiswa (bukan cuma
@@ -34,7 +34,7 @@ export function PenggunaanRuangPortal({ mahasiswa }) {
                   <td className="cell-sub">{formatTanggal(e.tanggal)}</td>
                   <td className="cell-sub">{e.jam || '—'}</td>
                   <td>{e.ruang ? <Badge tone="blue">{e.ruang}</Badge> : <span className="muted">—</span>}</td>
-                  <td className="cell-sub">{programLabel(programOf(e.m))} · {e.ev}</td>
+                  <td className="cell-sub">{programDisplayLabel(e.m)} · {e.ev}</td>
                   <td>
                     <div className="cell-name">{e.m.nama}</div>
                     <div className="cell-sub">{e.m.nim}</div>

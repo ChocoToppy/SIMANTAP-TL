@@ -1,4 +1,4 @@
-import { programOf, programLabel, punyaKlasifikasi, bidangLabel, eventsFor, getJadwal, formatTanggal, jamTampil, kondisi } from '../../utils/helpers.js';
+import { programOf, programDisplayLabel, punyaKlasifikasi, bidangLabel, eventsFor, getJadwal, formatTanggal, jamTampil, kondisi } from '../../utils/helpers.js';
 import { downloadCSV, downloadXLSX } from '../../utils/exportUtils.js';
 
 // Ekspor tabel Mahasiswa (CSV/XLSX) — dipisah dari Mahasiswa.jsx karena murni
@@ -9,7 +9,7 @@ const CORE_HEADERS = ['No. (Periode)', 'Program', 'Nama', 'NIM', 'Angkatan', 'Ju
 function coreRow(m, { nomorUrut, namaLengkapDosen }) {
   const k = kondisi(m);
   return [
-    (nomorUrut[m.id] || {}).periode ?? '', programLabel(programOf(m)), m.nama, m.nim, m.angkatan, m.judul, m.periode,
+    (nomorUrut[m.id] || {}).periode ?? '', programDisplayLabel(m), m.nama, m.nim, m.angkatan, m.judul, m.periode,
     punyaKlasifikasi(programOf(m)) ? (m.klasifikasi || '') : '', bidangLabel(m.bidang), namaLengkapDosen(m.dosenWali),
     namaLengkapDosen(m.pembimbing1), namaLengkapDosen(m.pembimbing2), namaLengkapDosen(m.penguji1), namaLengkapDosen(m.penguji2),
     m.tahap, k.label, m.tanggalMulai || '', m.batasAkhir || '', m.nomorSurat || '',
@@ -37,7 +37,7 @@ export async function eksporMahasiswa(format, list, ctx) {
   list.forEach((m) => eventsFor(programOf(m)).forEach((ev) => {
     const j = getJadwal(m, ev);
     if (j.tanggal || jamTampil(j) || j.ruang || j.printBA || j.syarat) {
-      jadwalRows.push([m.nama, m.nim, programLabel(programOf(m)), ev, j.tanggal || '', jamTampil(j), j.ruang || '', j.printBA ? 'Ya' : 'Tidak', j.syarat ? 'Ya' : 'Tidak']);
+      jadwalRows.push([m.nama, m.nim, programDisplayLabel(m), ev, j.tanggal || '', jamTampil(j), j.ruang || '', j.printBA ? 'Ya' : 'Tidak', j.syarat ? 'Ya' : 'Tidak']);
     }
   }));
   try {

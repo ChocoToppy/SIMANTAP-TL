@@ -80,7 +80,8 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
   const [ppErr, setPpErr] = useState('');
   const [dlBusyKP, setDlBusyKP] = useState(false);
   async function unduhPerpanjanganKP() {
-    const config = getTemplateConfig('Perpanjangan KP', m, dosenByKode, {});
+    const docType = programOf(m) === 'KP' ? 'Perpanjangan KP' : 'Perpanjangan Magang';
+    const config = getTemplateConfig(docType, m, dosenByKode, {});
     if (!config) return;
     setDlBusyKP(true);
     try {
@@ -112,6 +113,7 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
       if (r.pembimbing < 1) next.pembimbing1 = '';
       if (r.penguji < 1) next.penguji1 = '';
       if (r.penguji < 2) next.penguji2 = '';
+      if (p === 'MG' && !next.jenisMagang) next.jenisMagang = 'Magang';
       return next;
     });
   }
@@ -325,7 +327,6 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
         tahapTab={tahapTab} setTahapTab={setTahapTab} p={p} events={events} jadwalBlok={jadwalBlok}
         dosenByKode={dosenByKode} konten={konten} uploadAdminDokumenKP={uploadAdminDokumenKP} hapusAdminDokumenKP={hapusAdminDokumenKP}
         setPP={setPP} unduhPerpanjanganKP={unduhPerpanjanganKP} dlBusyKP={dlBusyKP}
-        ppBusy={ppBusy} ppErr={ppErr} berikanSuratPerpanjangan={berikanSuratPerpanjangan}
         baru={baru} onCancel={onCancel} submit={submit}
       />
     );

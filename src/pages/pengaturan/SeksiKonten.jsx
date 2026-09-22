@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Field } from '../../components/ui.jsx';
-import { KP_DOKUMEN, MAGANG_DOKUMEN, BERKAS_SYARAT } from '../../utils/helpers.js';
+import { KP_DOKUMEN, MAGANG_DOKUMEN, MKT_DOKUMEN, BERKAS_SYARAT } from '../../utils/helpers.js';
 
 // ----- Editor konten: label/syarat dokumen KP + daftar berkas per kegiatan -----
 // Hanya teks informasional yang bisa diubah di sini — alur/tahapan/kelayakan
@@ -61,6 +61,23 @@ export function SeksiKonten({ konten = {}, onSimpan }) {
         ))}
       </div>
 
+      <div className="sched-title" style={{ marginTop: 24 }}>Dokumen MKT (Mata Kuliah Terapan)</div>
+      <p className="hint" style={{ marginTop: 0 }}>
+        MKT punya berkas .docx sendiri (beda file dari Magang biasa), jadi labelnya diatur
+        terpisah di sini — tidak berbagi teks dengan Dokumen Magang di atas.
+      </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {MKT_DOKUMEN.map((d) => (
+          <KontenDokumenCard
+            key={d.key}
+            d={d}
+            override={overrideDokumen[d.key]}
+            onSimpan={(patch) => simpanDokumen(d.key, patch)}
+            onReset={() => resetDokumen(d.key)}
+          />
+        ))}
+      </div>
+
       <div className="sched-title" style={{ marginTop: 24 }}>Dokumen yang perlu disiapkan (per kegiatan)</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {Object.keys(BERKAS_SYARAT).map((ev) => (
@@ -82,14 +99,22 @@ function KontenDokumenCard({ d, override, onSimpan, onReset }) {
   const [expanded, setExpanded] = useState(false);
   const [label, setLabel] = useState(override?.label || d.label);
   const [syarat, setSyarat] = useState(override?.syarat || d.syarat);
+  const [linkEksternal, setLinkEksternal] = useState(override?.linkEksternal || d.linkEksternal || '');
+  const [linkLabel, setLinkLabel] = useState(override?.linkLabel || d.linkLabel || '');
   const overridden = !!override;
 
   function simpan() {
-    onSimpan({ label: label.trim() || d.label, syarat: syarat.trim() || d.syarat });
+    onSimpan({
+      label: label.trim() || d.label,
+      syarat: syarat.trim() || d.syarat,
+      ...(d.linkConfigurable ? { linkEksternal: linkEksternal.trim(), linkLabel: linkLabel.trim() || d.linkLabel } : {}),
+    });
   }
   function reset() {
     setLabel(d.label);
     setSyarat(d.syarat);
+    setLinkEksternal(d.linkEksternal || '');
+    setLinkLabel(d.linkLabel || '');
     onReset();
   }
 
@@ -105,6 +130,12 @@ function KontenDokumenCard({ d, override, onSimpan, onReset }) {
         <div className="form-grid" style={{ marginTop: 10 }}>
           <Field label="Label" full><input value={label} onChange={(e) => setLabel(e.target.value)} /></Field>
           <Field label="Syarat / hint" full><textarea rows={2} value={syarat} onChange={(e) => setSyarat(e.target.value)} /></Field>
+          {d.linkConfigurable && (
+            <>
+              <Field label="URL tautan" full><input value={linkEksternal} onChange={(e) => setLinkEksternal(e.target.value)} placeholder="https://..." /></Field>
+              <Field label="Label tombol" full><input value={linkLabel} onChange={(e) => setLinkLabel(e.target.value)} placeholder={d.linkLabel} /></Field>
+            </>
+          )}
           <div className="field-full" style={{ display: 'flex', gap: 8 }}>
             <button className="btn btn-primary" onClick={simpan}>Simpan</button>
             {overridden && <button className="btn ghost" onClick={reset}>Reset ke default</button>}

@@ -33,10 +33,10 @@ export function Portal({ nim, nama, email, mahasiswa, allDosen, periodeBuka = []
   async function uploadDokumenKP(m, key, file) {
     const hasil = await readFileForUpload(file, `${m.id}/${key}`);
     const field = dokumenFieldFor(programOf(m)) || 'dokumenKP';
-    const label = ((dokumenConfigFor(programOf(m)) || []).find((d) => d.key === key) || {}).label || key;
+    const label = ((dokumenConfigFor(programOf(m), m) || []).find((d) => d.key === key) || {}).label || key;
     let rec = { ...m, [field]: { ...(m[field] || {}), [key]: hasil } };
     rec = catatAktivitas(rec, 'unggah', label);
-    if (key === 'suratBalasan' && m.tahap === 'Pendaftaran') {
+    if (['suratBalasan', 'suratBalasanMagang', 'suratBalasanMkt'].includes(key) && m.tahap === 'Pendaftaran') {
       rec = { ...rec, tahap: 'Bimbingan' };
       rec = catatAktivitas(rec, 'tahapBimbingan');
     }
@@ -49,7 +49,7 @@ export function Portal({ nim, nama, email, mahasiswa, allDosen, periodeBuka = []
   function hapusDokumenKP(m, key) {
     const field = dokumenFieldFor(programOf(m)) || 'dokumenKP';
     if (!(m[field] || {})[key]) return;
-    const label = ((dokumenConfigFor(programOf(m)) || []).find((d) => d.key === key) || {}).label || key;
+    const label = ((dokumenConfigFor(programOf(m), m) || []).find((d) => d.key === key) || {}).label || key;
     const dokumen = { ...(m[field] || {}) };
     delete dokumen[key];
     let rec = { ...m, [field]: dokumen };

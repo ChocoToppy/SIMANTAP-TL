@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { todayISO, catatAktivitas, programOf, programLabel } from '../../utils/helpers.js';
+import { todayISO, catatAktivitas, programOf, programDisplayLabel } from '../../utils/helpers.js';
 import { generateDocument, getTemplateConfig } from '../../utils/documentGenerator.js';
 import { readFileForUpload } from '../../utils/fileUpload.js';
 import { Field, FileDropZone } from '../../components/ui.jsx';
@@ -14,7 +14,8 @@ export function FormPerpanjangan({ awal, allDosen = [], mode, onCancel, onSave }
   const [err, setErr] = useState('');
   const minta = mode === 'minta';
   async function unduhPerpanjanganKP() {
-    const config = getTemplateConfig('Perpanjangan KP', awal, dosenByKode, {});
+    const docType = programOf(awal) === 'KP' ? 'Perpanjangan KP' : 'Perpanjangan Magang';
+    const config = getTemplateConfig(docType, awal, dosenByKode, {});
     if (!config) return;
     setDlBusy(true);
     try {
@@ -49,16 +50,16 @@ export function FormPerpanjangan({ awal, allDosen = [], mode, onCancel, onSave }
   }
   return (
     <div className="portal-form card">
-      <h2 className="page-title">{minta ? `Ajukan perpanjangan ${programLabel(programOf(awal))}` : 'Unggah surat perpanjangan final'}</h2>
+      <h2 className="page-title">{minta ? `Ajukan perpanjangan ${programDisplayLabel(awal)}` : 'Unggah surat perpanjangan final'}</h2>
       <div className="form-grid">
         {minta ? (
           <Field label="Alasan perpanjangan" full><textarea rows={3} value={alasan} onChange={(e) => setAlasan(e.target.value)} placeholder="Jelaskan alasan & rencana penyelesaian" /></Field>
         ) : (
           <>
-            {programOf(awal) === 'KP' && pp.suratAdminTersedia && (
+            {['KP', 'MG'].includes(programOf(awal)) && pp.suratAdminTersedia && (
               <div className="callout field-full">
                 Surat dari admin sudah tersedia.{' '}
-                <button type="button" className="btn" onClick={unduhPerpanjanganKP} disabled={dlBusy}>{dlBusy ? 'Menyiapkan PDF…' : 'Unduh surat perpanjangan KP (PDF)'}</button>{' '}
+                <button type="button" className="btn" onClick={unduhPerpanjanganKP} disabled={dlBusy}>{dlBusy ? 'Menyiapkan PDF…' : `Unduh surat perpanjangan ${programDisplayLabel(awal)} (PDF)`}</button>{' '}
                 Unduh, tanda tangani, lalu unggah berkasnya di bawah.
               </div>
             )}

@@ -144,7 +144,13 @@ function KpDokumenItem({ d, m, jEv, dosenByKode, canUpload, role, onUpload, onDe
       {!d.eligible && <div className="hint" style={{ marginTop: 2 }}>{d.syarat}</div>}
       {d.catatan && <div className="hint" style={{ marginTop: 2 }}>{d.catatan}</div>}
 
-      {d.linkEksternal && role !== 'admin' && (
+      {d.linkButton && role !== 'admin' && (
+        d.linkEksternal
+          ? <a className="btn btn-primary" style={{ marginTop: 4 }} href={d.linkEksternal} target="_blank" rel="noreferrer">{d.linkLabel || 'Buka tautan'}</a>
+          : <span className="hint" style={{ marginTop: 4 }}>Belum tersedia</span>
+      )}
+
+      {!d.linkButton && d.linkEksternal && role !== 'admin' && (
       <div className="hint" style={{ marginTop: 4 }}>
        <a href={d.linkEksternal} target="_blank" rel="noreferrer">{d.linkLabel || d.linkEksternal}</a>
         </div>

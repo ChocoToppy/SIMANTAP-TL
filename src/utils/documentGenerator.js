@@ -1,7 +1,7 @@
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import { saveAs } from 'file-saver';
-import { formatTanggal, todayISO, tambahHari, bidangLabel } from './helpers.js';
+import { formatTanggal, todayISO, tambahHari, bidangLabel, jenisMagangOf } from './helpers.js';
 
 /**
  * Generates and downloads a .docx file based on a template and JSON data.
@@ -109,6 +109,12 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
   // Tanggal cetak: tanggal saat berkas ini dibangun (di-prefetch saat halaman
   // dimuat, atau saat tombol Unduh ditekan bila belum ada di cache).
   const tgl_cetak = formatTanggal(todayISO());
+  // Magang & Mata Kuliah Terapan (MKT) berbagi seluruh alur & docType, tapi
+  // masing-masing punya berkas .docx sendiri (mis. kelayakan-magang.docx vs
+  // kelayakan-mkt.docx) — pilih file yang tepat berdasarkan m.jenisMagang.
+  const mktMhs = jenisMagangOf(m) === 'MKT';
+  const magangTemplate = (magangPath, mktPath) => (mktMhs ? mktPath : magangPath);
+  const jenisLabel = mktMhs ? 'MKT' : 'Magang';
 
   switch (docType) {
     case 'Kelayakan KP':
@@ -125,17 +131,121 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
 
     case 'Kelayakan Magang':
       return {
-        template: 'Magang/kelayakan-magang.docx',
-        filename: `Kelayakan_Magang_${m.nama}.docx`,
+        template: magangTemplate('Magang/kelayakan-magang.docx', 'Magang/kelayakan-mkt.docx'),
+        filename: `Kelayakan_${jenisLabel}_${m.nama}.docx`,
         data: {
           nama_mhs: m.nama,
           nim: m.nim,
           nama_dosen_wali: wali.nama_dosen_wali,
-          // Nama tag ini ("nio", bukan "nip") sesuai berkas .docx apa adanya —
-          // lihat public/doc-templates/Magang/kelayakan-magang.docx.
-          nio_dosen_wali: wali.nip_dosen_wali,
+          nip_dosen_wali: wali.nip_dosen_wali,
         }
       };
+
+    case 'Kelayakan Proposal Magang': {
+      const sfx = mktMhs ? 'mkt' : 'magang';
+      return {
+        template: magangTemplate('Magang/kelayakan-proposal-magang.docx', 'Magang/kelayakan-proposal-mkt.docx'),
+        filename: `Kelayakan_Proposal_${jenisLabel}_${m.nama}.docx`,
+        data: {
+          nama_mhs: m.nama,
+          nim: m.nim,
+          [`tema_${sfx}`]: bidangLabel(m.bidang),
+          [`judul_${sfx}`]: m.judul,
+          // kelayakan-proposal-magang.docx pakai {judul_kp} (bawaan dari
+          // berkas KP, belum diganti) alih-alih {judul_magang} — kirim
+          // kedua-duanya supaya tetap terisi walau tag-nya belum dibetulkan.
+          judul_kp: m.judul,
+          tgl_cetak,
+        }
+      };
+    }
+
+    case 'ST Pembimbing Magang': {
+      const sfx = mktMhs ? 'mkt' : 'magang';
+      return {
+        template: magangTemplate('Magang/pembimbing-magang-st.docx', 'Magang/pembimbing-mkt-st.docx'),
+        filename: `ST_Pembimbing_${jenisLabel}_${m.nama}.docx`,
+        data: {
+          no_surat: m.nomorSurat || jEv.nomorST || "___/UN7.../2026",
+          nama_dosen1: d1.nama || m.pembimbing1,
+          nip1: d1.nip || "-",
+          nama_mhs: m.nama,
+          nim: m.nim,
+          [`judul_${sfx}`]: m.judul,
+          [`mulai_${sfx}`]: formatTanggal(m.tanggalMulai) || "-",
+          [`akhir_${sfx}`]: formatTanggal(m.batasAkhir) || "-",
+          tgl_cetak,
+          ...wali,
+        }
+      };
+    }
+
+    case 'Persetujuan Expo Magang': {
+      const sfx = mktMhs ? 'mkt' : 'magang';
+      return {
+        template: magangTemplate('Magang/persetujuan-expo-magang.docx', 'Magang/persetujuan-expo-mkt.docx'),
+        filename: `Persetujuan_SM_${jenisLabel}_${m.nama}.docx`,
+        data: {
+          nama_mhs: m.nama,
+          nim: m.nim,
+          [`judul_${sfx}`]: m.judul,
+          tgl_cetak,
+          nama_dosen1: d1.nama || m.pembimbing1,
+          nip1: d1.nip || "-",
+          ...wali,
+        }
+      };
+    }
+
+    case 'BA Expo Magang': {
+      // seminar-magang-ba.docx & seminar-mkt-ba.docx pakai nama tag beda
+      // untuk jadwalnya (hari_smmagang/... vs hari_smmkt/...) dan
+      // judul_magang vs judul_mkt — kirim keduanya sekaligus supaya
+      // masing-masing berkas dapat tag yang benar tanpa perlu 2 docType.
+      const evTag = mktMhs ? 'smmkt' : 'smmagang';
+      return {
+        template: magangTemplate('Magang/seminar-magang-ba.docx', 'Magang/seminar-mkt-ba.docx'),
+        filename: `BA_Expo_${jenisLabel}_${m.nama}.docx`,
+        data: {
+          no_surat: m.nomorSurat || jEv.nomorST || "___/UN7.../2026",
+          nama_mhs: m.nama,
+          nim: m.nim,
+          judul_magang: m.judul,
+          judul_mkt: m.judul,
+          [`hari_${evTag}`]: jEv.hari || "-",
+          [`tanggal_${evTag}`]: formatTanggal(jEv.tanggal) || "-",
+          [`tgl_${evTag}`]: formatTanggal(jEv.tanggal) || "-",
+          [`waktu_${evTag}`]: `${jEv.jamMulai || '-'} s.d ${jEv.jamSelesai || '-'}`,
+          [`tempat_${evTag}`]: jEv.ruang || "-",
+          tgl_cetak,
+          nama_dosen1: d1.nama || m.pembimbing1,
+          nip1: d1.nip || "-",
+          ...wali,
+        }
+      };
+    }
+
+    case 'Perpanjangan Magang': {
+      const sfx = mktMhs ? 'mkt' : 'magang';
+      return {
+        template: magangTemplate('Magang/perpanjangan-magang.docx', 'Magang/perpanjangan-mkt.docx'),
+        filename: `Perpanjangan_${jenisLabel}_${m.nama}.docx`,
+        data: {
+          no_surat: m.nomorSurat || jEv.nomorST || "___/UN7.../2026",
+          nama_mhs: m.nama,
+          nim: m.nim,
+          [`judul_${sfx}`]: m.judul,
+          [`mulai_${sfx}`]: formatTanggal(m.tanggalMulai) || "-",
+          [`akhir_${sfx}`]: formatTanggal(m.batasAkhir) || "-",
+          [`mulai_pp${sfx}`]: formatTanggal(m.batasAkhir) || "-",
+          [`akhir_pp${sfx}`]: formatTanggal(tambahHari(m.batasAkhir, 30)) || "-",
+          tgl_cetak,
+          nama_dosen1: d1.nama || m.pembimbing1,
+          nip1: d1.nip || "-",
+          ...wali,
+        }
+      };
+    }
 
     case 'Kelayakan Proposal KP':
       return {

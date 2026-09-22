@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { buatId, todayISO, tambahHari, punyaSyarat, punyaKlasifikasi, catatAktivitas, KP_TEMA, KLASIFIKASI, BIDANG, programLabel, dosenAktifUntuk } from '../../utils/helpers.js';
+import { buatId, todayISO, tambahHari, punyaSyarat, punyaKlasifikasi, catatAktivitas, KP_TEMA, KLASIFIKASI, BIDANG, programLabel, dosenAktifUntuk, judulLabelFor } from '../../utils/helpers.js';
 import { Field } from '../../components/ui.jsx';
 import { PROGRAM_KEYS_PENDAFTARAN } from './shared.js';
 
@@ -43,13 +43,14 @@ export function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], a
       const kpKode = KP_TEMA.some((t) => t.kode === prev.bidang);
       if (kpStyle && !kpKode) next.bidang = KP_TEMA[0].kode;
       if (!kpStyle && kpKode) next.bidang = BIDANG[0].kode;
+      if (prog === 'MG' && !next.jenisMagang) next.jenisMagang = 'Magang';
       return next;
     });
   }
 
   function submit() {
     if (!(m.nama || '').trim()) { setErr('Nama wajib diisi.'); return; }
-    if (!m.judul.trim()) { setErr('Judul wajib diisi.'); return; }
+    if (!m.judul.trim()) { setErr(`${judulLabelFor(m)} wajib diisi.`); return; }
     if (!m.periode) { setErr('Pilih periode pendaftaran terlebih dahulu.'); return; }
     setErr('');
     const rec = { ...m, angkatan: Number(m.angkatan) || m.angkatan, verifikasi: 'baru' };
@@ -65,6 +66,14 @@ export function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], a
             {programOpsi.map((k) => <option key={k} value={k}>{programLabel(k)}</option>)}
           </select>
         </Field>
+        {m.program === 'MG' && (
+          <Field label="Jenis">
+            <select value={m.jenisMagang || 'Magang'} onChange={(e) => set('jenisMagang', e.target.value)}>
+              <option value="Magang">Magang</option>
+              <option value="MKT">Mata Kuliah Terapan</option>
+            </select>
+          </Field>
+        )}
         <Field label="Periode">
           <select value={m.periode} onChange={(e) => set('periode', e.target.value)} disabled={belumAdaPeriode}>
             <option value="">— pilih periode —</option>
@@ -78,7 +87,7 @@ export function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], a
             {angkatanOpsi.map((a) => <option key={a} value={a}>{a}</option>)}
           </select>
         </Field>
-        <Field label={isKPStyle ? (isKP ? 'Judul Kerja Praktik (sementara)' : 'Judul Magang (sementara)') : 'Judul'} full>
+        <Field label={isKPStyle ? judulLabelFor(m, { sementara: true }) : 'Judul'} full>
           <textarea rows={2} value={m.judul} onChange={(e) => set('judul', e.target.value)} placeholder="Jangan pakai huruf kapital semua" />
         </Field>
         <Field label="Dosen Wali">
