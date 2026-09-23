@@ -70,11 +70,10 @@ export function programDisplayLabel(m) {
   if (programOf(m) === 'MG' && jenisMagangOf(m) === 'MKT') return 'MKT';
   return programLabel(programOf(m));
 }
-export function judulLabelFor(m, opts = {}) {
-  const { sementara = false } = opts;
+export function judulLabelFor(m) {
   if (programOf(m) === 'MG' && jenisMagangOf(m) === 'MKT') return 'Nama Mata Kuliah';
-  if (programOf(m) === 'KP') return sementara ? 'Judul Kerja Praktik (sementara)' : 'Judul';
-  if (programOf(m) === 'MG') return sementara ? 'Judul Magang (sementara)' : 'Judul';
+  if (programOf(m) === 'KP') return 'Judul Kerja Praktik';
+  if (programOf(m) === 'MG') return 'Judul Magang';
   return 'Judul';
 }
 export function stagesFor(program) { return (PROGRAMS[program] || PROGRAMS.TA).stages; }
@@ -1084,6 +1083,64 @@ export const AKTIVITAS_LABEL = {
   perpanjanganFinal: 'Mengunggah surat perpanjangan final',
 };
 
+// Warna & ikon per tipe aktivitas, dipakai RiwayatAktivitas untuk kartu berwarna.
+export const AKTIVITAS_WARNA = {
+  dibuat: 'gray',
+  daftar: 'green',
+  perbaikan: 'amber',
+  jadwal: 'blue',
+  unggah: 'violet',
+  hapusBerkas: 'red',
+  tahapBimbingan: 'green',
+  perpanjanganMinta: 'amber',
+  perpanjanganFinal: 'green',
+};
+// Versi singkat AKTIVITAS_LABEL, dipakai sebagai teks badge di kolom Aktivitas
+// tabel (ruang sempit — label lengkap seperti "Perbaikan pendaftaran dikirim
+// ulang" tidak muat).
+export const AKTIVITAS_LABEL_SINGKAT = {
+  dibuat: 'Dibuat admin',
+  daftar: 'Daftar',
+  perbaikan: 'Perbaikan',
+  jadwal: 'Jadwal',
+  unggah: 'Unggah',
+  hapusBerkas: 'Hapus berkas',
+  tahapBimbingan: 'Bimbingan',
+  perpanjanganMinta: 'Perpanjangan',
+  perpanjanganFinal: 'Perpanjangan final',
+};
+
+// Field pendaftaran yang bisa diedit mahasiswa saat mengirim ulang (perbaikan) —
+// dipakai ringkasPerubahanPendaftaran untuk menyebut field mana saja yang berubah,
+// alih-alih cuma mencatat "diedit" tanpa detail.
+const FIELD_LABEL_PENDAFTARAN = {
+  periode: 'Periode', nama: 'Nama', angkatan: 'Angkatan', dosenWali: 'Dosen Wali',
+  klasifikasi: 'Klasifikasi', bidang: 'Topik/Bidang', tanggalMulai: 'Tanggal mulai', batasAkhir: 'Tanggal berakhir',
+};
+const FIELD_LABEL_DETAIL_PENDAFTARAN = {
+  semester: 'Semester', sksIpk: 'Jumlah SKS/IPK', tempatKP: 'Tempat/Perusahaan', instansi: 'Instansi',
+  alamatWA: 'Alamat', nomorWA: 'Nomor WA', berkasLink: 'Link berkas', ipk: 'IPK',
+  statusKP: 'Status Kerja Praktik', terdaftarKRS: 'Status KRS', sudahUGB: 'Status UGB/proposal',
+  namaPersetujuanDosen: 'Persetujuan dosen',
+};
+
+// Bandingkan data pendaftaran lama vs baru, kembalikan daftar label field yang
+// berubah (mis. ['Judul', 'Nomor WA']) — dipakai sebagai catatan riwayat aktivitas
+// saat mahasiswa mengirim ulang pendaftaran, supaya admin tahu persis apa yang diedit.
+export function ringkasPerubahanPendaftaran(lama, baru) {
+  const berubah = [];
+  if ((lama.judul || '') !== (baru.judul || '')) berubah.push(judulLabelFor(baru));
+  for (const [key, label] of Object.entries(FIELD_LABEL_PENDAFTARAN)) {
+    if ((lama[key] ?? '') !== (baru[key] ?? '')) berubah.push(label);
+  }
+  const pLama = lama.pendaftaran || {};
+  const pBaru = baru.pendaftaran || {};
+  for (const [key, label] of Object.entries(FIELD_LABEL_DETAIL_PENDAFTARAN)) {
+    if ((pLama[key] ?? '') !== (pBaru[key] ?? '')) berubah.push(label);
+  }
+  return berubah;
+}
+
 export function nowStamp() { return new Date().toISOString(); }
 
 // Format tanggal+jam dari timestamp ISO lengkap (beda dari formatTanggal yang
@@ -1101,6 +1158,16 @@ export function formatWaktu(iso) {
   if (isNaN(d.getTime())) return '-';
   const jam = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   return `${d.getDate()} ${BULAN[d.getMonth()]} ${d.getFullYear()} · ${jam}`;
+}
+
+// Format tanggal ringkas dd-mm-yyyy tanpa jam — dipakai di kolom Aktivitas tabel
+// (ruang sempit & bisa diresize pengguna), beda dari formatWaktu yang panjang.
+export function formatTanggalSingkat(iso) {
+  if (!iso) return '-';
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? parseISO(iso) : new Date(iso);
+  if (!d || isNaN(d.getTime())) return '-';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()}`;
 }
 
 // Tambahkan satu entri riwayat aktivitas (immutable) — panggil sebelum onSave

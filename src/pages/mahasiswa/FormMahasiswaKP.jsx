@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { PROGRAM_KEYS, programLabel, programDisplayLabel, BIDANG, ringkasPendaftaran, normalizeUrl, formatTanggal, judulLabelFor } from '../../utils/helpers.js';
-import { Field, Modal } from '../../components/ui.jsx';
+import { Field, Modal, MessageIcon } from '../../components/ui.jsx';
 import { KpDocumentPanel } from '../../components/kpDocuments.jsx';
 import { RiwayatAktivitas } from './AktivitasCells.jsx';
 
@@ -19,79 +19,144 @@ export function FormMahasiswaKP({
   setPP, unduhPerpanjanganKP, dlBusyKP,
   baru, onCancel, submit,
 }) {
+  // "Halaman" di dalam modal — 'utama' (tab tahap, dokumen, dst) atau 'data'
+  // (form identitas/penugasan Program..Batas akhir, dibuka lewat tombol "Edit
+  // data pendaftaran"). Mahasiswa baru selalu tampil satu halaman penuh (semua
+  // field wajib langsung terlihat, belum ada apa-apa untuk disembunyikan).
+  const [page, setPage] = useState('utama');
+  // Catatan/pesan untuk mahasiswa disembunyikan default — cuma dibuka lewat
+  // tombol ikon pesan di ringkasan identitas.
+  const [catatanOpen, setCatatanOpen] = useState(false);
+  // Di halaman "data", X / klik-luar / tombol kiri footer HARUS cuma kembali ke
+  // halaman utama (bukan batalkan seluruh edit) — keduanya menulis ke `m` yang
+  // sama, jadi tidak ada apa pun yang perlu "dibatalkan" saat pindah halaman.
+  const kembaliAtauBatal = page === 'data' ? () => setPage('utama') : onCancel;
+  const judul = baru ? 'Tambah mahasiswa' : (page === 'data' ? (
+    <span className="modal-breadcrumb">
+      <button type="button" className="modal-breadcrumb-link" onClick={() => setPage('utama')}>Edit mahasiswa</button>
+      <span className="modal-breadcrumb-sep">›</span>
+      <span className="modal-breadcrumb-current">Edit data pendaftaran</span>
+    </span>
+  ) : 'Edit mahasiswa');
   return (
     <Modal
-      title={baru ? 'Tambah mahasiswa' : 'Edit mahasiswa'}
-      onClose={onCancel}
+      title={judul}
+      onClose={kembaliAtauBatal}
       wide
       footer={
         <>
-          <button className="btn" onClick={onCancel}>Batal</button>
+          <button className="btn" onClick={kembaliAtauBatal}>{page === 'data' ? 'Kembali' : 'Batal'}</button>
           <button className="btn btn-primary" onClick={submit}>Simpan</button>
         </>
       }
     >
-      <div className="form-grid">
-        {!baru && <RiwayatAktivitas m={m} />}
+      {!baru && page === 'utama' && (
+        <div className="mhs-edit-top">
+          <RiwayatAktivitas m={m} />
+          {alurTahapBlok}
+        </div>
+      )}
 
-        <Field label="Program">
-          <select value={m.program} onChange={(e) => gantiProgram(e.target.value)}>
-            {PROGRAM_KEYS.map((pr) => <option key={pr} value={pr}>{programLabel(pr)}</option>)}
-          </select>
-        </Field>
-        {m.program === 'MG' && (
-          <Field label="Jenis">
-            <select value={m.jenisMagang || 'Magang'} onChange={(e) => set('jenisMagang', e.target.value)}>
-              <option value="Magang">Magang</option>
-              <option value="MKT">Mata Kuliah Terapan</option>
+      {(baru || page === 'data') && (
+      <>
+        <div className="form-grid" style={{ marginTop: baru ? 0 : 16 }}>
+          <Field label="Program">
+            <select value={m.program} onChange={(e) => gantiProgram(e.target.value)}>
+              {PROGRAM_KEYS.map((pr) => <option key={pr} value={pr}>{programLabel(pr)}</option>)}
             </select>
           </Field>
+          {m.program === 'MG' && (
+            <Field label="Jenis">
+              <select value={m.jenisMagang || 'Magang'} onChange={(e) => set('jenisMagang', e.target.value)}>
+                <option value="Magang">Magang</option>
+                <option value="MKT">Mata Kuliah Terapan</option>
+              </select>
+            </Field>
+          )}
+          <Field label="Periode">
+            <input value={m.periode} onChange={(e) => set('periode', e.target.value)} placeholder="mis. 2021 Ganjil" list="periode-list" />
+            <datalist id="periode-list">
+              {periodeList.map((pr) => <option key={pr} value={pr} />)}
+            </datalist>
+          </Field>
+
+          <Field label="Nama" full><input value={m.nama} onChange={(e) => set('nama', e.target.value)} /></Field>
+          <Field label="NIM"><input value={m.nim} onChange={(e) => set('nim', e.target.value)} /></Field>
+          <Field label="Angkatan">
+            <input value={m.angkatan} onChange={(e) => set('angkatan', e.target.value)} placeholder="mis. 2024" list="angkatan-list" />
+            <datalist id="angkatan-list">
+              {daftarAngkatan.map((a) => <option key={a} value={a} />)}
+            </datalist>
+          </Field>
+          <Field label={judulLabelFor(m)} full><textarea rows={2} value={m.judul} onChange={(e) => set('judul', e.target.value)} /></Field>
+          <Field label="Bidang">
+            <select value={m.bidang} onChange={(e) => set('bidang', e.target.value)}>
+              {BIDANG.map((b) => <option key={b.kode} value={b.kode}>{b.label}</option>)}
+            </select>
+          </Field>
+
+          <Field label={pembimbing1Label}><select value={m.pembimbing1} onChange={(e) => set('pembimbing1', e.target.value)}>{dosenOpts}</select></Field>
+          {roles.pembimbing >= 2 && (
+            <Field label="Pembimbing 2"><select value={m.pembimbing2} onChange={(e) => set('pembimbing2', e.target.value)}>{dosenOpts}</select></Field>
+          )}
+          {roles.penguji >= 1 && (
+            <Field label={penguji1Label}><select value={m.penguji1} onChange={(e) => set('penguji1', e.target.value)}>{dosenOpts}</select></Field>
+          )}
+          {roles.penguji >= 2 && (
+            <Field label="Penguji 2"><select value={m.penguji2} onChange={(e) => set('penguji2', e.target.value)}>{dosenOpts}</select></Field>
+          )}
+          <Field label="Dosen Wali"><select value={m.dosenWali || ''} onChange={(e) => set('dosenWali', e.target.value)}>{dosenOpts}</select></Field>
+
+          <Field label="Tahap saat ini">
+            <select value={m.tahap} onChange={(e) => setTahap(e.target.value)}>
+              {stages.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </Field>
+          <Field label="Tanggal mulai"><input type="date" value={m.tanggalMulai} onChange={(e) => set('tanggalMulai', e.target.value)} /></Field>
+          <Field label="Batas akhir"><input type="date" value={m.batasAkhir} onChange={(e) => set('batasAkhir', e.target.value)} /></Field>
+        </div>
+      </>
+      )}
+
+      {page === 'utama' && (
+      <>
+      <div className="form-grid" style={{ marginTop: 20 }}>
+        {baru && alurTahapBlok}
+      </div>
+
+      <div className="mhs-edit-identity">
+        {!baru && (
+          <div className="mhs-edit-identity-info">
+            <div>
+              <span className="field-label">Nama</span>
+              <div className="cell-name">{m.nama}</div>
+            </div>
+            <div>
+              <span className="field-label">NIM</span>
+              <div>{m.nim}</div>
+            </div>
+            <div className="mhs-edit-identity-judul">
+              <span className="field-label">{judulLabelFor(m)}</span>
+              <div>{m.judul || <span className="muted">—</span>}</div>
+            </div>
+          </div>
         )}
-        <Field label="Periode">
-          <input value={m.periode} onChange={(e) => set('periode', e.target.value)} placeholder="mis. 2021 Ganjil" list="periode-list" />
-          <datalist id="periode-list">
-            {periodeList.map((pr) => <option key={pr} value={pr} />)}
-          </datalist>
-        </Field>
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={() => setCatatanOpen((v) => !v)}
+          aria-label="Catatan/pesan untuk mahasiswa"
+          title="Catatan/pesan untuk mahasiswa"
+        ><MessageIcon /></button>
+      </div>
 
-        <Field label="Nama" full><input value={m.nama} onChange={(e) => set('nama', e.target.value)} /></Field>
-        <Field label="NIM"><input value={m.nim} onChange={(e) => set('nim', e.target.value)} /></Field>
-        <Field label="Angkatan">
-          <input value={m.angkatan} onChange={(e) => set('angkatan', e.target.value)} placeholder="mis. 2024" list="angkatan-list" />
-          <datalist id="angkatan-list">
-            {daftarAngkatan.map((a) => <option key={a} value={a} />)}
-          </datalist>
-        </Field>
-        <Field label={judulLabelFor(m)} full><textarea rows={2} value={m.judul} onChange={(e) => set('judul', e.target.value)} /></Field>
-        <Field label="Bidang">
-          <select value={m.bidang} onChange={(e) => set('bidang', e.target.value)}>
-            {BIDANG.map((b) => <option key={b.kode} value={b.kode}>{b.label}</option>)}
-          </select>
-        </Field>
+      {catatanOpen && (
+        <div className="form-grid" style={{ marginTop: 12 }}>
+          <Field label="Catatan / pesan untuk mahasiswa" full><textarea rows={2} value={m.catatan} onChange={(e) => set('catatan', e.target.value)} /></Field>
+        </div>
+      )}
 
-        <Field label={pembimbing1Label}><select value={m.pembimbing1} onChange={(e) => set('pembimbing1', e.target.value)}>{dosenOpts}</select></Field>
-        {roles.pembimbing >= 2 && (
-          <Field label="Pembimbing 2"><select value={m.pembimbing2} onChange={(e) => set('pembimbing2', e.target.value)}>{dosenOpts}</select></Field>
-        )}
-        {roles.penguji >= 1 && (
-          <Field label={penguji1Label}><select value={m.penguji1} onChange={(e) => set('penguji1', e.target.value)}>{dosenOpts}</select></Field>
-        )}
-        {roles.penguji >= 2 && (
-          <Field label="Penguji 2"><select value={m.penguji2} onChange={(e) => set('penguji2', e.target.value)}>{dosenOpts}</select></Field>
-        )}
-        <Field label="Dosen Wali"><select value={m.dosenWali || ''} onChange={(e) => set('dosenWali', e.target.value)}>{dosenOpts}</select></Field>
-
-        <Field label="Tahap saat ini">
-          <select value={m.tahap} onChange={(e) => setTahap(e.target.value)}>
-            {stages.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-        </Field>
-        <Field label="Tanggal mulai"><input type="date" value={m.tanggalMulai} onChange={(e) => set('tanggalMulai', e.target.value)} /></Field>
-        <Field label="Batas akhir"><input type="date" value={m.batasAkhir} onChange={(e) => set('batasAkhir', e.target.value)} /></Field>
-
-        {alurTahapBlok}
-
-        <Field label="Catatan / pesan untuk mahasiswa" full><textarea rows={2} value={m.catatan} onChange={(e) => set('catatan', e.target.value)} /></Field>
+      <div className="form-grid" style={{ marginTop: 12 }}>
         <label className="check field-full">
           <input type="checkbox" checked={!!m.dibatalkan} onChange={(e) => set('dibatalkan', e.target.checked)} />
           <span>Dibatalkan (tidak dihitung sebagai aktif &amp; beban dosen)</span>
@@ -127,6 +192,12 @@ export function FormMahasiswaKP({
                     <option value="perbaikan">Perlu perbaikan</option>
                   </select>
                 </Field>
+                {!baru && (
+                  <div className="field">
+                    <span className="field-label" style={{ visibility: 'hidden' }}>_</span>
+                    <button type="button" className="btn" onClick={() => setPage('data')}>Edit data pendaftaran</button>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -154,14 +225,16 @@ export function FormMahasiswaKP({
               <div className="sched-title">Kelulusan</div>
               <div className="sched-grid">
                 <Field label="Tanggal lulus"><input type="date" value={m.tanggalLulus || ''} onChange={(e) => set('tanggalLulus', e.target.value)} /></Field>
-                <Field label="Nilai angka (admin, tidak terlihat mahasiswa)">
+                <Field label="Nilai angka">
                   <input type="number" min="0" max="100" value={(m.nilaiAkhir || {}).angka || ''} onChange={(e) => setM((prev) => ({ ...prev, nilaiAkhir: { ...(prev.nilaiAkhir || {}), angka: e.target.value } }))} />
+                  <div className="hint" style={{ marginTop: 4 }}>Nilai tidak terlihat mahasiswa</div>
                 </Field>
-                <Field label="Nilai huruf (admin, tidak terlihat mahasiswa)">
+                <Field label="Nilai huruf">
                   <select value={(m.nilaiAkhir || {}).huruf || ''} onChange={(e) => setM((prev) => ({ ...prev, nilaiAkhir: { ...(prev.nilaiAkhir || {}), huruf: e.target.value } }))}>
                     <option value="">—</option>
                     {['A', 'AB', 'B', 'BC', 'C', 'D', 'E'].map((h) => <option key={h} value={h}>{h}</option>)}
                   </select>
+                  <div className="hint" style={{ marginTop: 4 }}>Nilai tidak terlihat mahasiswa</div>
                 </Field>
               </div>
               {m.tahap === 'Lulus'
@@ -198,6 +271,8 @@ export function FormMahasiswaKP({
         {notifikasiBlok}
         {peringatanBlok}
       </div>
+      </>
+      )}
     </Modal>
   );
 }

@@ -10,7 +10,7 @@ import { PanduanPage } from './pages/PanduanPage.jsx';
 import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, stagesFor, eventsFor, punyaKlasifikasi, punyaSyarat, rolesFor, syaratLabel, getJadwal, STAGES, KLASIFIKASI, BIDANG, KP_TEMA, HARI, bidangLabel, todayISO, parseISO, daysBetween, BULAN, formatTanggal, kondisi, isAktif, indexTahap, hitungBeban, hitungBebanProgram, hitungBebanRinci, SEMUA, filterByPeriode, daftarPeriode, PERIODE_AKTIF, TOPIK, VERIFIKASI, statusVerif, tambahHari, LABEL_PENDAFTARAN, ringkasPendaftaran, RUANG, menitJam, rentangJadwal, jamTampil, beririsan, dosenTerlibat, kumpulkanEvent, cariBentrok, pesanNotifikasi, waLink, mailtoLink, waMahasiswa, TEMPLATE_SURAT, tokenSurat, renderSurat, PEJABAT, KOP_SURAT, evKeyDok, dokTA, DURASI_EVENT, JAM_KERJA, durasiEvent, jamTambah, dalamJamKerja, tahapBerikut, eventAktif, BERKAS_SYARAT, berkasSyarat, bolehAjukanJadwal, orphanedUploadPaths } from './utils/helpers.js';
 import { deleteUploadedFile, deleteUploadedFolder } from './utils/fileUpload.js';
 import { DOSEN_AWAL, plusHari, RAW_MAHASISWA, MAHASISWA_AWAL, AKUN_AWAL, PERIODE_BUKA_AWAL, PENGUMUMAN_AWAL, PERIODE_AKTIF_AWAL, PANDUAN_AWAL } from './data/seed.js';
-import { Badge, StageBar, ExportMenu, TextSizeToggle, ThemeToggle, RolePill, TabIcon, Muat, PasswordField } from './components/ui.jsx';
+import { Badge, StageBar, ExportMenu, TextSizeToggle, ThemeToggle, RolePill, TabIcon, LogoutIcon, Dropdown, Muat, PasswordField } from './components/ui.jsx';
 import { db, auth } from './utils/firebase.js';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, query, where } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -489,15 +489,17 @@ export default function App() {
     return (
       <div className="app">
         <header className="topbar">
-          <button className="btn btn-logout btn-sm" onClick={keluar}>Logout</button>
+          <div className="topbar-left">
+            <button className="btn btn-logout btn-sm" onClick={keluar}>Logout</button>
+            <RolePill peran="admin" nama={profilAdmin.nama} />
+          </div>
           <div className="brand">
             <img className="brand-mark" src={logoTl} alt="TL Undip" />
             <span className="brand-name">SIMANTAP</span>
           </div>
           <div className="topbar-right">
-            <ThemeToggle />
+            <ThemeToggle square />
             <TextSizeToggle />
-            <RolePill peran="admin" nama={profilAdmin.nama} />
             <button className="btn ghost" onClick={() => navigate('/')}>← Kembali</button>
           </div>
         </header>
@@ -546,51 +548,58 @@ export default function App() {
   ];
 
   return (
-    <div className="app">
-      <header className="topbar">
-        <button className="btn btn-logout btn-sm" onClick={keluar}>Logout</button>
-        <div className="brand">
+    <div className="app-root">
+      <nav className="sidebar">
+        <div className="sidebar-brand">
           <img className="brand-mark" src={logoTl} alt="TL Undip" />
           <span className="brand-name">SIMANTAP</span>
         </div>
-        <div className="topbar-right">
-          <ThemeToggle />
-          <TextSizeToggle />
-          <label className="periode-pick">
-            <span>Periode</span>
-            <select value={periode} onChange={(e) => setPeriode(e.target.value)}>
-              {periodeList.map((pp) => <option key={pp} value={pp}>{pp}</option>)}
-              <option value={SEMUA}>Semua periode</option>
-            </select>
-          </label>
-          <button className="icon-btn" onClick={() => navigate('/pengaturan')} title="Pengaturan" aria-label="Pengaturan">
-            <img src={gearIcon} alt="" width={20} height={20} className="gear-icon" />
-          </button>
-          <RolePill peran="admin" nama={profilAdmin.nama} />
-        </div>
-      </header>
-      <div className="masthead-rule" />
-
-      <nav className="tabs">
         {TABS.map((t) => (
-          <button key={t.key} className={'tab' + (tab === t.key ? ' active' : '')} onClick={() => setTab(t.key)}>
+          <button key={t.key} className={'sidebar-item' + (tab === t.key ? ' active' : '')} onClick={() => setTab(t.key)} title={t.label}>
             <TabIcon tabKey={t.key} />
-            <span className="tab-label">{t.label}</span>
+            <span>{t.label}</span>
           </button>
         ))}
+        <button type="button" className="sidebar-item sidebar-logout" onClick={keluar} title="Logout">
+          <LogoutIcon className="tab-icon" />
+          <span>Logout</span>
+        </button>
       </nav>
 
-      <main className="content">
-        {tab === 'dashboard' && <Dashboard mahasiswa={mhsPeriode} dosen={data.dosen} />}
-        {tab === 'mahasiswa' && (
-          <Mahasiswa mahasiswa={mhsPeriode} allMahasiswa={data.mahasiswa} allDosen={data.dosen} periode={periode} periodeList={periodeList} daftarAngkatan={daftarAngkatan} konten={data.konten || {}} onSave={simpanMahasiswa} onDelete={hapusMahasiswa} />
-        )}
-        {tab === 'dosen' && (
-          <Dosen dosen={data.dosen} mahasiswa={mhsPeriode} periodeLabel={periode === SEMUA ? 'semua periode' : periode} onSave={simpanDosen} onDelete={hapusDosen} />
-        )}
-      </main>
+      <div className="app-main">
+        <header className="topbar">
+          <div className="topbar-left">
+            <RolePill peran="admin" nama={profilAdmin.nama} />
+          </div>
+          <div className="topbar-right">
+            <ThemeToggle square />
+            <TextSizeToggle />
+            <Dropdown
+              className="periode-pick"
+              value={periode}
+              onChange={setPeriode}
+              ariaLabel="Periode"
+              options={[...periodeList.map((pp) => ({ value: pp, label: pp })), { value: SEMUA, label: 'Semua periode' }]}
+            />
+            <button className="icon-btn" onClick={() => navigate('/pengaturan')} title="Pengaturan" aria-label="Pengaturan">
+              <img src={gearIcon} alt="" width={20} height={20} className="gear-icon" />
+            </button>
+          </div>
+        </header>
+        <div className="masthead-rule" />
 
-      <footer className="foot">SIMANTAP © 2026 Universitas Diponegoro</footer>
+        <main className="content">
+          {tab === 'dashboard' && <Dashboard mahasiswa={mhsPeriode} dosen={data.dosen} />}
+          {tab === 'mahasiswa' && (
+            <Mahasiswa mahasiswa={mhsPeriode} allMahasiswa={data.mahasiswa} allDosen={data.dosen} periode={periode} periodeList={periodeList} daftarAngkatan={daftarAngkatan} konten={data.konten || {}} onSave={simpanMahasiswa} onDelete={hapusMahasiswa} />
+          )}
+          {tab === 'dosen' && (
+            <Dosen dosen={data.dosen} mahasiswa={mhsPeriode} periodeLabel={periode === SEMUA ? 'semua periode' : periode} onSave={simpanDosen} onDelete={hapusDosen} />
+          )}
+        </main>
+
+        <footer className="foot">SIMANTAP © 2026 Universitas Diponegoro</footer>
+      </div>
     </div>
   );
 }

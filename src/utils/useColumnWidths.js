@@ -52,10 +52,11 @@ export function useColumnWidths(storageKey, columns, containerRef) {
     const startX = e.clientX;
     const startWidth = widths[index];
 
+    const minWidth = columns[index].minWidth || MIN_COL_WIDTH;
     function onMove(ev) {
       setWidths((cur) => {
         const proposed = startWidth + (ev.clientX - startX);
-        const clamped = Math.min(Math.max(MIN_COL_WIDTH, proposed), MAX_COL_WIDTH);
+        const clamped = Math.min(Math.max(minWidth, proposed), MAX_COL_WIDTH);
         const copy = cur.slice();
         copy[index] = clamped;
         return copy;

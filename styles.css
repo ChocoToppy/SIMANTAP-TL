@@ -93,12 +93,19 @@ html[data-theme="dark"] {
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; }
 
+/* ---------- Scrollbar (aksen hijau, berlaku di seluruh aplikasi) ---------- */
+html { scrollbar-width: thin; scrollbar-color: var(--accent) transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 4px; }
+*::-webkit-scrollbar-thumb:hover { background: var(--accent-hover); }
+
 /* ---------- Ukuran teks (aksesibilitas) ---------- */
 html.text-sm { font-size: 87.5%; }
 html.text-md { font-size: 100%; }
 html.text-lg { font-size: 112.5%; }
 
-.text-size-toggle { display: inline-flex; align-items: center; gap: 2px; background: transparent; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 3px; }
+.text-size-toggle { display: inline-flex; align-items: center; gap: 2px; background: transparent; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 3px; height: 36px; box-sizing: border-box; }
 .text-size-toggle button {
   background: none; border: none; cursor: pointer; color: var(--muted); font-weight: 700; font-family: var(--font-heading);
   border-radius: 1px; padding: 5px 9px; line-height: 1; transition: all 0.15s ease;
@@ -134,6 +141,7 @@ h1, h2, h3, h4, h5, h6, .brand-name {
   display: flex; align-items: center; justify-content: space-between;
   gap: 12px; flex-wrap: wrap; padding: 20px 0 0;
 }
+.topbar-left { display: flex; align-items: center; gap: 10px; }
 .brand { display: flex; align-items: center; gap: 12px; }
 .brand-mark {
   width: 44px; height: 44px; object-fit: contain; display: block; flex: none;
@@ -141,8 +149,7 @@ h1, h2, h3, h4, h5, h6, .brand-name {
 .brand-name { font-size: 1.25rem; font-weight: 600; letter-spacing: -0.02em; }
 .brand-name::after { content: '-TL'; color: var(--accent); }
 .topbar-right { display: flex; align-items: center; gap: 10px; }
-.periode-pick { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--muted); font-weight: 500; }
-.periode-pick select { min-width: 160px; }
+.periode-pick { min-width: 160px; width: auto; }
 
 .masthead-rule { height: 3px; background: var(--text); margin: 14px 0 0; }
 .masthead-rule + .tabs, .masthead-rule + .toolbar { margin-top: 0; }
@@ -171,7 +178,77 @@ h1, h2, h3, h4, h5, h6, .brand-name {
 .program-tab:hover { color: var(--text); border-color: var(--accent); }
 .program-tab.active { background: var(--accent); border-color: var(--accent); color: #f5f5f2; }
 
+/* ---------- Sidebar (nav utama admin: Dashboard/Mahasiswa/Dosen) ---------- */
+/* Full-height, sejajar header (bukan di bawahnya) — .app-root membungkus
+   sidebar + .app-main (header/tabs/content/footer lama) berdampingan. */
+.app-root { display: flex; min-height: 100vh; }
+.app-main { flex: 1 1 auto; min-width: 0; padding: 0 28px 60px; display: flex; flex-direction: column; }
+.sidebar {
+  flex: 0 0 64px; position: sticky; top: 0; align-self: flex-start; height: 100vh; overflow: hidden;
+  display: flex; flex-direction: column; gap: 4px; padding: 16px 10px;
+  background: var(--surface); border-right: 1px solid var(--border);
+  transition: flex-basis 0.18s ease;
+}
+/* Melebar otomatis saat di-hover (mouse), kembali menciut saat kursor pergi —
+   perangkat sentuh (tanpa hover) tetap dapat versi mobile lewat media query
+   di bawah, jadi tidak pernah "terjebak" menciut tanpa cara memperlebarnya. */
+.sidebar:hover { flex-basis: 260px; }
+/* gap:0 saat menciut — `gap` flexbox tetap "makan" ruang di antara ikon & label
+   walau labelnya max-width:0 (lebar nol), jadi ikon kegeser ~setengah gap ke
+   kiri dari titik tengah sebenarnya. Baru dikasih gap saat hover (melebar),
+   waktu labelnya beneran perlu jarak dari ikon. */
+.sidebar-brand { display: flex; align-items: center; justify-content: center; gap: 0; padding: 0 10px; margin-bottom: 12px; flex: none; }
+.sidebar-brand .brand-mark { width: 44px; height: 44px; flex: none; }
+.sidebar-item {
+  display: flex; align-items: center; justify-content: center; gap: 0; padding: 10px; border-radius: var(--radius-sm);
+  background: none; border: 1px solid transparent; color: var(--muted); cursor: pointer; text-align: left;
+  font-size: 0.85rem; font-weight: 600; font-family: var(--font-heading); transition: background 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+}
+/* Diciutkan: ikon/logo dipusatkan (justify-content:center, gap:0 di atas).
+   Melebar (hover): rata kiri seperti daftar nav biasa, gap 12px sebelum label. */
+.sidebar:hover .sidebar-brand, .sidebar:hover .sidebar-item { justify-content: flex-start; gap: 12px; }
+.sidebar-item .tab-icon { display: block; width: 20px; height: 20px; flex: none; }
+.sidebar-item:hover { color: var(--text); background: var(--surface-2); }
+.sidebar-item.active { color: var(--text); background: var(--accent-weak); border-color: var(--accent-weak); }
+.sidebar-item.active .tab-icon { color: var(--accent); }
+/* Logout didorong ke paling bawah sidebar (margin-top:auto menyerap sisa ruang
+   di atasnya), diberi warna merah supaya jelas beda dari nav biasa. */
+.sidebar-logout { margin-top: auto; color: var(--red); }
+.sidebar-logout:hover { color: var(--red-text); background: var(--red-bg); }
+/* Label teks (nav & brand) disembunyikan LEWAT opacity+max-width, bukan cuma
+   mengandalkan overflow:hidden si sidebar — supaya benar-benar hilang total
+   saat menciut, bukan "mengintip" sebagian (huruf pertama kepotong doang)
+   kalau kebetulan masih ada sisa ruang sebelum tepi sidebar. */
+.sidebar-item span, .sidebar-brand .brand-name {
+  opacity: 0; max-width: 0; overflow: hidden; transition: opacity 0.12s ease, max-width 0.18s ease;
+}
+.sidebar:hover .sidebar-item span { opacity: 1; max-width: 160px; }
+/* "SIMANTAP-TL" (termasuk "-TL" dari ::after) butuh lebih lebar dari label nav
+   biasa supaya tidak membungkus 2 baris — sidebar sengaja dibuat lebih lebar
+   (260px) saat hover untuk menampungnya dalam satu baris. */
+.sidebar:hover .sidebar-brand .brand-name { opacity: 1; max-width: 200px; white-space: nowrap; }
+@media (max-width: 860px) {
+  /* Tidak ada hover di layar sentuh — kembali ke baris tab horizontal biasa,
+     semua label selalu terlihat (bukan ciut ke ikon). */
+  .app-root { flex-direction: column; min-height: 0; }
+  .app-main { padding: 0 14px 24px; }
+  .sidebar-brand { flex: 1 1 100%; margin-bottom: 8px; }
+  .sidebar-item span, .sidebar-brand .brand-name { opacity: 1; max-width: none; }
+  .sidebar {
+    flex-basis: auto; position: static; height: auto; width: 100%; overflow: visible;
+    flex-direction: row; flex-wrap: wrap; gap: 8px; border-right: none; border-bottom: 1px solid var(--border);
+  }
+  .sidebar:hover { flex-basis: auto; }
+  .sidebar-item { flex: 1 1 auto; justify-content: center; }
+}
+
 .content { min-height: 50vh; animation: fadeIn 0.4s ease-out; padding-top: 22px; }
+/* Kalau .content langsung mengikuti nav .tabs (mis. Portal/DosenPortal), .tabs
+   sudah punya margin-bottom sendiri — hilangkan padding-top .content di sini
+   supaya jaraknya tidak dobel (tapi tidak sampai 0/menempel), tidak menyentuh
+   .tabs lain (mis. tab tahap di modal) yang tidak diikuti .content. */
+.tabs + .content { padding-top: 0; }
 .foot { text-align: center; color: var(--muted-2); font-size: 0.7rem; margin-top: 40px; letter-spacing: 0.04em; }
 
 /* ---------- Buttons & inputs ---------- */
@@ -191,6 +268,11 @@ html[data-theme="dark"] .btn:hover { background: rgba(241, 241, 238, 0.08); }
 html[data-theme="dark"] .btn.ghost:hover { background: rgba(241, 241, 238, 0.08); }
 .btn-amber { background: var(--amber-bg); border: 1px solid var(--amber); color: var(--amber-text); }
 .btn-amber:hover { background: var(--amber-border); border-color: var(--amber); }
+/* Solid, seperti .btn-primary tapi kuning — dipakai untuk tombol yang perlu
+   menonjol jelas sebagai "sedang aktif" (mis. tombol Kolom saat ada kolom
+   disembunyikan), bukan cuma outline halus seperti .btn-amber. */
+.btn-amber-solid { background: var(--amber); border-color: var(--amber); color: #f5f5f2; }
+.btn-amber-solid:hover { background: var(--amber-text); border-color: var(--amber-text); }
 /* Tombol Keluar — merah solid + teks putih, dipakai di semua topbar (semua
    peran, semua ukuran layar), supaya aksi keluar selalu jelas dan konsisten. */
 .btn-logout { background: var(--red); border-color: var(--red); color: #fff; }
@@ -200,16 +282,73 @@ html[data-theme="dark"] .btn.ghost:hover { background: rgba(241, 241, 238, 0.08)
 .push { margin-left: auto; }
 
 input, select, textarea {
-  font: inherit; color: var(--text); background: var(--surface);
+  font: inherit; color: var(--text); background: var(--surface); box-sizing: border-box;
   border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
   padding: 9px 11px; width: 100%; transition: border-color 0.15s ease;
 }
+/* select tanpa ini bisa render sedikit lebih tinggi dari input/textarea di
+   beberapa browser (line-height bawaan UA beda) walau padding/border sama —
+   disamakan biar sejajar kalau ditaruh sebaris (mis. Tanggal lulus / Nilai angka / Nilai huruf). */
+select { line-height: 1.3; }
 input:focus, select:focus, textarea:focus {
   outline: none; border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-weak);
 }
 input:disabled { background: var(--surface-2); color: var(--muted); cursor: not-allowed; }
 textarea { resize: vertical; }
+
+/* Panah dropdown kustom (bukan bawaan OS/browser) supaya select ikut gaya
+   border/warna aplikasi seperti kontrol lain — hanya kotak tertutupnya yang
+   bisa distyle begini; daftar opsi saat dibuka tetap tampilan native browser,
+   itu batasan platform (tidak ada cara CSS mengubahnya lintas browser). */
+select {
+  appearance: none; -webkit-appearance: none; -moz-appearance: none;
+  padding-right: 34px; cursor: pointer;
+  background-repeat: no-repeat; background-position: right 12px center; background-size: 14px;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235b6670' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+}
+html[data-theme="dark"] select {
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a9b0b6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+}
+select:disabled { cursor: not-allowed; }
+
+/* ---------- Dropdown kustom (komponen Dropdown, pengganti <select> native) ----------
+   Dipakai saat daftar opsi TERBUKAnya juga perlu ikut tema (bukan cuma kotak
+   tertutup) — mis. Periode di topbar — karena popup <select> native tidak bisa
+   distyle CSS. Kotak tertutupnya (.dd-trigger) sengaja disamakan persis dengan
+   style select di atas (border, panah) supaya bertukar tempat tanpa keliatan beda. */
+.dd-wrap { position: relative; }
+/* Disamakan gaya & tinggi (36px) dengan .icon-btn-outline & .text-size-toggle
+   di sebelahnya di topbar (border tipis transparan, bukan kotak terisi
+   seperti select biasa) — supaya ketiganya kelihatan satu keluarga kontrol. */
+.dd-trigger {
+  font: inherit; color: var(--text); background: none; box-sizing: border-box;
+  border: 1px solid var(--border-strong); border-radius: var(--radius);
+  height: 36px; padding: 0 34px 0 12px; width: 100%; cursor: pointer; text-align: left;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  background-repeat: no-repeat; background-position: right 12px center; background-size: 14px;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235b6670' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+}
+.dd-trigger:hover { background: rgba(21, 32, 43, 0.05); }
+html[data-theme="dark"] .dd-trigger:hover { background: rgba(241, 241, 238, 0.08); }
+html[data-theme="dark"] .dd-trigger {
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a9b0b6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+}
+.dd-trigger:focus, .dd-trigger.open { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-weak); }
+.dd-trigger span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dd-menu {
+  position: absolute; top: calc(100% + 4px); left: 0; width: 100%; z-index: 41;
+  background: var(--bg); border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg); padding: 4px; max-height: 260px; overflow-y: auto;
+  animation: slideUp 0.15s ease-out;
+}
+.dd-option {
+  display: block; width: 100%; text-align: left; background: none; border: none;
+  padding: 9px 12px; font: inherit; font-size: 0.85rem; color: var(--text); border-radius: var(--radius-sm);
+  cursor: pointer; transition: background 0.12s ease; white-space: nowrap;
+}
+.dd-option:hover { background: var(--surface-2); }
+.dd-option.selected { background: var(--accent-weak); color: var(--accent); font-weight: 600; }
 
 .password-field { position: relative; }
 .password-field input { padding-right: 38px; }
@@ -314,6 +453,7 @@ html[data-theme="dark"] .kp-dok-toggle:hover { background: rgba(241, 241, 238, 0
 .badge-amber { background: var(--amber-bg); color: var(--amber-text); }
 .badge-red { background: var(--red-bg); color: var(--red-text); }
 .badge-blue { background: var(--blue-bg); color: var(--blue-text); }
+.badge-violet { background: var(--violet-bg); color: var(--violet-text); }
 .badge-gray { background: var(--gray-bg); color: var(--muted); }
 
 /* ---------- Stage bar (bilah tersegmen) ---------- */
@@ -328,6 +468,14 @@ html[data-theme="dark"] .kp-dok-toggle:hover { background: rgba(241, 241, 238, 0
 .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 20px; }
 .toolbar .search { flex: 1; min-width: 240px; }
 .toolbar select { width: auto; min-width: 140px; }
+/* Search, Filter/Kolom/Ekspor/+Tambah disamakan tinggi (36px, seperti kontrol
+   topbar: theme toggle, text size, dropdown Periode) — sebelumnya masing-masing
+   tinggi sendiri-sendiri dari padding (bukan nilai tetap), jadi baris toolbar
+   kelihatan tidak rata. */
+.toolbar .search { height: 36px; box-sizing: border-box; }
+.toolbar > .btn, .toolbar-toggle, .toolbar .exp-wrap > .btn {
+  height: 36px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center;
+}
 .hint { font-size: 0.8rem; color: var(--muted); }
 
 /* ---------- Table ---------- */
@@ -353,6 +501,9 @@ html[data-theme="dark"] .tbl tbody tr:hover { background: rgba(241, 241, 238, 0.
 .tbl .num { text-align: center; color: var(--muted); font-weight: 500; }
 .cell-name { font-weight: 600; color: var(--text); }
 .cell-sub { font-size: 0.72rem; color: var(--muted); margin-top: 3px; }
+/* .tbl td { text-align: left } (lihat blok Table) lebih spesifik dari .cell-center
+   sendirian — perlu digabung .tbl td supaya beneran menang. */
+.tbl td.cell-center { text-align: center; }
 .cell-judul { max-width: 280px; color: var(--text); line-height: 1.4; }
 .muted { color: var(--muted); }
 .cell-actions { white-space: nowrap; text-align: right; }
@@ -422,6 +573,13 @@ html[data-theme="dark"] .tbl tbody tr:hover { background: rgba(241, 241, 238, 0.
 }
 .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 24px; border-bottom: 3px solid var(--text); flex: 0 0 auto; }
 .modal-head h3 { margin: 0; font-size: 1.15rem; font-weight: 600; }
+/* Judul modal bergaya breadcrumb (mis. "Edit mahasiswa › Edit data pendaftaran")
+   saat modal punya "halaman" di dalamnya — segmen leluhur bisa diklik untuk kembali. */
+.modal-breadcrumb { display: inline-flex; align-items: center; gap: 8px; }
+.modal-breadcrumb-link { background: none; border: none; padding: 0; margin: 0; font: inherit; color: var(--muted); cursor: pointer; }
+.modal-breadcrumb-link:hover { color: var(--accent); text-decoration: underline; }
+.modal-breadcrumb-sep { color: var(--muted); font-weight: 400; }
+.modal-breadcrumb-current { color: var(--text); }
 .modal-body { padding: 24px; overflow-y: auto; flex: 1 1 auto; }
 .modal-foot { display: flex; justify-content: flex-end; gap: 12px; padding: 16px 24px; border-top: 1px solid var(--border); flex: 0 0 auto; }
 .icon-btn { background: none; border: none; font-size: 1.125rem; cursor: pointer; color: var(--muted); padding: 6px; border-radius: var(--radius-sm); transition: all 0.2s ease; display: grid; place-items: center; }
@@ -448,9 +606,18 @@ html[data-theme="dark"] .icon-btn-outline:hover { background: rgba(241, 241, 238
 
 /* ---------- Modal lebar dengan tab per-tahap + panel dokumen sticky (KP) ---------- */
 .modal-wide { max-width: 1100px; }
-.modal-kp-layout { display: flex; gap: 24px; align-items: flex-start; }
+/* align-items: stretch (bukan flex-start) supaya kolom kiri (tab tahap) &
+   kanan (dokumen + perpanjangan) sama tinggi — berakhir di baris yang sama,
+   bukan salah satu menggantung dengan ruang kosong di bawahnya. */
+.modal-kp-layout { display: flex; gap: 24px; align-items: stretch; }
 .modal-kp-main { flex: 1 1 60%; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
 .modal-kp-side { flex: 0 0 320px; position: sticky; top: 0; display: flex; flex-direction: column; gap: 16px; }
+/* Panel tahap yang lagi aktif (satu-satunya .sched yang dirender di kolom kiri)
+   diberi flex:1 supaya border-nya benar-benar memanjang mengisi kolom yang
+   di-stretch itu, bukan cuma area flex-nya doang yang tinggi. Begitu juga
+   panel Perpanjangan (terakhir di kolom kanan) untuk arah sebaliknya. */
+.modal-kp-main > .sched { flex: 1; }
+.modal-kp-side > .sched:last-child { flex: 1; }
 @media (max-width: 860px) {
   .modal-kp-layout { flex-direction: column; }
   .modal-kp-side { position: static; flex-basis: auto; width: 100%; }
@@ -531,6 +698,11 @@ html[data-theme="dark"] .icon-btn-outline:hover { background: rgba(241, 241, 238
 .sched { border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; background: var(--surface); }
 .sched-title { font-size: 0.9rem; font-weight: 600; margin-bottom: 14px; color: var(--text); font-family: var(--font-heading); }
 .sched-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+/* Baris field & tombol yang disandingkan (mis. Status verifikasi + tombol Edit
+   data pendaftaran) disamakan tingginya — border seragam, bukan cuma isinya. */
+.sched-grid .field { height: 100%; }
+.sched-grid .field select { flex: 1; }
+.sched-grid .field > .btn { flex: 1; display: flex; align-items: center; justify-content: center; }
 .sched-checks { display: flex; gap: 24px; margin-top: 14px; flex-wrap: wrap; }
 
 /* ---------- Sebaran per program ---------- */
@@ -566,6 +738,9 @@ html[data-theme="dark"] .icon-btn-outline:hover { background: rgba(241, 241, 238
   font-weight: 500; font-family: var(--font-body); transition: background 0.15s;
 }
 .exp-menu button:hover { background: var(--surface-2); color: var(--accent); }
+.col-menu { max-height: 320px; overflow-y: auto; }
+.col-menu label.check { padding: 8px 10px; border-radius: var(--radius-sm); }
+.col-menu label.check:hover { background: var(--surface-2); }
 
 /* ---------- Login ---------- */
 .login-wrap { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 20px; background: var(--bg); position: relative; }
@@ -651,9 +826,52 @@ html[data-theme="dark"] .icon-btn-outline:hover { background: rgba(241, 241, 238
 /* ---------- Kelola periode ---------- */
 .periode-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .periode-item { display: flex; align-items: center; justify-content: space-between; background: var(--surface-2); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 0.875rem; font-weight: 500; }
-/* Cap riwayat aktivitas to ~3 rows tall, scroll for the rest — otherwise a
+
+/* Baris atas modal edit mahasiswa: Riwayat aktivitas (kiri) + Alur tahap (kanan),
+   masing-masing separuh lebar. */
+.mhs-edit-top { display: flex; gap: 16px; align-items: stretch; }
+.mhs-edit-top > * { flex: 1 1 50%; min-width: 0; }
+
+/* Ringkasan identitas (Nama/NIM/Judul, selalu terlihat) + tombol buka Catatan/pesan
+   (disembunyikan default, cuma tampil saat ikon pesan diklik). */
+.mhs-edit-identity { display: flex; align-items: flex-start; gap: 16px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); margin-top: 20px; }
+.mhs-edit-identity-info { display: flex; flex-wrap: wrap; gap: 20px 24px; flex: 1 1 auto; min-width: 0; }
+.mhs-edit-identity-judul { flex: 1 1 240px; min-width: 0; }
+.mhs-edit-identity > .icon-btn { margin-left: auto; flex-shrink: 0; border: 1px solid var(--border-strong); font-size: 1rem; }
+
+/* ---------- Riwayat aktivitas (kartu berwarna, terbaru di atas) ---------- */
+/* Cap riwayat aktivitas ke tinggi ~3 kartu, scroll untuk sisanya — otherwise a
    long-lived student's activity log pushes the whole edit modal open-ended. */
-.riwayat-list { max-height: 168px; overflow-y: auto; }
+.riwayat-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; max-height: 190px; overflow-y: auto; }
+.riwayat-card { border-left: 3px solid var(--border-strong); background: var(--surface-2); border-radius: var(--radius-sm); padding: 10px 14px; }
+.riwayat-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.riwayat-card-title { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; font-size: 0.85rem; }
+.riwayat-card-time { font-size: 0.72rem; color: var(--muted); white-space: nowrap; flex-shrink: 0; }
+.riwayat-card-detail { font-size: 0.8rem; color: var(--muted); margin-top: 3px; }
+.riwayat-terbaru-tag {
+  font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+  background: var(--accent); color: #f5f5f2; border-radius: var(--radius-sm); padding: 1px 6px;
+}
+.riwayat-card-green { border-left-color: var(--green); background: var(--green-bg); }
+.riwayat-card-green .riwayat-card-title { color: var(--green-text); }
+.riwayat-card-amber { border-left-color: var(--amber); background: var(--amber-bg); }
+.riwayat-card-amber .riwayat-card-title { color: var(--amber-text); }
+.riwayat-card-red { border-left-color: var(--red); background: var(--red-bg); }
+.riwayat-card-red .riwayat-card-title { color: var(--red-text); }
+.riwayat-card-blue { border-left-color: var(--blue); background: var(--blue-bg); }
+.riwayat-card-blue .riwayat-card-title { color: var(--blue-text); }
+.riwayat-card-violet { border-left-color: var(--violet); background: var(--violet-bg); }
+.riwayat-card-violet .riwayat-card-title { color: var(--violet-text); }
+.riwayat-card-gray { border-left-color: var(--border-strong); background: var(--surface-2); }
+
+/* ---------- Ringkasan aktivitas di tabel (kolom Aktivitas) ---------- */
+/* Badge di atas, tanggal di bawah (mengikuti pola kolom Deadline: Badge + .cell-sub)
+   supaya kontennya tumpuk vertikal dan tidak pernah meluber ke kolom sebelah. */
+.aktivitas-mini { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+/* Semua badge disamakan lebarnya ke label terpanjang ("Perpanjangan final")
+   supaya rapi sejajar, bukan tiap badge mengecil/melebar sesuai teksnya sendiri. */
+.aktivitas-mini .badge { min-width: 150px; text-align: center; }
+.aktivitas-mini-more { font-size: 0.7rem; color: var(--muted); }
 
 /* ---------- Panel notifikasi ---------- */
 .notif-msg { width: 100%; resize: vertical; font: inherit; padding: 12px 14px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); line-height: 1.5; }
@@ -776,8 +994,6 @@ html[data-theme="dark"] .icon-btn-outline:hover { background: rgba(241, 241, 238
   .topbar-right .btn { padding: 7px 11px; font-size: 0.76rem; }
   .brand-mark { width: 32px; height: 32px; }
   .brand-name { font-size: 1.02rem; }
-  .periode-pick span:first-child { display: none; }
-  .periode-pick select { min-width: 0; }
   .role-pill-sub { display: none; }
   .masthead-rule { margin-top: 10px; }
   /* Ukuran teks (A A A) disembunyikan di HP — jarang dipakai di layar kecil,

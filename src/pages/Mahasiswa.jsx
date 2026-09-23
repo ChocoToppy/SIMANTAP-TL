@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, punyaKlasifikasi, BIDANG, formatTanggal, kondisi, SEMUA, statusVerif, cariBentrok, eventAktif, bidangLabel, tanggalDibuat, hitungNomorUrut, jenisMagangOf } from '../utils/helpers.js';
-import { Badge, StageBar, ExportMenu, ColResizeHandle, Empty } from '../components/ui.jsx';
+import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, punyaKlasifikasi, BIDANG, KP_TEMA, formatTanggal, formatTanggalSingkat, kondisi, SEMUA, statusVerif, cariBentrok, eventAktif, bidangLabel, tanggalDibuat, hitungNomorUrut, jenisMagangOf } from '../utils/helpers.js';
+import { Badge, StageBar, ExportMenu, ColumnMenu, ColResizeHandle, Empty } from '../components/ui.jsx';
 import { useColumnWidths } from '../utils/useColumnWidths.js';
 import { AktivitasMini, JadwalMini } from './mahasiswa/AktivitasCells.jsx';
 import { FormMahasiswa } from './mahasiswa/FormMahasiswa.jsx';
@@ -39,6 +39,33 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
   const [programTab, setProgramTab] = useState('KP');
   const [fAngkatan, setFAngkatan] = useState('');
   const [fBidang, setFBidang] = useState('');
+  // KP/Magang & TA/Capstone pakai daftar kode bidang yang beda (KP_TEMA vs BIDANG) —
+  // reset filter ini tiap pindah tab supaya tidak nyangkut kode dari tab sebelumnya
+  // yang tidak berlaku lagi (bakal bikin hasil filter kosong tanpa alasan jelas).
+  useEffect(() => { setFBidang(''); }, [programTab]);
+
+  // Kolom tabel yang disembunyikan (pilihan pengguna) — beda dari lebar kolom
+  // (colWidths), ini SENGAJA diingat lintas sesi via localStorage, karena
+  // menyembunyikan kolom biasanya preferensi tampilan jangka panjang, bukan
+  // sekadar geser sementara.
+  const [hiddenCols, setHiddenCols] = useState(() => {
+    try {
+      const simpanan = JSON.parse(localStorage.getItem('simantap-hidden-cols-mahasiswa') || '[]');
+      return new Set(Array.isArray(simpanan) ? simpanan : []);
+    } catch {
+      return new Set();
+    }
+  });
+  useEffect(() => {
+    localStorage.setItem('simantap-hidden-cols-mahasiswa', JSON.stringify([...hiddenCols]));
+  }, [hiddenCols]);
+  function toggleKolom(key) {
+    setHiddenCols((cur) => {
+      const next = new Set(cur);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }
   const [fStatus, setFStatus] = useState('all');
   const [fVerif, setFVerif] = useState('');
   const [fDosen, setFDosen] = useState('');
@@ -74,16 +101,32 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
     { key: 'tahap', width: 210 },
     ...dosenCols.map((c) => ({ key: c.key, width: 100 })),
     { key: 'deadline', width: 130 },
-    { key: 'aktivitas', width: 170 },
+    { key: 'aktivitas', width: 170, minWidth: 170 },
     { key: 'nomorSurat', width: 130 },
     { key: 'aksi', width: 100, flex: true, minWidth: 100 },
   ], [dosenCols]);
+  // Kolom yang ditawarkan di menu "Kolom" — "No.", "Mahasiswa" & "Aksi" sengaja
+  // tidak ditawarkan (identitas baris & tombol aksi wajib selalu ada).
+  const kolomBisaSembunyi = useMemo(() => [
+    { key: 'judul', label: 'Judul' },
+    { key: 'tahap', label: 'Tahap & jadwal' },
+    ...dosenCols.map((c) => ({ key: c.key, label: c.label })),
+    { key: 'deadline', label: 'Deadline' },
+    { key: 'aktivitas', label: 'Aktivitas' },
+    { key: 'nomorSurat', label: 'No. Surat' },
+  ], [dosenCols]);
+  const jumlahKolomTersembunyi = COLS.filter((c) => hiddenCols.has(c.key)).length;
   const tableWrapRef = useRef(null);
   const [colWidths, startResize, tableWidth] = useColumnWidths('simantap-col-mahasiswa', COLS, tableWrapRef);
 
   // Cuma dipakai untuk lencana "Filter (n)" di tombol toggle mobile — angka
   // filter tambahan (di luar pencarian) yang lagi aktif.
   const filterAktifCount = [fStatus !== 'all', !!fAngkatan, !!fBidang, !!fVerif, !!fDosen].filter(Boolean).length;
+
+  // Opsi filter Bidang ikut tab program aktif — KP/Magang pakai daftar tema KP_TEMA,
+  // bukan BIDANG (topik TA/CAP), sesuai field `bidang` yang dipakai tiap gaya program
+  // (lihat gantiProgram di FormPendaftaran.jsx).
+  const bidangOpsiFilter = (programTab === 'KP' || programTab === 'MG') ? KP_TEMA : BIDANG;
 
   const angkatanList = useMemo(
     () => Array.from(new Set(mahasiswa.filter((m) => programOf(m) === programTab).map((m) => m.angkatan))).sort((a, b) => b - a),
@@ -216,7 +259,7 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
                 </select>
                 <select value={fBidang} onChange={(e) => setFBidang(e.target.value)}>
                   <option value="">Semua bidang</option>
-                  {BIDANG.map((b) => <option key={b.kode} value={b.kode}>{b.label}</option>)}
+                  {bidangOpsiFilter.map((b) => <option key={b.kode} value={b.kode}>{b.label}</option>)}
                 </select>
                 <select value={fVerif} onChange={(e) => setFVerif(e.target.value)}>
                   <option value="">Semua verifikasi</option>
@@ -237,6 +280,7 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
             </>
           )}
         </div>
+        <ColumnMenu columns={kolomBisaSembunyi} hidden={hiddenCols} onToggle={toggleKolom} />
         <ExportMenu label="Ekspor" onXLSX={() => ekspor('xlsx')} onCSV={() => ekspor('csv')} />
         <button className="btn btn-primary" onClick={tambah}>+ Tambah</button>
       </div>
@@ -254,21 +298,21 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
         <table className="tbl tbl-resizable" style={{ width: tableWidth }}>
           <colgroup>
             {COLS.map((c, i) => (
-              <col key={c.key} style={i === COLS.length - 1 ? undefined : { width: colWidths[i] }} />
+              hiddenCols.has(c.key) ? null : <col key={c.key} style={i === COLS.length - 1 ? undefined : { width: colWidths[i] }} />
             ))}
           </colgroup>
           <thead>
             <tr>
               <th className="th-sort" onClick={() => ubahSort('no')}>No.{panah('no')}<ColResizeHandle onMouseDown={(e) => startResize(0, e)} /></th>
               <th className="th-sort" onClick={() => ubahSort('nama')}>Mahasiswa{panah('nama')}<ColResizeHandle onMouseDown={(e) => startResize(1, e)} /></th>
-              <th className="th-sort" onClick={() => ubahSort('judul')}>Judul{panah('judul')}<ColResizeHandle onMouseDown={(e) => startResize(2, e)} /></th>
-              <th className="th-sort" onClick={() => ubahSort('tahap')}>Tahap &amp; jadwal{panah('tahap')}<ColResizeHandle onMouseDown={(e) => startResize(3, e)} /></th>
+              {!hiddenCols.has('judul') && <th className="th-sort" onClick={() => ubahSort('judul')}>Judul{panah('judul')}<ColResizeHandle onMouseDown={(e) => startResize(2, e)} /></th>}
+              {!hiddenCols.has('tahap') && <th className="th-sort" onClick={() => ubahSort('tahap')}>Tahap &amp; jadwal{panah('tahap')}<ColResizeHandle onMouseDown={(e) => startResize(3, e)} /></th>}
               {dosenCols.map((c, i) => (
-                <th key={c.key} className="th-sort" onClick={() => ubahSort(c.key)}>{c.label}{panah(c.key)}<ColResizeHandle onMouseDown={(e) => startResize(4 + i, e)} /></th>
+                !hiddenCols.has(c.key) && <th key={c.key} className="th-sort" onClick={() => ubahSort(c.key)}>{c.label}{panah(c.key)}<ColResizeHandle onMouseDown={(e) => startResize(4 + i, e)} /></th>
               ))}
-              <th className="th-sort" onClick={() => ubahSort('deadline')}>Deadline{panah('deadline')}<ColResizeHandle onMouseDown={(e) => startResize(4 + dosenCols.length, e)} /></th>
-              <th className="th-sort" onClick={() => ubahSort('dibuat')}>Aktivitas{panah('dibuat')}<ColResizeHandle onMouseDown={(e) => startResize(5 + dosenCols.length, e)} /></th>
-              <th>No. Surat<ColResizeHandle onMouseDown={(e) => startResize(6 + dosenCols.length, e)} /></th>
+              {!hiddenCols.has('deadline') && <th className="th-sort" onClick={() => ubahSort('deadline')}>Deadline{panah('deadline')}<ColResizeHandle onMouseDown={(e) => startResize(4 + dosenCols.length, e)} /></th>}
+              {!hiddenCols.has('aktivitas') && <th className="th-sort" onClick={() => ubahSort('dibuat')}>Aktivitas{panah('dibuat')}<ColResizeHandle onMouseDown={(e) => startResize(5 + dosenCols.length, e)} /></th>}
+              {!hiddenCols.has('nomorSurat') && <th>No. Surat<ColResizeHandle onMouseDown={(e) => startResize(6 + dosenCols.length, e)} /></th>}
               <th></th>
             </tr>
           </thead>
@@ -278,26 +322,31 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
                 <tr key={m.id}>
                   <td className="cell-sub">{noUntuk(m)}</td>
                   <td>
+                    <div style={{ marginBottom: 4 }}><Badge tone={statusVerif(m).tone}>{statusVerif(m).label}</Badge></div>
                     <div className="cell-name">{m.nama}</div>
+                    <div className="cell-sub">{m.nim}</div>
                     <div className="cell-sub">
-                      {m.nim} · {bidangLabel(m.bidang)} · {programLabel(programOf(m))}
-                      {programOf(m) === 'MG' && jenisMagangOf(m) === 'MKT' && <span className="chip chip-mkt" style={{ marginLeft: 6 }}>MKT</span>}
+                      {bidangLabel(m.bidang)}
                       {m.klasifikasi && punyaKlasifikasi(programOf(m)) ? ` · ${m.klasifikasi}` : ''}
+                      {programOf(m) === 'MG' && jenisMagangOf(m) === 'MKT' && <span className="chip chip-mkt" style={{ marginLeft: 6 }}>MKT</span>}
                     </div>
-                    <div style={{ marginTop: 4 }}><Badge tone={statusVerif(m).tone}>{statusVerif(m).label}</Badge></div>
                   </td>
-                  <td className="cell-judul">{m.judul || <span className="muted">—</span>}</td>
-                  <td style={{ minWidth: 180 }}>
-                    <StageBar program={programOf(m)} tahap={m.tahap} />
-                    <JadwalMini m={m} />
-                  </td>
-                  {dosenCols.map((c) => <td key={c.key}>{m[c.key] || '-'}</td>)}
-                  <td>
-                    <Badge tone={k.tone}>{k.label}</Badge>
-                    <div className="cell-sub">{formatTanggal(m.batasAkhir)}</div>
-                  </td>
-                  <td><AktivitasMini m={m} /></td>
-                  <td className="cell-sub">{m.nomorSurat || '—'}</td>
+                  {!hiddenCols.has('judul') && <td className="cell-judul">{m.judul || <span className="muted">—</span>}</td>}
+                  {!hiddenCols.has('tahap') && (
+                    <td style={{ minWidth: 180 }}>
+                      <StageBar program={programOf(m)} tahap={m.tahap} />
+                      <JadwalMini m={m} />
+                    </td>
+                  )}
+                  {dosenCols.map((c) => !hiddenCols.has(c.key) && <td key={c.key}>{m[c.key] || '-'}</td>)}
+                  {!hiddenCols.has('deadline') && (
+                    <td className="cell-center">
+                      <Badge tone={k.tone}>{k.label}</Badge>
+                      <div className="cell-sub">{formatTanggalSingkat(m.batasAkhir)}</div>
+                    </td>
+                  )}
+                  {!hiddenCols.has('aktivitas') && <td><AktivitasMini m={m} /></td>}
+                  {!hiddenCols.has('nomorSurat') && <td className="cell-sub">{m.nomorSurat || '—'}</td>}
                   <td className="cell-actions">
                     <button className="link-btn" onClick={() => edit(m)}>Edit</button>
                     <button className="link-btn danger" onClick={() => hapus(m)}>Hapus</button>
@@ -308,7 +357,7 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
                 return grupRows.map((g) => (
                   <React.Fragment key={g.label}>
                     <tr className="tbl-group-row">
-                      <td colSpan={COLS.length}>{groupMode === 'angkatan' ? `Angkatan ${g.label}` : g.label}</td>
+                      <td colSpan={COLS.length - jumlahKolomTersembunyi}>{groupMode === 'angkatan' ? `Angkatan ${g.label}` : g.label}</td>
                     </tr>
                     {g.items.map(baris)}
                   </React.Fragment>
@@ -371,9 +420,9 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
               {[5, 10, 25, 50, 100, 500].map((n) => <option key={n} value={n}>{n}</option>)}
             </select>
             <button className="btn btn-sm" disabled={safePage <= 1} onClick={() => setPage(1)}>«</button>
-            <button className="btn btn-sm" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>‹ Sebelumnya</button>
+            <button className="btn btn-sm" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>‹</button>
             <span className="hint">{safePage} / {totalPages}</span>
-            <button className="btn btn-sm" disabled={safePage >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>Berikutnya ›</button>
+            <button className="btn btn-sm" disabled={safePage >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>›</button>
             <button className="btn btn-sm" disabled={safePage >= totalPages} onClick={() => setPage(totalPages)}>»</button>
           </div>
         </div>

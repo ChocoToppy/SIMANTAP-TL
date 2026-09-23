@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { buatId, todayISO, tambahHari, punyaSyarat, punyaKlasifikasi, catatAktivitas, KP_TEMA, KLASIFIKASI, BIDANG, programLabel, dosenAktifUntuk, judulLabelFor } from '../../utils/helpers.js';
+import { buatId, todayISO, tambahHari, punyaSyarat, punyaKlasifikasi, catatAktivitas, ringkasPerubahanPendaftaran, KP_TEMA, KLASIFIKASI, BIDANG, programLabel, dosenAktifUntuk, judulLabelFor } from '../../utils/helpers.js';
 import { Field } from '../../components/ui.jsx';
 import { PROGRAM_KEYS_PENDAFTARAN } from './shared.js';
 
@@ -54,7 +54,8 @@ export function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], a
     if (!m.periode) { setErr('Pilih periode pendaftaran terlebih dahulu.'); return; }
     setErr('');
     const rec = { ...m, angkatan: Number(m.angkatan) || m.angkatan, verifikasi: 'baru' };
-    onSave(catatAktivitas(rec, baru ? 'daftar' : 'perbaikan'));
+    const catatan = baru ? '' : ringkasPerubahanPendaftaran(awal, rec).join(', ');
+    onSave(catatAktivitas(rec, baru ? 'daftar' : 'perbaikan', catatan));
   }
 
   return (
@@ -87,8 +88,11 @@ export function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], a
             {angkatanOpsi.map((a) => <option key={a} value={a}>{a}</option>)}
           </select>
         </Field>
-        <Field label={isKPStyle ? judulLabelFor(m, { sementara: true }) : 'Judul'} full>
-          <textarea rows={2} value={m.judul} onChange={(e) => set('judul', e.target.value)} placeholder="Jangan pakai huruf kapital semua" />
+        <Field label={judulLabelFor(m)} full>
+          <textarea rows={2} value={m.judul} onChange={(e) => set('judul', e.target.value)} />
+          <div className="hint" style={{ marginTop: 6 }}>
+            Huruf kapital hanya di awal kata, bukan semua huruf kapital. Contoh: "Analisis Pengelolaan Limbah Cair", bukan "ANALISIS PENGELOLAAN LIMBAH CAIR".
+          </div>
         </Field>
         <Field label="Dosen Wali">
           <select value={m.dosenWali || ''} onChange={(e) => set('dosenWali', e.target.value)}>

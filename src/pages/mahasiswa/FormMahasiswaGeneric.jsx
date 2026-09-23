@@ -110,14 +110,16 @@ export function FormMahasiswaGeneric({
         <Field label="Tanggal mulai"><input type="date" value={m.tanggalMulai} onChange={(e) => set('tanggalMulai', e.target.value)} /></Field>
         <Field label="Batas akhir"><input type="date" value={m.batasAkhir} onChange={(e) => set('batasAkhir', e.target.value)} /></Field>
         <Field label="Tanggal lulus"><input type="date" value={m.tanggalLulus || ''} onChange={(e) => set('tanggalLulus', e.target.value)} /></Field>
-        <Field label="Nilai angka (admin, tidak terlihat mahasiswa)">
+        <Field label="Nilai angka">
           <input type="number" min="0" max="100" value={(m.nilaiAkhir || {}).angka || ''} onChange={(e) => setM((prev) => ({ ...prev, nilaiAkhir: { ...(prev.nilaiAkhir || {}), angka: e.target.value } }))} />
+          <div className="hint" style={{ marginTop: 4 }}>Nilai tidak terlihat mahasiswa</div>
         </Field>
-        <Field label="Nilai huruf (admin, tidak terlihat mahasiswa)">
+        <Field label="Nilai huruf">
           <select value={(m.nilaiAkhir || {}).huruf || ''} onChange={(e) => setM((prev) => ({ ...prev, nilaiAkhir: { ...(prev.nilaiAkhir || {}), huruf: e.target.value } }))}>
             <option value="">—</option>
             {['A', 'AB', 'B', 'BC', 'C', 'D', 'E'].map((h) => <option key={h} value={h}>{h}</option>)}
           </select>
+          <div className="hint" style={{ marginTop: 4 }}>Nilai tidak terlihat mahasiswa</div>
         </Field>
 
         {alurTahapBlok}

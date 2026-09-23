@@ -53,6 +53,29 @@ function SunIcon() {
   );
 }
 
+// Ikon pesan/catatan (bubble chat) — dipakai mis. tombol buka Catatan/pesan
+// untuk mahasiswa di modal edit, menggantikan emoji 💬.
+export function MessageIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
+// Ikon logout (pintu + panah keluar) — dipakai tombol Logout di sidebar admin.
+// className diteruskan supaya bisa pakai kelas .tab-icon (ukuran/warna sama
+// dengan ikon nav sidebar lain).
+export function LogoutIcon({ className }) {
+  return (
+    <svg className={className} width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
+  );
+}
+
 function EyeIcon() {
   return (
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -318,6 +341,75 @@ export function ExportMenu({ label = 'Ekspor', onXLSX, onCSV }) {
           <div className="exp-menu">
             <button onClick={() => { setOpen(false); onXLSX(); }}>Excel (.xlsx)</button>
             <button onClick={() => { setOpen(false); onCSV(); }}>CSV (.csv)</button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// Tombol "Kolom" dengan menu checklist untuk sembunyikan/tampilkan kolom tabel.
+// columns: [{ key, label }] — kolom yang boleh disembunyikan (bukan semua kolom
+// tabel, mis. No. & Aksi sengaja tidak ditawarkan supaya baris tetap bisa dipakai).
+// hidden: Set berisi key kolom yang lagi disembunyikan; onToggle(key) membalik status satu kolom.
+export function ColumnMenu({ label = 'Kolom', columns, hidden, onToggle }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="exp-wrap">
+      <button className={'btn' + (hidden.size > 0 ? ' btn-amber-solid' : '')} onClick={() => setOpen((o) => !o)}>{label} ▾</button>
+      {open && (
+        <>
+          <div className="exp-backdrop" onClick={() => setOpen(false)} />
+          <div className="exp-menu col-menu">
+            {columns.map((c) => (
+              <label key={c.key} className="check">
+                <input type="checkbox" checked={!hidden.has(c.key)} onChange={() => onToggle(c.key)} />
+                <span>{c.label}</span>
+              </label>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// Dropdown kustom pengganti <select> native — dipakai saat tampilan daftar
+// opsinya (bukan cuma kotak tertutupnya) perlu ikut tema aplikasi, karena
+// browser tidak memberi cara CSS untuk mengubah tampilan popup <select> native.
+// options: [{ value, label }]. Sengaja meniru antarmuka <select> (value/onChange)
+// supaya gampang ditukar di tempat yang sudah pakai pola itu.
+export function Dropdown({ value, onChange, options, ariaLabel, className = '' }) {
+  const [open, setOpen] = useState(false);
+  const current = options.find((o) => String(o.value) === String(value));
+  return (
+    <div className={'dd-wrap ' + className}>
+      <button
+        type="button"
+        className={'dd-trigger' + (open ? ' open' : '')}
+        onClick={() => setOpen((o) => !o)}
+        aria-label={ariaLabel}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span>{current ? current.label : ''}</span>
+      </button>
+      {open && (
+        <>
+          <div className="exp-backdrop" onClick={() => setOpen(false)} />
+          <div className="dd-menu" role="listbox" aria-label={ariaLabel}>
+            {options.map((o) => (
+              <button
+                type="button"
+                key={o.value}
+                role="option"
+                aria-selected={String(o.value) === String(value)}
+                className={'dd-option' + (String(o.value) === String(value) ? ' selected' : '')}
+                onClick={() => { onChange(o.value); setOpen(false); }}
+              >
+                {o.label}
+              </button>
+            ))}
           </div>
         </>
       )}
