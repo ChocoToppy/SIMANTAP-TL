@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Empty } from '../../components/ui.jsx';
 
 // ----- Daftar akun mahasiswa + reset password -----
@@ -17,6 +17,15 @@ export function SeksiAkun({ daftar, onReset, onToggleAktif, onDelete }) {
     if (!term) return true;
     return `${a.nama} ${a.nim}`.toLowerCase().includes(term);
   });
+
+  // Paginasi — sama seperti daftar Mahasiswa: pencarian jalan di atas SELURUH daftar,
+  // paginasi cuma memotong hasil akhirnya.
+  const [pageSize, setPageSize] = useState(100);
+  const [page, setPage] = useState(1);
+  useEffect(() => { setPage(1); }, [q, pageSize]);
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const pageRows = rows.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   function salin(nim, teks) {
     navigator.clipboard.writeText(teks).catch(() => {});
@@ -83,7 +92,7 @@ export function SeksiAkun({ daftar, onReset, onToggleAktif, onDelete }) {
               </tr>
             </thead>
             <tbody>
-              {rows.map((a) => (
+              {pageRows.map((a) => (
                 <tr key={a.nim}>
                   <td>{a.nama}</td>
                   <td className="cell-sub">{a.nim}</td>
@@ -116,6 +125,23 @@ export function SeksiAkun({ daftar, onReset, onToggleAktif, onDelete }) {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+      {rows.length > 0 && (
+        <div className="pagination">
+          <span className="hint">
+            Menampilkan {(safePage - 1) * pageSize + 1}–{Math.min(safePage * pageSize, rows.length)} dari {rows.length} data
+          </span>
+          <div className="pagination-controls">
+            <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} title="Baris per halaman">
+              {[5, 10, 25, 50, 100, 500].map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+            <button className="btn btn-sm" disabled={safePage <= 1} onClick={() => setPage(1)}>«</button>
+            <button className="btn btn-sm" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>‹</button>
+            <span className="hint">{safePage} / {totalPages}</span>
+            <button className="btn btn-sm" disabled={safePage >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>›</button>
+            <button className="btn btn-sm" disabled={safePage >= totalPages} onClick={() => setPage(totalPages)}>»</button>
+          </div>
         </div>
       )}
     </div>

@@ -15,8 +15,20 @@ import { db, auth } from './utils/firebase.js';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, query, where } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { readClaims, logout, changeOwnPassword, adminCreateUser, adminResetPassword, adminDeleteStudent, adminDeleteAdmin, claimSuperAdmin, adminUpdateSelf, studentUpdateProfile } from './utils/auth.js';
+import { bolehMasukDomainIni, KUNCI_DITOLAK } from './utils/domainAccess.js';
 import logoTl from './assets/logo-tl.png';
 import gearIcon from './assets/gear.png';
+
+// Dirender saat akun non-super-admin login di domain terbatas: tandai penolakan
+// (dibaca layar Login untuk menampilkan pesan) lalu langsung keluar.
+function DomainDitolak({ onLogout }) {
+  useEffect(() => {
+    sessionStorage.setItem(KUNCI_DITOLAK, '1');
+    onLogout();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return <div className="login-wrap"><p className="login-foot">Mengalihkan…</p></div>;
+}
 
 // ===================== App.js =====================
 // App.js — akar: sesi login (Firebase Auth + custom claims), render Login / Portal / Admin
@@ -404,6 +416,9 @@ export default function App() {
     return <Login pengumuman={data.pengumuman || PENGUMUMAN_AWAL} periodeAktif={data.periodeAktif || ''} />;
   }
 
+  // ----- Domain terbatas: hanya super admin & akun uji yang boleh lanjut -----
+  if (!bolehMasukDomainIni(claims)) return <DomainDitolak onLogout={keluar} />;
+
   // ----- Profil sesuai peran (dari custom claim), untuk cek mustChangePassword & data tampilan -----
   const profilAkun = claims.role === 'student' ? (data.akun || []).find((a) => a.uid === authUser.uid) : null;
   const profilDosen = claims.role === 'lecturer' ? (data.dosen || []).find((d) => d.kode === claims.kode) : null;
@@ -491,14 +506,14 @@ export default function App() {
         <header className="topbar">
           <div className="topbar-left">
             <button className="btn btn-logout btn-sm" onClick={keluar}>Logout</button>
-            <RolePill peran="admin" nama={profilAdmin.nama} />
+            <RolePill peran={claims.super ? "superadmin" : "admin"} nama={profilAdmin.nama} judul={claims.super ? "Super Admin" : "Admin"} />
           </div>
           <div className="brand">
             <img className="brand-mark" src={logoTl} alt="TL Undip" />
             <span className="brand-name">SIMANTAP</span>
           </div>
           <div className="topbar-right">
-            <ThemeToggle square />
+            <ThemeToggle />
             <TextSizeToggle />
             <button className="btn ghost" onClick={() => navigate('/')}>← Kembali</button>
           </div>
@@ -569,10 +584,10 @@ export default function App() {
       <div className="app-main">
         <header className="topbar">
           <div className="topbar-left">
-            <RolePill peran="admin" nama={profilAdmin.nama} />
+            <RolePill peran={claims.super ? "superadmin" : "admin"} nama={profilAdmin.nama} judul={claims.super ? "Super Admin" : "Admin"} />
           </div>
           <div className="topbar-right">
-            <ThemeToggle square />
+            <ThemeToggle />
             <TextSizeToggle />
             <Dropdown
               className="periode-pick"

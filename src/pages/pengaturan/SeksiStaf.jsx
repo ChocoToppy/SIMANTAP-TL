@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Field, Modal } from '../../components/ui.jsx';
+import { Field, Modal, Badge } from '../../components/ui.jsx';
 
 // ----- Kelola akun dosen & admin (roster kecil, dibuat manual oleh admin) -----
 export function SeksiStaf({ dosen, admin, onReset, onCreate, onToggleDosenAktif, onEditDosen, isSuperAdmin = false, currentAdminUid, onDeleteAdmin, onClaimSuperAdmin, onUpdateSelfAdmin }) {
@@ -226,7 +226,7 @@ export function SeksiStaf({ dosen, admin, onReset, onCreate, onToggleDosenAktif,
               const key = 'a-' + a.uid;
               return (
                 <tr key={a.uid}>
-                  <td>{a.nama} {a.superAdmin && <span className="chip chip-on">Super Admin</span>}</td>
+                  <td>{a.nama} {a.superAdmin ? <Badge tone="violet">Super Admin</Badge> : <Badge tone="blue">Admin</Badge>}</td>
                   <td className="cell-sub">{a.email}</td>
                   <td className="cell-actions">
                     {pesan && pesan.key === key ? <span className="hint">{pesan.teks}</span> : (

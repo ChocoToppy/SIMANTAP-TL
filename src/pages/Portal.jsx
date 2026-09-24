@@ -71,7 +71,7 @@ export function Portal({ nim, nama, email, mahasiswa, allDosen, periodeBuka = []
         </div>
         <div className="topbar-right">
           <button className="btn btn-primary" onClick={onOpenPanduan}>Panduan</button>
-          <ThemeToggle square />
+          <ThemeToggle />
           <TextSizeToggle />
         </div>
       </header>

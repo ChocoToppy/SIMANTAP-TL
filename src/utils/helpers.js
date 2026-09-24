@@ -1099,15 +1099,15 @@ export const AKTIVITAS_WARNA = {
 // tabel (ruang sempit — label lengkap seperti "Perbaikan pendaftaran dikirim
 // ulang" tidak muat).
 export const AKTIVITAS_LABEL_SINGKAT = {
-  dibuat: 'Dibuat admin',
+  dibuat: 'Dibuat',
   daftar: 'Daftar',
-  perbaikan: 'Perbaikan',
+  perbaikan: 'Edit',
   jadwal: 'Jadwal',
   unggah: 'Unggah',
-  hapusBerkas: 'Hapus berkas',
+  hapusBerkas: 'Hapus',
   tahapBimbingan: 'Bimbingan',
   perpanjanganMinta: 'Perpanjangan',
-  perpanjanganFinal: 'Perpanjangan final',
+  perpanjanganFinal: 'Final',
 };
 
 // Field pendaftaran yang bisa diedit mahasiswa saat mengirim ulang (perbaikan) —
@@ -1158,6 +1158,15 @@ export function formatWaktu(iso) {
   if (isNaN(d.getTime())) return '-';
   const jam = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   return `${d.getDate()} ${BULAN[d.getMonth()]} ${d.getFullYear()} · ${jam}`;
+}
+
+// Format sangat ringkas dd-Mmm (mis. "24-Sep") — dipakai kartu kecil di kolom
+// Aktivitas tabel; tahun & jam ada di riwayat detail (modal edit).
+export function formatHariBulan(iso) {
+  if (!iso) return '';
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? parseISO(iso) : new Date(iso);
+  if (!d || isNaN(d.getTime())) return '';
+  return `${String(d.getDate()).padStart(2, '0')}-${BULAN[d.getMonth()].slice(0, 3)}`;
 }
 
 // Format tanggal ringkas dd-mm-yyyy tanpa jam — dipakai di kolom Aktivitas tabel

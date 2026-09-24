@@ -13,12 +13,12 @@ export function Badge({ tone = 'gray', children }) {
 // Lencana identitas login di topbar — satu warna per peran (mahasiswa/dosen/
 // admin) supaya langsung terlihat sedang masuk sebagai apa. `sub` opsional
 // untuk info tambahan kecil (mis. kode dosen) di sebelah nama.
-export function RolePill({ peran, nama, sub }) {
+export function RolePill({ peran, nama, sub, judul }) {
   if (!nama) return null;
   return (
     <span className={`role-pill role-pill-${peran}`}>
       <span className="role-pill-dot" aria-hidden="true" />
-      {nama}
+      {judul ? `${nama} - ${judul}` : nama}
       {sub && <span className="role-pill-sub">· {sub}</span>}
     </span>
   );
@@ -121,27 +121,21 @@ export function PasswordField({ value, onChange, onKeyDown, placeholder, autoCom
   );
 }
 
-// Pengatur mode terang/gelap. `square`: gaya ikon kotak bergaris (dipakai di
-// header Portal mahasiswa mobile, meniru referensi desain) — defaultnya tetap
-// tombol ghost lama (dipakai di topbar admin/dosen/lainnya, tidak diubah).
-export function ThemeToggle({ square = false }) {
+// Pengatur mode terang/gelap — ikon menunjukkan mode yang SEDANG aktif (matahari
+// = mode terang, bulan = mode gelap); title/aria-label menyebut aksi kliknya.
+export function ThemeToggle() {
   const [theme, setThemeState] = useState(getTheme);
   function toggle() {
     const next = theme === 'dark' ? 'light' : 'dark';
     setThemeState(next);
     setTheme(next);
   }
-  const label = theme === 'dark' ? 'Mode terang' : 'Mode gelap';
-  if (square) {
-    return (
-      <button type="button" className="icon-btn-outline" onClick={toggle} title={label} aria-label={label}>
-        {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
-      </button>
-    );
-  }
+  const label = theme === 'dark' ? 'Ganti ke mode terang' : 'Ganti ke mode gelap';
+  const gelap = theme === 'dark';
   return (
-    <button type="button" className="btn ghost theme-toggle" onClick={toggle} title={label}>
-      {theme === 'dark' ? '☀️' : '🌙'}
+    <button type="button" className={'icon-btn-outline ' + (gelap ? 'theme-moon' : 'theme-sun')} onClick={toggle} title={label} aria-label={label}>
+      <span className="theme-icon-now">{gelap ? <MoonIcon /> : <SunIcon />}</span>
+      <span className="theme-icon-next">{gelap ? <SunIcon /> : <MoonIcon />}</span>
     </button>
   );
 }

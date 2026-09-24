@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ThemeToggle, TextSizeToggle, PasswordField } from '../components/ui.jsx';
 import { loginWithIdentifier, registerStudent, sendReset } from '../utils/auth.js';
 import logoTl from '../assets/logo-tl.png';
+import { diDomainTerbatas, URL_DOMAIN_UTAMA, KUNCI_DITOLAK } from '../utils/domainAccess.js';
 
 // ===================== Login.jsx =====================
 // Login.jsx — layar masuk: pilih peran, lalu masuk/daftar. Sejak migrasi ke
@@ -28,6 +29,8 @@ function pesanErrorAuth(e) {
 
 export function Login({ pengumuman = [], periodeAktif = '' }) {
   const [peran, setPeran] = useState(null); // null | 'mahasiswa' | 'dosen' | 'admin'
+  const domainTerbatas = diDomainTerbatas();
+  const barusajaDitolak = domainTerbatas && sessionStorage.getItem(KUNCI_DITOLAK) === '1';
 
   return (
     <div className="login-wrap">
@@ -35,6 +38,13 @@ export function Login({ pengumuman = [], periodeAktif = '' }) {
         <ThemeToggle />
         <TextSizeToggle />
       </div>
+      {domainTerbatas && (
+        <div className={'callout' + (barusajaDitolak ? ' callout-red' : ' callout-amber')} style={{ marginBottom: 16 }}>
+          {barusajaDitolak
+            ? <>Akun Anda tidak dapat masuk lewat alamat ini. Silakan masuk melalui <a href={URL_DOMAIN_UTAMA}>simantaptlundip.com</a>.</>
+            : <>Alamat ini dikhususkan untuk administrator. Mahasiswa dan dosen, silakan masuk melalui <a href={URL_DOMAIN_UTAMA}>simantaptlundip.com</a>.</>}
+        </div>
+      )}
       {periodeAktif && (
         <div className="periode-aktif-banner">Periode saat ini: <strong>{periodeAktif}</strong></div>
       )}

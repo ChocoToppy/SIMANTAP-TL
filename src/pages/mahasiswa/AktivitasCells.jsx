@@ -1,6 +1,5 @@
 import React from 'react';
-import { eventsFor, programOf, getJadwal, jamTampil, formatTanggal, AKTIVITAS_LABEL, AKTIVITAS_LABEL_SINGKAT, AKTIVITAS_WARNA, formatWaktu } from '../../utils/helpers.js';
-import { Badge } from '../../components/ui.jsx';
+import { eventsFor, programOf, getJadwal, jamTampil, formatTanggal, tanggalDibuat, AKTIVITAS_LABEL, AKTIVITAS_LABEL_SINGKAT, AKTIVITAS_WARNA, formatWaktu, formatHariBulan } from '../../utils/helpers.js';
 
 // Riwayat lengkap aktivitas mahasiswa (terbaru di atas), ditampilkan di modal edit admin.
 // Tiap entri jadi kartu berwarna sesuai tipenya supaya gampang dipindai sekilas,
@@ -36,18 +35,21 @@ export function RiwayatAktivitas({ m }) {
   );
 }
 
-// Tampilan ringkas riwayat aktivitas di tabel: cuma badge tipe aktivitas untuk
-// 2 entri paling baru (terbaru di atas), tanpa tanggal — detail lengkap & berjam
-// ada di modal edit (RiwayatAktivitas). Kolom ini punya minWidth = lebar label
-// terpanjang (lihat COLS di Mahasiswa.jsx) supaya badge tidak pernah kepotong.
+// Tampilan ringkas riwayat aktivitas di tabel: kartu berwarna versi sederhana
+// dari kartu di modal edit (RiwayatAktivitas) — label satu kata di kiri
+// (tengah vertikal), tanggal dd-Mmm kecil di kanan-atas — untuk 2 entri
+// paling baru (terbaru di atas). Nama lengkap, tahun, jam & catatan ada di modal.
 export function AktivitasMini({ m }) {
   const log = m.aktivitas || [];
-  const tampil = log.length ? log.slice(-2).reverse() : [{ tipe: 'daftar' }];
+  const tampil = log.length ? log.slice(-2).reverse() : [{ tipe: 'daftar', at: tanggalDibuat(m) }];
   const sisa = Math.max(0, log.length - tampil.length);
   return (
     <div className="aktivitas-mini">
       {tampil.map((a, i) => (
-        <Badge key={i} tone={AKTIVITAS_WARNA[a.tipe] || 'gray'}>{AKTIVITAS_LABEL_SINGKAT[a.tipe] || a.tipe}</Badge>
+        <div key={i} className={`riwayat-card riwayat-card-${AKTIVITAS_WARNA[a.tipe] || 'gray'} aktivitas-card`}>
+          <span className="riwayat-card-title">{AKTIVITAS_LABEL_SINGKAT[a.tipe] || a.tipe}</span>
+          {a.at && <span className="aktivitas-card-date">{formatHariBulan(a.at)}</span>}
+        </div>
       ))}
       {sisa > 0 && <div className="aktivitas-mini-more">+{sisa} lainnya</div>}
     </div>
