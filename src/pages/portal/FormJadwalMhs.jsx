@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { programOf, durasiEvent, jamTambah, dalamJamKerja, formatTanggal, berkasSyarat, JAM_KERJA, HARI, RUANG, catatAktivitas } from '../../utils/helpers.js';
 import { Field } from '../../components/ui.jsx';
+import { periksaUsulanRuang, teksBentrokRuang, opsiRuang, milikProgram } from '../../modules/ruang';
+import { FITUR_EKSPERIMENTAL } from '../../utils/config.js';
+import { BerkasCallout } from '../../components/BerkasCallout.jsx';
 
-export function FormJadwalMhs({ awal, ev, konten = {}, onCancel, onSave }) {
+export function FormJadwalMhs({ awal, ev, konten = {}, jadwalRuang = null, onCancel, onSave }) {
   const isSidang = ev.includes('Sidang');
   const isKP = programOf(awal) === 'KP' || ev.includes('KP');
   // Seminar KP tidak dibatasi rentang mulai/akhir KP: durasi KP terikat kerja
@@ -15,6 +18,14 @@ export function FormJadwalMhs({ awal, ev, konten = {}, onCancel, onSave }) {
   const set = (k, v) => setJ((p) => ({ ...p, [k]: v }));
   function setMulai(v) { setJ((p) => ({ ...p, jamMulai: v, jamSelesai: v ? jamTambah(v, durasi) : '' })); }
 
+  // Usulan tidak boleh diajukan bila ruang sudah terpakai (kuliah/kegiatan) pada
+  // tanggal & jam itu — mahasiswa hanya mengusulkan, admin yang memesan, tapi usulan
+  // harus relevan dengan ketersediaan. Hanya berlaku di build eksperimental.
+  const daftarRuang = opsiRuang(jadwalRuang, RUANG);
+  const bentrokRuang = FITUR_EKSPERIMENTAL && jadwalRuang && j.tanggal && j.jamMulai && j.ruang
+    ? periksaUsulanRuang(jadwalRuang, { tanggal: j.tanggal, jamMulai: j.jamMulai, jamSelesai: jamTambah(j.jamMulai, durasi), ruang: j.ruang }, { abaikan: milikProgram(awal.id, ev) }).bentrok
+    : [];
+
   function submit() {
     if (!isSidang) {
       if (j.tanggal && !bebasRentangKP) {
@@ -25,6 +36,7 @@ export function FormJadwalMhs({ awal, ev, konten = {}, onCancel, onSave }) {
         setErr(`Jadwal harus dalam jam kerja ${JAM_KERJA.mulai}–${JAM_KERJA.selesai}.`); return;
       }
     }
+    if (bentrokRuang.length) { setErr(`Ruang ${j.ruang} tidak tersedia pada waktu itu: ${teksBentrokRuang(bentrokRuang)}. Pilih ruang atau jam lain.`); return; }
     setErr('');
     if (isSidang) {
       // Sidang: mahasiswa hanya mengunggah berkas; jadwal (tanggal/jam/ruang) & status ditetapkan admin.
@@ -45,12 +57,7 @@ export function FormJadwalMhs({ awal, ev, konten = {}, onCancel, onSave }) {
           ? 'Jadwal sidang ditetapkan admin. Anda cukup mengunggah draft & berkas di sini.'
           : `Durasi ${ev} otomatis ${durasi} menit, dalam jam kerja ${JAM_KERJA.mulai}–${JAM_KERJA.selesai}. Nomor surat tugas & persetujuan jadwal ditentukan admin.`}
       </p>
-      <div className="callout" style={{ marginBottom: 12 }}>
-        <strong>Dokumen yang perlu disiapkan:</strong>
-        <ol style={{ margin: '6px 0 0', paddingLeft: 20 }}>
-          {berkasSyarat(ev, konten).map((item, i) => <li key={i}>{item}</li>)}
-        </ol>
-      </div>
+      <BerkasCallout items={berkasSyarat(ev, konten)} />
       <div className="form-grid">
         {!isSidang && (
           <>
@@ -68,8 +75,8 @@ export function FormJadwalMhs({ awal, ev, konten = {}, onCancel, onSave }) {
             <Field label="Ruang">
               <select value={j.ruang || ''} onChange={(e) => set('ruang', e.target.value)}>
                 <option value="">— pilih ruang —</option>
-                {RUANG.map((r) => <option key={r} value={r}>{r}</option>)}
-                {j.ruang && !RUANG.includes(j.ruang) && <option value={j.ruang}>{j.ruang}</option>}
+                {daftarRuang.map((r) => <option key={r} value={r}>{r}</option>)}
+                {j.ruang && !daftarRuang.includes(j.ruang) && <option value={j.ruang}>{j.ruang}</option>}
               </select>
             </Field>
           </>
@@ -84,6 +91,11 @@ export function FormJadwalMhs({ awal, ev, konten = {}, onCancel, onSave }) {
           </>
         )}
       </div>
+      {bentrokRuang.length > 0 && (
+        <div className="login-err" style={{ marginTop: 12 }}>
+          ⛔ Ruang ini sudah terpakai pada jam tersebut: {teksBentrokRuang(bentrokRuang)}. Usulan tidak dapat diajukan — pilih ruang atau jam lain.
+        </div>
+      )}
       {err && <div className="login-err" style={{ marginTop: 12 }}>{err}</div>}
       <div className="modal-foot" style={{ paddingLeft: 0, paddingRight: 0 }}>
         <button className="btn" onClick={onCancel}>Batal</button>

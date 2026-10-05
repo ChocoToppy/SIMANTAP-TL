@@ -97,6 +97,33 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ----- Jadwal ruang (fitur eksperimental): ruang master, semester, booking -----
+    // Non-admin hanya boleh membaca yang sudah terbit; query klien WAJIB disertai
+    // where('status'|'terbit','==', ...) yang cocok (lihat useJadwalRuang.js).
+    match /ruang/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    match /semesterRuang/{id} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.status == 'terbit');
+      allow write: if isAdmin();
+    }
+    match /booking/{id} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.terbit == true);
+      allow write: if isAdmin();
+    }
+
+    // ----- Registri nomor surat: satu dokumen per nomor yang pernah terbit, tidak
+    // pernah dihapus (nomor kedaluwarsa tidak boleh dipakai ulang). Counter menyimpan
+    // nomor urut terakhir per tahun. Hanya admin (lewat transaksi di nomorSuratDb.js). -----
+    match /nomorSurat/{id} {
+      allow read, create, update: if isAdmin();
+      allow delete: if false;
+    }
+    match /nomorSuratCounter/{tahun} {
+      allow read, write: if isAdmin();
+    }
+
     // ----- Daftar angkatan yang bisa dipilih saat pendaftaran (arsip, bukan
     // hapus, spy data mahasiswa lama tetap konsisten — lihat SeksiAngkatan.jsx) -----
     match /angkatan/{id} {

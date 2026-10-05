@@ -114,8 +114,8 @@ export function KartuPengajuan({ m, allDosen = [], konten = {}, panduan = [], on
         <div className="callout callout-green"><strong>Lulus.</strong>{m.tanggalLulus ? ` Tanggal lulus: ${formatTanggal(m.tanggalLulus)}` : ''}</div>
       )}
 
-    {/* Dokumen KP/Magang per tahap: unduh (PDF) & unggah berkas ditandatangani/dinilai */}
-      {(isKP || isMG) && (
+    {/* Dokumen KP/Magang/TA per tahap: unduh (PDF) & unggah berkas ditandatangani/dinilai */}
+      {(isKP || isMG || isTA) && (
         <KpDocumentPanel m={m} program={programOf(m)} title={`Dokumen ${programDisplayLabel(m)}`} dosenByKode={dosenByKode} konten={konten} canUpload onUpload={onUploadDokumenKP} onDeleteUpload={onDeleteDokumenKP} />
       )}
 

@@ -6,6 +6,13 @@ import { SeksiPanduan } from './pengaturan/SeksiPanduan.jsx';
 import { SeksiKonten } from './pengaturan/SeksiKonten.jsx';
 import { SeksiAkun } from './pengaturan/SeksiAkun.jsx';
 import { SeksiStaf } from './pengaturan/SeksiStaf.jsx';
+import { SeksiForm } from './pengaturan/SeksiForm.jsx';
+import { SeksiNomorSurat } from './pengaturan/SeksiNomorSurat.jsx';
+import { SeksiJadwalRuang } from '../modules/ruang';
+import { FITUR_EKSPERIMENTAL } from '../utils/config.js';
+import { ErrorBoundary } from '../components/ErrorBoundary.jsx';
+import { TabIcon } from '../components/ui.jsx';
+import { konfirmasiKeluar } from '../utils/perubahanBelumDisimpan.js';
 
 // ===================== Pengaturan.jsx =====================
 // Halaman admin "Pengaturan" — dulunya tiga modal terpisah (Kelola periode /
@@ -20,13 +27,17 @@ import { SeksiStaf } from './pengaturan/SeksiStaf.jsx';
 // sendiri di folder ./pengaturan/ — halaman ini hanya jadi sidebar + router.
 
 const SUB_TABS = [
-  { key: 'periode', label: 'Periode', icon: '🗓️' },
-  { key: 'angkatan', label: 'Angkatan', icon: '🎓' },
-  { key: 'pengumuman', label: 'Pengumuman', icon: '📢' },
-  { key: 'panduan', label: 'Kelola Panduan', icon: '📘' },
-  { key: 'konten', label: 'Konten', icon: '📝' },
-  { key: 'akun', label: 'Akun Mahasiswa', icon: '🔑' },
-  { key: 'staf', label: 'Dosen & Admin', icon: '👤' },
+  { key: 'periode', label: 'Periode', icon: 'kalender' },
+  { key: 'angkatan', label: 'Angkatan', icon: 'mahasiswa' },
+  { key: 'pengumuman', label: 'Pengumuman', icon: 'pengumuman' },
+  { key: 'panduan', label: 'Kelola Panduan', icon: 'buku' },
+  { key: 'form', label: 'Form Pendaftaran', icon: 'pengajuan' },
+  { key: 'konten', label: 'Konten', icon: 'dokumen' },
+  { key: 'nomorSurat', label: 'Registri Nomor Surat', icon: 'dokumen' },
+  { key: 'akun', label: 'Akun Mahasiswa', icon: 'kunci' },
+  { key: 'staf', label: 'Dosen & Admin', icon: 'akun' },
+  // Eksperimental: hanya ada di build `full`, lihat FITUR_EKSPERIMENTAL.
+  ...(FITUR_EKSPERIMENTAL ? [{ key: 'ruang', label: 'Jadwal Ruang', icon: 'ruang' }] : []),
 ];
 
 export function Pengaturan({
@@ -34,13 +45,16 @@ export function Pengaturan({
   pengumuman, onSimpanPengumuman,
   panduan, onSimpanPanduan,
   konten = {}, onSimpanKonten,
-  akun = [], dosen = [], admin = [],
+  akun = [], dosen = [], mahasiswa = [], admin = [],
   onResetPassword, onCreateUser, onToggleAkunAktif, onDeleteAkun, onToggleDosenAktif, onEditDosen,
   isSuperAdmin = false, currentAdminUid, onDeleteAdmin, onClaimSuperAdmin, onUpdateSelfAdmin,
   angkatan = [], onTambahAngkatan, onToggleAngkatanAktif,
+  jadwalRuang = null, aksiJadwalRuang,
 }) {
   const [subTab, setSubTab] = useState(SUB_TABS[0].key);
   const aktif = SUB_TABS.find((t) => t.key === subTab) || SUB_TABS[0];
+  // Pindah menu: minta konfirmasi bila editor visual masih punya draf yang belum disimpan.
+  const pindahSeksi = (k) => { if (k === subTab || konfirmasiKeluar()) setSubTab(k); };
 
   return (
     <div className="pengaturan-layout">
@@ -52,9 +66,9 @@ export function Pengaturan({
               key={t.key}
               type="button"
               className={'pengaturan-nav-item' + (subTab === t.key ? ' active' : '')}
-              onClick={() => setSubTab(t.key)}
+              onClick={() => pindahSeksi(t.key)}
             >
-              <span className="pengaturan-nav-icon" aria-hidden="true">{t.icon}</span>
+              <span className="pengaturan-nav-icon" aria-hidden="true"><TabIcon tabKey={t.icon} /></span>
               {t.label}
             </button>
           ))}
@@ -85,9 +99,14 @@ export function Pengaturan({
         {subTab === 'konten' && (
           <SeksiKonten konten={konten} onSimpan={onSimpanKonten} />
         )}
+        {subTab === 'form' && (
+          <SeksiForm konten={konten} onSimpan={onSimpanKonten} bukaSeksi={pindahSeksi} dosen={dosen} angkatan={angkatan} periodeBuka={periodeBuka} />
+        )}
+        {subTab === 'nomorSurat' && <SeksiNomorSurat />}
         {subTab === 'akun' && (
           <SeksiAkun daftar={akun} onReset={onResetPassword} onToggleAktif={onToggleAkunAktif} onDelete={onDeleteAkun} />
         )}
+        {subTab === 'ruang' && <ErrorBoundary><SeksiJadwalRuang data={jadwalRuang} dosen={dosen} mahasiswa={mahasiswa} aksi={aksiJadwalRuang} /></ErrorBoundary>}
         {subTab === 'staf' && (
           <SeksiStaf dosen={dosen} admin={admin} onReset={onResetPassword} onCreate={onCreateUser} onToggleDosenAktif={onToggleDosenAktif} onEditDosen={onEditDosen}
             isSuperAdmin={isSuperAdmin} currentAdminUid={currentAdminUid} onDeleteAdmin={onDeleteAdmin} onClaimSuperAdmin={onClaimSuperAdmin} onUpdateSelfAdmin={onUpdateSelfAdmin} />

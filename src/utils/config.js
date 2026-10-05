@@ -11,6 +11,11 @@
 // program lain yang mungkin sudah ada dari sisi admin/dosen.
 export const PROGRAM_SCOPE = import.meta.env.VITE_PROGRAM_SCOPE || 'full';
 
+// Fitur yang belum siap produksi (mis. jadwal ruang dari Excel) — hanya aktif di
+// build eksperimental (`full`); di build produksi kodenya tetap ikut ter-bundle
+// tapi tidak pernah dirender/dimuat datanya.
+export const FITUR_EKSPERIMENTAL = PROGRAM_SCOPE !== 'prod';
+
 // 'prod' = KP & Magang (yang sudah selesai/siap produksi); tambahkan program
 // lain ke filter ini begitu masing-masing juga dianggap siap.
 export function programKeysTersedia(allKeys) {

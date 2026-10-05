@@ -1,5 +1,30 @@
 # Changelog
 
+## 05-10-2026 — Nomor surat otomatis + registri
+- Nomor surat tidak lagi diketik: di form edit mahasiswa, tombol "Ambil nomor" menyarankan nomor berikutnya (`013/UN7.F3.6.8.TL/DL/XII/2025`), admin mengonfirmasi, lalu nomor tercatat dan terpasang. Urutan per tahun, satu urutan untuk semua program; kode fakultas/penandatangan/hal tetap di `src/utils/nomorSurat.js`. Tombol aktif setelah data tersimpan dan pembimbing ditetapkan.
+- Registri baru di Pengaturan → Registri Nomor Surat: semua nomor yang pernah terbit (koleksi Firestore `nomorSurat`), bisa dicari/filter. Nomor kedaluwarsa tidak pernah dihapus atau dipakai ulang. Penerbitan memakai transaksi, jadi dua admin tidak bisa mendapat nomor yang sama. Aturan Firestore diperbarui — perlu `firebase deploy --only firestore:rules`.
+- "Akhiri nomor" mengedaluwarsakan nomor; "Akhiri & daftar ulang" juga mengosongkan pembimbing, mengembalikan ke Pendaftaran dengan rentang baru, dan mereset perpanjangan (tahap bisa dimajukan lewat dropdown tahap).
+- Perpanjangan kini dihitung: KP/Magang 1× 1 bulan, TA 2× 1 bulan, lewat tombol "Setujui perpanjangan" (menambah batas akhir). Nomor aktif yang lewat batas akhir dengan jatah perpanjangan habis diberi tanda "Perlu ditinjau" (tabel & form); sistem tidak pernah mengakhiri nomor sendiri.
+
+## 05-10-2026 — Pindah antar entri di form edit mahasiswa
+- Header modal "Edit mahasiswa" punya tombol ‹ n / total › untuk berpindah ke mahasiswa sebelumnya/berikutnya tanpa menutup form. Urutannya persis tabel yang sedang tampil: tab program, pencarian, filter (angkatan, bidang, status, verifikasi, dosen), urutan kolom, dan pengelompokan, lintas halaman paginasi.
+- Jika ada ubahan yang belum disimpan, muncul konfirmasi sebelum pindah (ubahan dibuang).
+
+## 02-10-2026 — Modul Ruang dipisah ke folder sendiri
+- Seluruh kode penggunaan ruang (grid harian/mingguan/bulanan, editor booking, impor Excel, sinkron program) dipindah ke `src/modules/ruang/` agar siap dipisah dari aplikasi suatu saat nanti. Perilaku tidak berubah.
+- Aplikasi hanya mengimpor lewat `modules/ruang/index.js`; semua ketergantungan modul ke kode induk ada di `modules/ruang/host.js`. Gaya grid pindah ke `modules/ruang/ruang.css`. Penjelasan batas, kontrak, dan langkah pemindahan ada di `modules/ruang/README.md`.
+
+## 29-09-2026 — Editor Form Pendaftaran di Pengaturan
+- Pengaturan punya bagian baru "Form Pendaftaran": menampilkan form pendaftaran asli yang dilihat mahasiswa (komponen yang sama, mode pratinjau); klik sebuah field lalu ubah judul, deskripsi, contoh isian (placeholder), status wajib, dan urutan tiap field form pendaftaran mahasiswa, terpisah per program (TA, Capstone, S2, KP, Magang, MKT). Berlaku langsung tanpa deploy ulang; disimpan di `config/global` → `konten.formPendaftaran`.
+- Field tidak bisa ditambah/dihapus — tetap di kode (`src/utils/formPendaftaran.js`) karena terikat ke data yang dibaca generator surat/PDF. Nama, judul, dan periode selalu wajib.
+- Pilihan dropdown Tema KP/Magang dan Bidang TA/Capstone/S2 diedit langsung di kartu field-nya (tambah, ubah nama, urutkan, nonaktifkan). Nonaktif, bukan hapus, supaya mahasiswa lama tetap menampilkan namanya; kode otomatis dan tidak bisa diubah (`src/utils/pilihan.js`).
+- Form edit admin untuk KP/Magang sebelumnya memakai daftar Bidang TA; sekarang memakai daftar Tema KP.
+- Bagian "Konten" juga ditampilkan sebagai komponen asli portal: panel dokumen KP/Magang/MKT dan kotak "Dokumen yang perlu disiapkan" per kegiatan. Klik lalu ubah teksnya di panel samping; hanya nilai yang berbeda dari bawaan yang disimpan.
+- Editor Form Pendaftaran dan Konten memakai draf: ubahan langsung terlihat di pratinjau tapi baru berlaku untuk mahasiswa setelah menekan "Simpan perubahan" (ada juga "Batalkan").
+- Peringatan bila meninggalkan editor dengan ubahan yang belum disimpan (pindah menu Pengaturan, Kembali, Logout, tutup/muat ulang tab), dan centang "Perubahan tersimpan" yang baru muncul setelah server Firestore mengonfirmasi tulisan.
+- Ikon menu Pengaturan diganti SVG yang selaras dengan sidebar.
+- Sidebar admin punya tombol sematkan (pin) agar tetap melebar tanpa hover.
+
 ## 02-09-2026 — Penambahan UI mobile-view untuk Mahasiswa
 - Menambahkan UI mobile view untuk mahasiswa, admin dan dosen belum memiliki mobile view yang optimal
 - Dist sekarang dibagi menjadi 2, production untuk deployment ke domain utama dan experimental untuk domain firebase

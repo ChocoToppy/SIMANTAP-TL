@@ -76,6 +76,17 @@ export function LogoutIcon({ className }) {
   );
 }
 
+// Ikon hamburger (tiga garis) — pembuka sidebar admin di layar sempit.
+export function HamburgerIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="4" y1="6" x2="20" y2="6" />
+      <line x1="4" y1="12" x2="20" y2="12" />
+      <line x1="4" y1="18" x2="20" y2="18" />
+    </svg>
+  );
+}
+
 function EyeIcon() {
   return (
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -196,6 +207,12 @@ const TAB_ICON_PATHS = {
   pengajuan: 'M9 2h6v2h3v18H6V4h3V2Zm2 2v1h2V4h-2ZM8 9h8v2H8V9Zm0 4h8v2H8v-2Zm0 4h5v2H8v-2Z',
   ruang: 'M4 3h16v18H4V3Zm2 2v14h12V5H6Zm2 2h3v3H8V7Zm5 0h3v3h-3V7Zm-5 5h3v3H8v-3Zm5 0h3v3h-3v-3Z',
   akun: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-4.4 0-8 2.2-8 5v1h16v-1c0-2.8-3.6-5-8-5Z',
+  // Ikon bagian halaman Pengaturan (nav samping /pengaturan) — gaya sama: isi penuh, currentColor.
+  kalender: 'M7 2h2v2h6V2h2v2h3v18H4V4h3V2Zm-1 8v10h12V10H6Zm2 2h3v3H8v-3Z',
+  pengumuman: 'M3 10v4h3l6 4V6L6 10H3Zm12-3.5v11c1.8-.9 3-2.7 3-5.5s-1.2-4.6-3-5.5Z',
+  buku: 'M5 3h13a1 1 0 0 1 1 1v17H7a2 2 0 0 1-2-2V3Zm2 2v10.2c.3-.1.7-.2 1-.2h9V5H7Zm1 12a1 1 0 0 0 0 2h9v-2H8Z',
+  dokumen: 'M6 2h8l6 6v14H6V2Zm7 1.5V9h5.5L13 3.5ZM9 13v2h8v-2H9Zm0 4v2h8v-2H9Z',
+  kunci: 'M8 5a5 5 0 1 1 0 10A5 5 0 0 1 8 5Zm0 3a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm4.5 1H22v4h-2v-2h-2v2h-2v-2h-3.5V9Z',
 };
 
 export function TabIcon({ tabKey }) {
@@ -217,12 +234,15 @@ export function Field({ label, children, full }) {
   );
 }
 
-export function Modal({ title, onClose, children, footer, wide }) {
+// opsi.stabil: tinggi modal tetap (tidak ikut isi) · opsi.tanpaAnimasi: lewati
+// animasi buka — dipakai saat berpindah entri supaya modal tidak "berkedip".
+export function Modal({ title, onClose, children, footer, wide, headExtra, opsi = {} }) {
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className={'modal' + (wide ? ' modal-wide' : '')} onClick={(e) => e.stopPropagation()}>
+    <div className={'modal-overlay' + (opsi.tanpaAnimasi ? ' no-anim' : '')} onClick={onClose}>
+      <div className={'modal' + (wide ? ' modal-wide' : '') + (opsi.stabil ? ' modal-stabil' : '')} onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h3>{title}</h3>
+          {headExtra}
           <button className="icon-btn" onClick={onClose} aria-label="Tutup">✕</button>
         </div>
         <div className="modal-body">{children}</div>

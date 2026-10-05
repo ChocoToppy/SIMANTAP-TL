@@ -335,6 +335,120 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
         }
       };
 
+    // Tugas Akhir — tata letak dulu; tag mengikuti "List of Tags.txt", isinya
+    // belum dicocokkan ke tiap template.
+    case 'Persetujuan UGB TA':
+      return {
+        template: 'TA/persetujuan-ugb.docx',
+        filename: `Persetujuan_UGB_${m.nama}.docx`,
+        data: {
+          nama_mhs: m.nama,
+          nim: m.nim,
+          judul_ta: m.judul,
+          tgl_cetak,
+          nama_dosen1: d1.nama || m.pembimbing1,
+          nip1: d1.nip || "-",
+          ...wali,
+        }
+      };
+
+    case 'Persetujuan Dosbing TA': {
+      const d2 = dosenByKode[m.pembimbing2] || {};
+      return {
+        template: 'TA/persetujuan-dosbing.docx',
+        filename: `Persetujuan_Dosbing_${m.nama}.docx`,
+        data: {
+          nama_mhs: m.nama,
+          nim: m.nim,
+          judul_ta: m.judul,
+          tgl_cetak,
+          nama_dosen1: d1.nama || m.pembimbing1,
+          nip1: d1.nip || "-",
+          nama_dosen2: d2.nama || m.pembimbing2 || "-",
+          nip2: d2.nip || "-",
+          ...wali,
+        }
+      };
+    }
+
+    case 'BA Sempro TA': {
+      const d2 = dosenByKode[m.pembimbing2] || {};
+      return {
+        template: 'TA/ba-sempro-ta.docx',
+        filename: `BA_Sempro_${m.nama}.docx`,
+        data: {
+          no_surat: m.nomorSurat || jEv.nomorST || "___/UN7.../2026",
+          nama_mhs: m.nama,
+          nim: m.nim,
+          judul_ta: m.judul,
+          tgl_sempro: formatTanggal(jEv.tanggal) || "-",
+          waktu_sempro: `${jEv.jamMulai || '-'} s.d ${jEv.jamSelesai || '-'}`,
+          tempat_sempro: jEv.ruang || "-",
+          tgl_surat_sempro: formatTanggal(jEv.tanggal) || "-",
+          tgl_cetak,
+          nama_dosen1: d1.nama || m.pembimbing1,
+          nip1: d1.nip || "-",
+          nama_dosen2: d2.nama || m.pembimbing2 || "-",
+          nip2: d2.nip || "-",
+          ...wali,
+        }
+      };
+    }
+
+    case 'BA Semhas TA': {
+      const d2 = dosenByKode[m.pembimbing2] || {};
+      return {
+        template: 'TA/ba-expo-ta.docx',
+        filename: `BA_Semhas_${m.nama}.docx`,
+        data: {
+          no_surat: m.nomorSurat || jEv.nomorST || "___/UN7.../2026",
+          nama_mhs: m.nama,
+          nim: m.nim,
+          judul_ta: m.judul,
+          tgl_expo: formatTanggal(jEv.tanggal) || "-",
+          waktu_expo: `${jEv.jamMulai || '-'} s.d ${jEv.jamSelesai || '-'}`,
+          tempat_expo: jEv.ruang || "-",
+          tgl_cetak,
+          nama_dosen1: d1.nama || m.pembimbing1,
+          nip1: d1.nip || "-",
+          nama_dosen2: d2.nama || m.pembimbing2 || "-",
+          nip2: d2.nip || "-",
+          ...wali,
+        }
+      };
+    }
+
+    case 'BA Sidang TA': {
+      // Dosen 1-2 = pembimbing, 3 = ketua penguji, 4 = anggota penguji.
+      const d2 = dosenByKode[m.pembimbing2] || {};
+      const d3 = dosenByKode[m.penguji1] || {};
+      const d4 = dosenByKode[m.penguji2] || {};
+      return {
+        template: 'TA/ba-sidang-ta.docx',
+        filename: `BA_Sidang_${m.nama}.docx`,
+        data: {
+          no_surat: m.nomorSurat || jEv.nomorST || "___/UN7.../2026",
+          nama_mhs: m.nama,
+          nim: m.nim,
+          judul_ta: m.judul,
+          hari_sidang: jEv.hari || "-",
+          tgl_sidang: formatTanggal(jEv.tanggal) || "-",
+          waktu_sidang: `${jEv.jamMulai || '-'} s.d ${jEv.jamSelesai || '-'}`,
+          tempat_sidang: jEv.ruang || "-",
+          tgl_cetak,
+          nama_dosen1: d1.nama || m.pembimbing1,
+          nip1: d1.nip || "-",
+          nama_dosen2: d2.nama || m.pembimbing2 || "-",
+          nip2: d2.nip || "-",
+          nama_dosen3: d3.nama || m.penguji1 || "-",
+          nip3: d3.nip || "-",
+          nama_dosen4: d4.nama || m.penguji2 || "-",
+          nip4: d4.nip || "-",
+          ...wali,
+        }
+      };
+    }
+
     default:
       return null;
   }

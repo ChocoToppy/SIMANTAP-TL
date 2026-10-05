@@ -7,8 +7,9 @@ import { Badge, StageBar, Field, Modal, Empty, ExportMenu } from '../components/
 // ===================== Dashboard.js =====================
 // Dashboard.js — ringkasan untuk koordinator (lintas program, bisa difilter)
 
-export function Dashboard({ mahasiswa, dosen }) {
-  const [prog, setProg] = useState('ALL'); // ALL | TA | KP | CAP
+// prog (ALL | TA | KP | CAP | MG | S2) dipegang App supaya sidebar mobile bisa
+// ikut mengubahnya.
+export function Dashboard({ mahasiswa, dosen, prog, setProg }) {
   const [bebanMode, setBebanMode] = useState('semua'); // 'semua' (incl lulus) | 'aktif'
 
   // Mahasiswa sesuai filter program (untuk metrik, beban, perhatian, sebaran).
@@ -71,7 +72,7 @@ export function Dashboard({ mahasiswa, dosen }) {
 
   return (
     <div className="dashboard">
-      <div className="seg">
+      <div className="seg dash-filter">
         {FILTERS.map((f) => (
           <button key={f.key} className={'seg-btn' + (prog === f.key ? ' active' : '')} onClick={() => setProg(f.key)}>
             {f.label}

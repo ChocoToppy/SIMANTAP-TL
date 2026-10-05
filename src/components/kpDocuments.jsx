@@ -8,12 +8,12 @@ import { FileDropZone } from './ui.jsx';
 // (dengan unggah berkas tanda tangan/nilai) dan panel admin (lihat semua,
 // tanpa unggah).
 
-export function KpDocumentPanel({ m, program = 'KP', dosenByKode = {}, konten = {}, canUpload = false, role = 'student', onUpload, onDeleteUpload, collapsible = true, title = 'Dokumen Kerja Praktek', activeStage }) {
+export function KpDocumentPanel({ m, program = 'KP', dosenByKode = {}, konten = {}, canUpload = false, role = 'student', onUpload, onDeleteUpload, collapsible = true, title = 'Dokumen Kerja Praktek', activeStage, pratinjau }) {
   const [expanded, setExpanded] = useState(!collapsible);
   const grup = dokumenPerTahap(program, m, konten);
-  // Dokumen yang butuh jadwal (mis. BA Seminar KP) selalu merujuk kegiatan
-  // utama program ini — KP & Magang masing-masing cuma punya satu.
-  const jEv = getJadwal(m, eventsFor(program)[0]);
+  // Dokumen yang butuh jadwal (mis. BA Seminar KP) merujuk `d.event`; kalau tidak
+  // diisi, pakai kegiatan utama program (KP & Magang cuma punya satu, TA tiga).
+  const jadwalDok = (d) => getJadwal(m, d.event || eventsFor(program)[0]);
   const [stageTabInternal, setStageTabInternal] = useState(grup[0] ? grup[0].stage : null);
   // Saat activeStage diberikan (mis. modal admin KP), panel ini mengikuti tab
   // tahap yang sama dengan panel utama — tidak punya tab sendiri lagi.
@@ -32,7 +32,7 @@ export function KpDocumentPanel({ m, program = 'KP', dosenByKode = {}, konten = 
       g.dokumen.forEach((d) => {
         if (!d.docType || !d.eligible) return;
         anyEligible = true;
-        const config = getTemplateConfig(d.docType, m, dosenByKode, jEv);
+        const config = getTemplateConfig(d.docType, m, dosenByKode, jadwalDok(d));
         if (config) prefetchTemplate(config.template);
       });
     });
@@ -78,9 +78,17 @@ export function KpDocumentPanel({ m, program = 'KP', dosenByKode = {}, konten = 
           )}
           {aktif ? (
             <div className="kp-dok-group" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {aktif.dokumen.map((d) => (
-                <KpDokumenItem key={d.key} d={d} m={m} jEv={jEv} dosenByKode={dosenByKode} canUpload={canUpload} role={role} onUpload={onUpload} onDeleteUpload={onDeleteUpload} />
-              ))}
+              {aktif.dokumen.map((d) => {
+                const item = <KpDokumenItem key={d.key} d={d} m={m} jEv={jadwalDok(d)} dosenByKode={dosenByKode} canUpload={canUpload} role={role} onUpload={onUpload} onDeleteUpload={onDeleteUpload} />;
+                if (!pratinjau) return item;
+                // Mode pratinjau (editor Pengaturan → Konten): tiap dokumen bisa dipilih untuk diedit.
+                return (
+                  <div key={d.key} className={'ff-slot ff-slot-rapat' + (pratinjau.terpilih === d.key ? ' ff-slot-on' : '')}>
+                    {item}
+                    <button type="button" className="ff-slot-hit" onClick={() => pratinjau.onPilih(d.key)} aria-label={`Ubah dokumen ${d.label}`} />
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <div className="hint">Tidak ada dokumen pada tahap ini.</div>

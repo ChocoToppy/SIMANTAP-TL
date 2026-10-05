@@ -1,189 +1,138 @@
 import React, { useState } from 'react';
-import { Field } from '../../components/ui.jsx';
-import { KP_DOKUMEN, MAGANG_DOKUMEN, MKT_DOKUMEN, BERKAS_SYARAT } from '../../utils/helpers.js';
+import { KP_DOKUMEN, MAGANG_DOKUMEN, MKT_DOKUMEN, BERKAS_SYARAT, berkasSyarat, programLabel } from '../../utils/helpers.js';
+import { KpDocumentPanel } from '../../components/kpDocuments.jsx';
+import { BerkasCallout } from '../../components/BerkasCallout.jsx';
+import { InspektorDokumen, InspektorBerkas } from './InspektorKonten.jsx';
+import { BarSimpan } from './BarSimpan.jsx';
+import { useDraftKonten } from './useDraftKonten.js';
 
-// ----- Editor konten: label/syarat dokumen KP + daftar berkas per kegiatan -----
-// Hanya teks informasional yang bisa diubah di sini — alur/tahapan/kelayakan
-// tetap ditentukan di kode (KP_DOKUMEN/BERKAS_SYARAT di helpers.js), yang juga
-// jadi nilai bawaan (default) tiap field selama admin belum meng-override-nya.
-export function SeksiKonten({ konten = {}, onSimpan }) {
+// ===================== SeksiKonten.jsx =====================
+// Editor teks yang tampil untuk mahasiswa, ditampilkan sebagai komponen ASLI dari
+// portal (panel dokumen & kotak "Dokumen yang perlu disiapkan") dalam mode
+// pratinjau — klik salah satu lalu ubah di panel samping. Hanya teks yang bisa
+// diubah; alur/tahapan/kelayakan dokumen tetap di kode (KP_DOKUMEN dkk. di
+// helpers.js) dan jadi nilai bawaan selama admin belum meng-override.
+// Disimpan di config/global → konten.dokumen[key] dan konten.berkasSyarat[kegiatan].
+
+const LAYAR = [
+  { key: 'KP', label: 'Dokumen KP', program: 'KP', daftar: KP_DOKUMEN },
+  { key: 'MG', label: 'Dokumen Magang', program: 'MG', jenis: 'Magang', daftar: MAGANG_DOKUMEN },
+  { key: 'MKT', label: 'Dokumen MKT', program: 'MG', jenis: 'MKT', daftar: MKT_DOKUMEN },
+  { key: 'berkas', label: 'Persiapan kegiatan' },
+];
+
+export function SeksiKonten({ konten: kontenTersimpan = {}, onSimpan: simpanKeServer }) {
+  // Semua ubahan masuk ke draf (`konten` di bawah = draf) dan baru ditulis ke Firestore
+  // lewat "Simpan perubahan"; pratinjau membaca draf, jadi langsung ikut berubah.
+  const { draft: konten, setDraft: onSimpan, dirty, simpan, batal } = useDraftKonten(kontenTersimpan, simpanKeServer);
+  const [layarKey, setLayarKey] = useState('KP');
+  const [terpilih, setTerpilih] = useState(null);
+  const [ev, setEv] = useState(Object.keys(BERKAS_SYARAT)[0]);
+  const layar = LAYAR.find((l) => l.key === layarKey);
   const overrideDokumen = konten.dokumen || {};
   const overrideBerkas = konten.berkasSyarat || {};
 
-  function simpanDokumen(key, patch) {
-    onSimpan({ ...konten, dokumen: { ...overrideDokumen, [key]: patch } });
+  // Simpan hanya beda dari bawaan — nilai yang kembali sama dibuang supaya tidak
+  // ditandai "Diubah" tanpa alasan.
+  function ubahDokumen(d, patch) {
+    const ov = { ...(overrideDokumen[d.key] || {}) };
+    for (const [k, v] of Object.entries(patch)) {
+      const t = String(v).trim();
+      if (!t || t === (d[k] || '')) delete ov[k]; else ov[k] = t;
+    }
+    const next = { ...overrideDokumen };
+    if (Object.keys(ov).length) next[d.key] = ov; else delete next[d.key];
+    onSimpan({ ...konten, dokumen: next });
   }
   function resetDokumen(key) {
     const next = { ...overrideDokumen };
     delete next[key];
     onSimpan({ ...konten, dokumen: next });
   }
-  function simpanBerkas(ev, list) {
-    onSimpan({ ...konten, berkasSyarat: { ...overrideBerkas, [ev]: list } });
+  function simpanBerkas(list) {
+    const sama = list.join('\n') === BERKAS_SYARAT[ev].join('\n');
+    const next = { ...overrideBerkas };
+    if (sama) delete next[ev]; else next[ev] = list;
+    onSimpan({ ...konten, berkasSyarat: next });
   }
-  function resetBerkas(ev) {
+  function resetBerkas() {
     const next = { ...overrideBerkas };
     delete next[ev];
     onSimpan({ ...konten, berkasSyarat: next });
   }
 
+  const dokTerpilih = layar.daftar && terpilih ? layar.daftar.find((d) => d.key === terpilih) : null;
+  // Mahasiswa contoh: belum diverifikasi, tahap Pendaftaran — kondisi di mana
+  // keterangan syarat tiap dokumen terlihat (setelah tersedia, tombol unduh yang tampil).
+  const contoh = layar.program ? { program: layar.program, jenisMagang: layar.jenis, tahap: 'Pendaftaran', verifikasi: 'baru', pendaftaran: {}, jadwal: {} } : null;
+  const namaProgram = layar.program ? (layar.key === 'MKT' ? 'MKT' : programLabel(layar.program)) : '';
+
   return (
     <div className="card">
       <p className="hint" style={{ marginTop: 0 }}>
-        Ubah teks yang tampil untuk mahasiswa — label & syarat tiap dokumen KP/Magang, dan
-        daftar berkas yang perlu disiapkan per kegiatan. Ini hanya teks; alur/tahapan/kelayakan
-        dokumen tetap ditentukan di kode, tidak berubah dari sini.
+        Tampilan di bawah adalah yang dilihat mahasiswa. Klik sebuah dokumen (atau kotak daftar
+        persiapan) untuk mengubah teksnya di panel samping. Ini hanya teks; alur, tahapan, dan
+        kelayakan dokumen tetap ditentukan di kode.
       </p>
 
-      <div className="sched-title" style={{ marginTop: 20 }}>Dokumen KP</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {KP_DOKUMEN.map((d) => (
-          <KontenDokumenCard
-            key={d.key}
-            d={d}
-            override={overrideDokumen[d.key]}
-            onSimpan={(patch) => simpanDokumen(d.key, patch)}
-            onReset={() => resetDokumen(d.key)}
-          />
+      <div className="program-tabs">
+        {LAYAR.map((l) => (
+          <button key={l.key} type="button" className={'program-tab' + (layarKey === l.key ? ' active' : '')} onClick={() => { setLayarKey(l.key); setTerpilih(null); }}>
+            {l.label}
+          </button>
         ))}
       </div>
 
-      <div className="sched-title" style={{ marginTop: 24 }}>Dokumen Magang</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {MAGANG_DOKUMEN.map((d) => (
-          <KontenDokumenCard
-            key={d.key}
-            d={d}
-            override={overrideDokumen[d.key]}
-            onSimpan={(patch) => simpanDokumen(d.key, patch)}
-            onReset={() => resetDokumen(d.key)}
-          />
-        ))}
-      </div>
-
-      <div className="sched-title" style={{ marginTop: 24 }}>Dokumen MKT (Mata Kuliah Terapan)</div>
-      <p className="hint" style={{ marginTop: 0 }}>
-        MKT punya berkas .docx sendiri (beda file dari Magang biasa), jadi labelnya diatur
-        terpisah di sini — tidak berbagi teks dengan Dokumen Magang di atas.
-      </p>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {MKT_DOKUMEN.map((d) => (
-          <KontenDokumenCard
-            key={d.key}
-            d={d}
-            override={overrideDokumen[d.key]}
-            onSimpan={(patch) => simpanDokumen(d.key, patch)}
-            onReset={() => resetDokumen(d.key)}
-          />
-        ))}
-      </div>
-
-      <div className="sched-title" style={{ marginTop: 24 }}>Dokumen yang perlu disiapkan (per kegiatan)</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {Object.keys(BERKAS_SYARAT).map((ev) => (
-          <KontenBerkasCard
-            key={ev}
-            ev={ev}
-            defaultList={BERKAS_SYARAT[ev]}
-            override={overrideBerkas[ev]}
-            onSimpan={(list) => simpanBerkas(ev, list)}
-            onReset={() => resetBerkas(ev)}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function KontenDokumenCard({ d, override, onSimpan, onReset }) {
-  const [expanded, setExpanded] = useState(false);
-  const [label, setLabel] = useState(override?.label || d.label);
-  const [syarat, setSyarat] = useState(override?.syarat || d.syarat);
-  const [linkEksternal, setLinkEksternal] = useState(override?.linkEksternal || d.linkEksternal || '');
-  const [linkLabel, setLinkLabel] = useState(override?.linkLabel || d.linkLabel || '');
-  const overridden = !!override;
-
-  function simpan() {
-    onSimpan({
-      label: label.trim() || d.label,
-      syarat: syarat.trim() || d.syarat,
-      ...(d.linkConfigurable ? { linkEksternal: linkEksternal.trim(), linkLabel: linkLabel.trim() || d.linkLabel } : {}),
-    });
-  }
-  function reset() {
-    setLabel(d.label);
-    setSyarat(d.syarat);
-    setLinkEksternal(d.linkEksternal || '');
-    setLinkLabel(d.linkLabel || '');
-    onReset();
-  }
-
-  return (
-    <div className="kp-dok-item" style={{ border: '1px solid var(--border-strong)', borderRadius: 8, padding: '10px 14px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <button type="button" className="link-btn" style={{ padding: '2px 0', fontSize: '0.85rem' }} onClick={() => setExpanded((v) => !v)}>
-          {expanded ? '▾' : '▸'} {override?.label || d.label}
-        </button>
-        {overridden && <span className="chip chip-on">Di-override</span>}
-      </div>
-      {expanded && (
-        <div className="form-grid" style={{ marginTop: 10 }}>
-          <Field label="Label" full><input value={label} onChange={(e) => setLabel(e.target.value)} /></Field>
-          <Field label="Syarat / hint" full><textarea rows={2} value={syarat} onChange={(e) => setSyarat(e.target.value)} /></Field>
-          {d.linkConfigurable && (
-            <>
-              <Field label="URL tautan" full><input value={linkEksternal} onChange={(e) => setLinkEksternal(e.target.value)} placeholder="https://..." /></Field>
-              <Field label="Label tombol" full><input value={linkLabel} onChange={(e) => setLinkLabel(e.target.value)} placeholder={d.linkLabel} /></Field>
-            </>
+      {layar.key === 'berkas' ? (
+        <>
+          <div className="program-tabs">
+            {Object.keys(BERKAS_SYARAT).map((k) => (
+              <button key={k} type="button" className={'program-tab' + (ev === k ? ' active' : '')} onClick={() => setEv(k)}>{k}</button>
+            ))}
+          </div>
+          <div className="ff-layout">
+            <div className="ff-canvas">
+              <div className="portal-form card">
+                <h2 className="page-title">{ev === 'Sidang' ? 'Unggah draft & berkas sidang' : `Ajukan jadwal ${ev}`}</h2>
+                <div className="ff-slot ff-slot-on">
+                  <BerkasCallout items={berkasSyarat(ev, konten)} />
+                  <div className="ff-slot-hit ff-slot-hit-diam" />
+                </div>
+                <p className="hint" style={{ margin: 0 }}>Kolom tanggal, jam, dan ruang di bawah kotak ini tidak ditampilkan di pratinjau.</p>
+              </div>
+            </div>
+            <InspektorBerkas key={ev} ev={ev} daftar={berkasSyarat(ev, konten)} diubah={!!overrideBerkas[ev]} onSimpan={simpanBerkas} onReset={resetBerkas} />
+          </div>
+        </>
+      ) : (
+        <div className="ff-layout">
+          <div className="ff-canvas">
+            <div className="portal-form card">
+              <KpDocumentPanel
+                key={layar.key} m={contoh} program={layar.program} konten={konten} collapsible={false}
+                title={`Dokumen ${namaProgram}`}
+                pratinjau={{ terpilih, onPilih: setTerpilih }}
+              />
+              <p className="hint" style={{ margin: '12px 0 0' }}>
+                Pratinjau untuk mahasiswa yang pendaftarannya belum diverifikasi, jadi keterangan syarat tiap dokumen terlihat.
+              </p>
+            </div>
+          </div>
+          {dokTerpilih ? (
+            <InspektorDokumen
+              key={dokTerpilih.key} d={dokTerpilih} o={overrideDokumen[dokTerpilih.key]}
+              onUbah={(patch) => ubahDokumen(dokTerpilih, patch)} onReset={() => resetDokumen(dokTerpilih.key)}
+            />
+          ) : (
+            <div className="ff-inspector">
+              <div className="ff-inspector-title">Ubah dokumen</div>
+              <p className="hint" style={{ margin: 0 }}>Klik sebuah dokumen pada tampilan di sebelah kiri untuk mengubah nama, keterangan syarat, atau tautannya.</p>
+            </div>
           )}
-          <div className="field-full" style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-primary" onClick={simpan}>Simpan</button>
-            {overridden && <button className="btn ghost" onClick={reset}>Reset ke default</button>}
-          </div>
         </div>
       )}
-    </div>
-  );
-}
 
-function KontenBerkasCard({ ev, defaultList, override, onSimpan, onReset }) {
-  const [expanded, setExpanded] = useState(false);
-  const [teks, setTeks] = useState((override || defaultList).join('\n'));
-  const [err, setErr] = useState('');
-  const overridden = !!override;
-
-  function simpan() {
-    const list = teks.split('\n').map((s) => s.trim()).filter(Boolean);
-    if (list.length === 0) { setErr('Isi minimal satu baris.'); return; }
-    setErr('');
-    onSimpan(list);
-  }
-  function reset() {
-    setTeks(defaultList.join('\n'));
-    setErr('');
-    onReset();
-  }
-
-  return (
-    <div className="kp-dok-item" style={{ border: '1px solid var(--border-strong)', borderRadius: 8, padding: '10px 14px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <button type="button" className="link-btn" style={{ padding: '2px 0', fontSize: '0.85rem' }} onClick={() => setExpanded((v) => !v)}>
-          {expanded ? '▾' : '▸'} {ev}
-        </button>
-        {overridden && <span className="chip chip-on">Di-override</span>}
-      </div>
-      {expanded && (
-        <div style={{ marginTop: 10 }}>
-          <Field label="Satu berkas per baris" full>
-            <textarea rows={4} value={teks} onChange={(e) => setTeks(e.target.value)} />
-          </Field>
-          {err && <div className="login-err" style={{ marginTop: 4 }}>{err}</div>}
-          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-            <button className="btn btn-primary" onClick={simpan}>Simpan</button>
-            {overridden && <button className="btn ghost" onClick={reset}>Reset ke default</button>}
-          </div>
-        </div>
-      )}
+      <BarSimpan dirty={dirty} onSimpan={simpan} onBatal={batal} />
     </div>
   );
 }

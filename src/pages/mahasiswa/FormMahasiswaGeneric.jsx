@@ -1,8 +1,10 @@
 import React from 'react';
-import { PROGRAM_KEYS, programLabel, punyaKlasifikasi, KLASIFIKASI, BIDANG, ringkasPendaftaran, normalizeUrl, formatTanggal, dokTA } from '../../utils/helpers.js';
+import { PROGRAM_KEYS, programLabel, punyaKlasifikasi, KLASIFIKASI, ringkasPendaftaran, normalizeUrl, formatTanggal, dokTA } from '../../utils/helpers.js';
+import { bidangUntukPilihan } from '../../utils/pilihan.js';
 import { cetakSuratPDF } from '../../utils/exportUtils.js';
 import { Field, Modal, FileDropZone } from '../../components/ui.jsx';
 import { RiwayatAktivitas } from './AktivitasCells.jsx';
+import { NomorSuratPanel } from './NomorSuratPanel.jsx';
 
 // Tata letak generik (non-KP) di dalam modal FormMahasiswa (lihat
 // FormMahasiswa.jsx) — dipakai untuk TA, Capstone Design, Magang, Tesis S2.
@@ -13,12 +15,14 @@ export function FormMahasiswaGeneric({
   roles, pembimbing1Label, penguji1Label, dosenOpts, stages, events, jadwalBlok,
   alurTahapBlok, notifikasiBlok, peringatanBlok, p,
   dosenByKode, ppBusy, ppErr, berikanSuratPerpanjangan,
-  baru, onCancel, submit,
+  baru, onCancel, submit, navEntri, modalOpsi,
 }) {
   return (
     <Modal
       title={baru ? 'Tambah mahasiswa' : 'Edit mahasiswa'}
       onClose={onCancel}
+      headExtra={navEntri}
+      opsi={modalOpsi}
       footer={
         <>
           <button className="btn" onClick={onCancel}>Batal</button>
@@ -47,11 +51,9 @@ export function FormMahasiswaGeneric({
                 <option value="perbaikan">Perlu perbaikan</option>
               </select>
             </Field>
-            <Field label="Nomor Surat">
-              <input value={m.nomorSurat || ''} onChange={(e) => set('nomorSurat', e.target.value)} placeholder="mis. 123/UN7.../2026" />
-            </Field>
+            <NomorSuratPanel m={m} setM={setM} baru={baru} />
           </div>
-          <div className="hint" style={{ marginTop: 6 }}>Nomor surat ini dipakai untuk semua surat program ini — isi saat verifikasi pertama kali.</div>
+          <div className="hint" style={{ marginTop: 6 }}>Nomor surat ini dipakai untuk semua surat program ini — ambil saat verifikasi pertama kali.</div>
         </div>
 
         {!baru && <RiwayatAktivitas m={m} />}
@@ -87,7 +89,7 @@ export function FormMahasiswaGeneric({
         )}
         <Field label="Bidang">
           <select value={m.bidang} onChange={(e) => set('bidang', e.target.value)}>
-            {BIDANG.map((b) => <option key={b.kode} value={b.kode}>{b.label}</option>)}
+            {bidangUntukPilihan(m.bidang).map((b) => <option key={b.kode} value={b.kode}>{b.label}</option>)}
           </select>
         </Field>
 

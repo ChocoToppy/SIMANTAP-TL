@@ -1,7 +1,9 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, punyaKlasifikasi, BIDANG, KP_TEMA, formatTanggal, formatTanggalSingkat, kondisi, SEMUA, statusVerif, cariBentrok, eventAktif, bidangLabel, tanggalDibuat, hitungNomorUrut, jenisMagangOf } from '../utils/helpers.js';
+import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, punyaKlasifikasi, formatTanggal, formatTanggalSingkat, kondisi, SEMUA, statusVerif, cariBentrok, eventAktif, bidangLabel, tanggalDibuat, hitungNomorUrut, jenisMagangOf } from '../utils/helpers.js';
+import { semuaKpTema, semuaBidang } from '../utils/pilihan.js';
 import { Badge, StageBar, ExportMenu, ColumnMenu, ColResizeHandle, Empty } from '../components/ui.jsx';
 import { useColumnWidths } from '../utils/useColumnWidths.js';
+import { perluDitinjau } from '../utils/nomorSurat.js';
 import { AktivitasMini, JadwalMini } from './mahasiswa/AktivitasCells.jsx';
 import { FormMahasiswa } from './mahasiswa/FormMahasiswa.jsx';
 import { eksporMahasiswa } from './mahasiswa/exportMahasiswa.js';
@@ -32,11 +34,11 @@ function kolomDosenProgram(programKey) {
   return cols;
 }
 
-export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeList, daftarAngkatan = [], konten = {}, onSave, onDelete }) {
+// Satu tabel = satu program (kolomnya beda-beda tiap program, jadi tidak
+// dicampur lagi). programTab dipegang App (default KP) supaya sidebar mobile
+// bisa ikut mengubahnya.
+export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeList, daftarAngkatan = [], konten = {}, onSave, onDelete, programTab, setProgramTab, jadwalRuang = null }) {
   const [q, setQ] = useState('');
-  // Satu tabel = satu program (kolomnya beda-beda tiap program, jadi tidak
-  // dicampur lagi) — defaultnya KP karena itu yang aktif jalan sekarang.
-  const [programTab, setProgramTab] = useState('KP');
   const [fAngkatan, setFAngkatan] = useState('');
   const [fBidang, setFBidang] = useState('');
   // KP/Magang & TA/Capstone pakai daftar kode bidang yang beda (KP_TEMA vs BIDANG) —
@@ -71,11 +73,14 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
   const [fDosen, setFDosen] = useState('');
   const [editing, setEditing] = useState(null);
   const [open, setOpen] = useState(false);
+  const [sudahPindah, setSudahPindah] = useState(false); // true = modal edit dibuka lewat ‹ › (tanpa animasi buka)
   // Filter tambahan (di luar pencarian & status) diciutkan di layar sempit —
   // supaya toolbar tidak jadi tumpukan dropdown yang berdesakan/terpotong.
   // Di layar lebar, CSS selalu menampilkannya (lihat .toolbar-extra), jadi
   // state ini cuma berpengaruh di mobile.
   const [filtersOpen, setFiltersOpen] = useState(false);
+  // Kolom cari diciutkan jadi ikon di layar sempit; melebar saat ditekan.
+  const [searchOpen, setSearchOpen] = useState(false);
   const [sortBy, setSortBy] = useState('nama'); // nama | tahap | deadline | dibuat
   const [sortDir, setSortDir] = useState('asc');
   function ubahSort(key) {
@@ -126,7 +131,7 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
   // Opsi filter Bidang ikut tab program aktif — KP/Magang pakai daftar tema KP_TEMA,
   // bukan BIDANG (topik TA/CAP), sesuai field `bidang` yang dipakai tiap gaya program
   // (lihat gantiProgram di FormPendaftaran.jsx).
-  const bidangOpsiFilter = (programTab === 'KP' || programTab === 'MG') ? KP_TEMA : BIDANG;
+  const bidangOpsiFilter = (programTab === 'KP' || programTab === 'MG') ? semuaKpTema() : semuaBidang();
 
   const angkatanList = useMemo(
     () => Array.from(new Set(mahasiswa.filter((m) => programOf(m) === programTab).map((m) => m.angkatan))).sort((a, b) => b - a),
@@ -216,8 +221,27 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
     return (nomorUrut[m.id] || {}).periode ?? '—';
   }
 
-  function tambah() { setEditing(null); setOpen(true); }
-  function edit(m) { setEditing(m); setOpen(true); }
+  // Urutan entri untuk tombol ‹ › di modal edit: persis urutan tabel — SEMUA baris
+  // hasil filter/sort (lintas halaman), dengan pengelompokan periode/angkatan
+  // ikut diterapkan seperti di grupRows.
+  const urutanEdit = useMemo(() => {
+    if (groupMode === 'none') return rows.map((r) => r.m.id);
+    const keyOf = (m) => (groupMode === 'angkatan' ? (m.angkatan || '—') : (m.periode || '—'));
+    const map = new Map();
+    rows.forEach((r) => {
+      const k = keyOf(r.m);
+      if (!map.has(k)) map.set(k, []);
+      map.get(k).push(r.m.id);
+    });
+    return Array.from(map.values()).flat();
+  }, [rows, groupMode]);
+  function pindahEdit(id) {
+    const r = rows.find((x) => x.m.id === id);
+    if (r) { setSudahPindah(true); setEditing(r.m); }
+  }
+
+  function tambah() { setSudahPindah(false); setEditing(null); setOpen(true); }
+  function edit(m) { setSudahPindah(false); setEditing(m); setOpen(true); }
   function simpan(m) { onSave(m); setOpen(false); }
   function hapus(m) { if (window.confirm(`Hapus data ${m.nama}?`)) onDelete(m.id); }
 
@@ -237,7 +261,22 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
         ))}
       </nav>
       <div className="toolbar">
-        <input className="search" placeholder="Cari nama, NIM, atau judul…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <div className={'search-wrap' + (searchOpen || q ? ' open' : '')}>
+          <button type="button" className="icon-btn-outline search-toggle" onClick={() => setSearchOpen(true)} title="Cari" aria-label="Cari">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="7" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+          </button>
+          <input
+            className="search"
+            placeholder="Cari nama, NIM, atau judul…"
+            value={q}
+            autoFocus={searchOpen}
+            onChange={(e) => setQ(e.target.value)}
+            onBlur={() => { if (!q) setSearchOpen(false); }}
+          />
+        </div>
         <div className="toolbar-filter">
           <button
             type="button"
@@ -246,6 +285,20 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
           >
             Filter{filterAktifCount > 0 ? ` (${filterAktifCount})` : ''} {filtersOpen ? '▴' : '▾'}
           </button>
+          {filterAktifCount > 0 && (
+            <button
+              type="button"
+              className="btn toolbar-clear"
+              title="Bersihkan filter"
+              aria-label="Bersihkan filter"
+              onClick={() => { setFStatus('all'); setFAngkatan(''); setFBidang(''); setFVerif(''); setFDosen(''); }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+                <line x1="6" y1="6" x2="18" y2="18" />
+                <line x1="18" y1="6" x2="6" y2="18" />
+              </svg>
+            </button>
+          )}
           {filtersOpen && (
             <>
               <div className="toolbar-filter-backdrop" onClick={() => setFiltersOpen(false)} />
@@ -282,7 +335,9 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
         </div>
         <ColumnMenu columns={kolomBisaSembunyi} hidden={hiddenCols} onToggle={toggleKolom} />
         <ExportMenu label="Ekspor" onXLSX={() => ekspor('xlsx')} onCSV={() => ekspor('csv')} />
-        <button className="btn btn-primary" onClick={tambah}>+ Tambah</button>
+        <button className="btn btn-primary tambah-btn" onClick={tambah} aria-label="Tambah">
+          <span className="tambah-plus">+</span><span className="tambah-label"> Tambah</span>
+        </button>
       </div>
 
       {(notif.baru + notif.perluJadwal + notif.perluHasil + notif.bentrok + notif.kelompok) > 0 && (
@@ -346,7 +401,7 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
                     </td>
                   )}
                   {!hiddenCols.has('aktivitas') && <td><AktivitasMini m={m} /></td>}
-                  {!hiddenCols.has('nomorSurat') && <td className="cell-sub">{m.nomorSurat || '—'}</td>}
+                  {!hiddenCols.has('nomorSurat') && <td className="cell-sub">{m.nomorSurat || '—'}{perluDitinjau(m) && <div><Badge tone="amber">Perlu ditinjau</Badge></div>}</td>}
                   <td className="cell-actions">
                     <button className="link-btn" onClick={() => edit(m)}>Edit</button>
                     <button className="link-btn danger" onClick={() => hapus(m)}>Hapus</button>
@@ -430,7 +485,11 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
 
       {open && (
         <FormMahasiswa
+          key={editing ? editing.id : 'baru'}
           awal={editing}
+          urutan={urutanEdit}
+          onPindah={pindahEdit}
+          sudahPindah={sudahPindah}
           allDosen={allDosen}
           allMahasiswa={allMahasiswa || mahasiswa}
           periode={periode}
@@ -438,6 +497,7 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
           daftarAngkatan={daftarAngkatan}
           konten={konten}
           defaultProgram={programTab}
+          jadwalRuang={jadwalRuang}
           onCancel={() => setOpen(false)}
           onSave={simpan}
         />

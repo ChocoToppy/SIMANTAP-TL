@@ -7,17 +7,22 @@ import { Login } from './pages/Login.jsx';
 import { Portal } from './pages/Portal.jsx';
 import { DosenPortal } from './pages/DosenPortal.jsx';
 import { PanduanPage } from './pages/PanduanPage.jsx';
+import { PenggunaanRuangPortal } from './modules/ruang';
 import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, stagesFor, eventsFor, punyaKlasifikasi, punyaSyarat, rolesFor, syaratLabel, getJadwal, STAGES, KLASIFIKASI, BIDANG, KP_TEMA, HARI, bidangLabel, todayISO, parseISO, daysBetween, BULAN, formatTanggal, kondisi, isAktif, indexTahap, hitungBeban, hitungBebanProgram, hitungBebanRinci, SEMUA, filterByPeriode, daftarPeriode, PERIODE_AKTIF, TOPIK, VERIFIKASI, statusVerif, tambahHari, LABEL_PENDAFTARAN, ringkasPendaftaran, RUANG, menitJam, rentangJadwal, jamTampil, beririsan, dosenTerlibat, kumpulkanEvent, cariBentrok, pesanNotifikasi, waLink, mailtoLink, waMahasiswa, TEMPLATE_SURAT, tokenSurat, renderSurat, PEJABAT, KOP_SURAT, evKeyDok, dokTA, DURASI_EVENT, JAM_KERJA, durasiEvent, jamTambah, dalamJamKerja, tahapBerikut, eventAktif, BERKAS_SYARAT, berkasSyarat, bolehAjukanJadwal, orphanedUploadPaths } from './utils/helpers.js';
 import { deleteUploadedFile, deleteUploadedFolder } from './utils/fileUpload.js';
 import { DOSEN_AWAL, plusHari, RAW_MAHASISWA, MAHASISWA_AWAL, AKUN_AWAL, PERIODE_BUKA_AWAL, PENGUMUMAN_AWAL, PERIODE_AKTIF_AWAL, PANDUAN_AWAL } from './data/seed.js';
-import { Badge, StageBar, ExportMenu, TextSizeToggle, ThemeToggle, RolePill, TabIcon, LogoutIcon, Dropdown, Muat, PasswordField } from './components/ui.jsx';
+import { Badge, StageBar, ExportMenu, TextSizeToggle, ThemeToggle, RolePill, TabIcon, LogoutIcon, Dropdown, Muat, PasswordField, HamburgerIcon } from './components/ui.jsx';
 import { db, auth } from './utils/firebase.js';
+import { setPilihan } from './utils/pilihan.js';
+import { konfirmasiKeluar } from './utils/perubahanBelumDisimpan.js';
 import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, query, where } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { readClaims, logout, changeOwnPassword, adminCreateUser, adminResetPassword, adminDeleteStudent, adminDeleteAdmin, claimSuperAdmin, adminUpdateSelf, studentUpdateProfile } from './utils/auth.js';
 import { bolehMasukDomainIni, KUNCI_DITOLAK } from './utils/domainAccess.js';
 import logoTl from './assets/logo-tl.png';
 import gearIcon from './assets/gear.png';
+import { FITUR_EKSPERIMENTAL } from './utils/config.js';
+import { useJadwalRuang, useSinkronProgram } from './modules/ruang';
 
 // Dirender saat akun non-super-admin login di domain terbatas: tandai penolakan
 // (dibaca layar Login untuk menampilkan pesan) lalu langsung keluar.
@@ -172,6 +177,21 @@ export default function App() {
   }
 
   const [tab, setTab] = useState('dashboard');
+  // Sidebar admin di layar sempit: laci yang bisa dibuka/ditutup (hamburger).
+  const [menuOpen, setMenuOpen] = useState(false);
+  // Sidebar desktop: disematkan = selalu melebar, tidak lagi bergantung hover.
+  const [pinned, setPinned] = useState(() => {
+    try { return localStorage.getItem('sidebarPinned') === '1'; } catch { return false; }
+  });
+  function togglePin() {
+    const next = !pinned;
+    setPinned(next);
+    try { localStorage.setItem('sidebarPinned', next ? '1' : '0'); } catch { /* storage diblokir */ }
+  }
+  // Filter program: dipegang di sini (bukan di halamannya) karena di mobile
+  // pilihannya ada di sidebar.
+  const [dashProg, setDashProg] = useState('ALL');
+  const [mhsProg, setMhsProg] = useState('KP');
 
   // Rute sederhana berbasis path asli (tanpa library router) — hanya dipakai
   // untuk memberi halaman Pengaturan alamatnya sendiri (/pengaturan), terpisah
@@ -185,10 +205,13 @@ export default function App() {
     return () => window.removeEventListener('popstate', onPop);
   }, []);
   function navigate(path) {
+    // Draf editor Pengaturan yang belum disimpan: minta konfirmasi dulu (lihat perubahanBelumDisimpan.js).
+    if (path !== window.location.pathname && !konfirmasiKeluar()) return;
     if (path !== window.location.pathname) window.history.pushState(null, '', path);
     setRoute(path);
   }
   function keluar() {
+    if (!konfirmasiKeluar()) return;
     logout();
     navigate('/');
   }
@@ -293,6 +316,10 @@ export default function App() {
     return () => unsub();
   }, [claims]);
 
+  // Jadwal ruang (eksperimental): ruang master, semester, booking. Lihat useJadwalRuang.js.
+  const { data: jadwalRuang, aksi: aksiJadwalRuang } = useJadwalRuang(authUser, claims);
+  const sinkronTidakMasuk = useSinkronProgram({ aktif: claims?.role === 'admin', mahasiswa: mahasiswaList, data: jadwalRuang, aksi: aksiJadwalRuang });
+
   const periodeBuka = useMemo(() => (data.periodeBuka || []).slice().sort(), [data.periodeBuka]);
   const periodeList = useMemo(() => {
     const set = new Set([...daftarPeriode(data.mahasiswa), ...periodeBuka]);
@@ -306,6 +333,8 @@ export default function App() {
     [data.angkatan]
   );
   const daftarAngkatan = useMemo(() => (data.angkatan || []).map((a) => a.label).sort(), [data.angkatan]);
+  // Daftar Tema KP/Bidang TA hasil edit admin — harus terpasang sebelum anak-anak dirender (lihat pilihan.js).
+  setPilihan(data.konten);
   const [periode, setPeriode] = useState(() => {
     const list = daftarPeriode(load().mahasiswa);
     return list.length ? list[list.length - 1] : SEMUA;
@@ -365,16 +394,20 @@ export default function App() {
     setDosenList((prev) => prev.filter((x) => x.kode !== kode));
     hapusDoc('dosen', kode);
   }
+  // Mengembalikan promise<boolean>: true hanya setelah server Firestore mengonfirmasi
+  // tulisan (dipakai editor Pengaturan untuk memunculkan centang "tersimpan").
+  // Pemanggil lain boleh mengabaikan nilainya.
   function simpanConfig(next) {
     setConfig(next);
     const perkiraanUkuran = new Blob([JSON.stringify(next)]).size;
     if (perkiraanUkuran > DOC_SAFE_LIMIT) {
       alert(`Gagal menyimpan: data konfigurasi sudah ${Math.round(perkiraanUkuran / 1024)} KB, mendekati/melebihi batas 1 MiB per dokumen Firestore. Perubahan ini TIDAK disimpan.`);
-      return;
+      return Promise.resolve(false);
     }
-    setDoc(doc(db, 'config', 'global'), next).catch((e) => {
+    return setDoc(doc(db, 'config', 'global'), next).then(() => true).catch((e) => {
       console.error('FB err:', e);
       alert('Gagal menyimpan perubahan ke server: ' + (e.message || e) + '\n\nPerubahan Anda BELUM tersimpan secara permanen. Coba lagi, atau hubungi admin.');
+      return false;
     });
   }
   function bukaPeriode(p) {
@@ -397,7 +430,7 @@ export default function App() {
     simpanConfig({ ...config, panduan: list });
   }
   function simpanKonten(next) {
-    simpanConfig({ ...config, konten: next });
+    return simpanConfig({ ...config, konten: next });
   }
   function tambahAngkatan(label) {
     const v = (label || '').trim();
@@ -481,6 +514,7 @@ export default function App() {
         angkatanAktif={angkatanAktif}
         panduan={data.panduan || []}
         konten={data.konten || {}}
+        jadwalRuang={jadwalRuang}
         onSave={simpanMahasiswa}
         onSimpanAkun={async (profil) => {
           const { nimBerubah } = await studentUpdateProfile(profil);
@@ -532,8 +566,11 @@ export default function App() {
             onSimpanPanduan={simpanPanduan}
             konten={data.konten || {}}
             onSimpanKonten={simpanKonten}
+            jadwalRuang={jadwalRuang}
+            aksiJadwalRuang={aksiJadwalRuang}
             akun={data.akun || []}
             dosen={data.dosen || []}
+            mahasiswa={data.mahasiswa || []}
             admin={adminList}
             angkatan={data.angkatan || []}
             onTambahAngkatan={tambahAngkatan}
@@ -560,22 +597,78 @@ export default function App() {
     { key: 'dashboard', label: 'Dashboard' },
     { key: 'mahasiswa', label: 'Mahasiswa' },
     { key: 'dosen', label: 'Dosen' },
+    // Eksperimental: hanya di build `full` (lihat FITUR_EKSPERIMENTAL).
+    ...(FITUR_EKSPERIMENTAL ? [{ key: 'ruang', label: 'Penggunaan Ruang' }] : []),
   ];
 
   return (
     <div className="app-root">
-      <nav className="sidebar">
+      <div className="mobile-bar">
+        <div className="mobile-bar-left">
+          <button type="button" className="icon-btn-outline hamburger" onClick={() => setMenuOpen(true)} title="Menu" aria-label="Buka menu" aria-expanded={menuOpen}>
+            <HamburgerIcon />
+          </button>
+          <ThemeToggle />
+        </div>
+        <div className="mobile-bar-brand">
+          <span className="brand-name">SIMANTAP</span>
+          <img className="brand-mark" src={logoTl} alt="TL Undip" />
+        </div>
+      </div>
+      {menuOpen && <div className="sidebar-backdrop" onClick={() => setMenuOpen(false)} />}
+      <nav className={'sidebar' + (menuOpen ? ' sidebar-open' : '') + (pinned ? ' sidebar-pinned' : '')}>
         <div className="sidebar-brand">
           <img className="brand-mark" src={logoTl} alt="TL Undip" />
           <span className="brand-name">SIMANTAP</span>
+          <button type="button" className="sidebar-pin" onClick={togglePin} aria-pressed={pinned} title={pinned ? 'Lepas sematan' : 'Sematkan sidebar'} aria-label={pinned ? 'Lepas sematan sidebar' : 'Sematkan sidebar'}>
+            <svg viewBox="0 0 24 24" fill={pinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 17v5" />
+              <path d="M9 3h6l-1 6 3.5 3.5V15h-11v-2.5L10 9z" />
+            </svg>
+          </button>
+        </div>
+        <div className="sidebar-role">
+          <RolePill peran={claims.super ? "superadmin" : "admin"} nama={profilAdmin.nama} judul={claims.super ? "Super Admin" : "Admin"} />
+        </div>
+        <div className="sidebar-periode">
+          <Dropdown
+            className="periode-pick"
+            value={periode}
+            onChange={setPeriode}
+            ariaLabel="Periode"
+            options={[...periodeList.map((pp) => ({ value: pp, label: pp })), { value: SEMUA, label: 'Semua periode' }]}
+          />
         </div>
         {TABS.map((t) => (
-          <button key={t.key} className={'sidebar-item' + (tab === t.key ? ' active' : '')} onClick={() => setTab(t.key)} title={t.label}>
+          <button key={t.key} className={'sidebar-item sidebar-nav' + (tab === t.key ? ' active' : '')} onClick={() => setTab(t.key)} title={t.label}>
             <TabIcon tabKey={t.key} />
             <span>{t.label}</span>
           </button>
         ))}
-        <button type="button" className="sidebar-item sidebar-logout" onClick={keluar} title="Logout">
+        {/* Mobile saja: filter program (Dashboard & Mahasiswa). Menu utama pindah ke bar bawah. */}
+        {(tab === 'dashboard' || tab === 'mahasiswa') && (
+          <div className="sidebar-programs">
+            <div className="sidebar-section">Program</div>
+            {[...(tab === 'dashboard' ? ['ALL'] : []), ...PROGRAM_KEYS].map((p) => {
+              const aktifP = (tab === 'dashboard' ? dashProg : mhsProg) === p;
+              return (
+                <button
+                  key={p}
+                  type="button"
+                  className={'sidebar-item' + (aktifP ? ' active' : '')}
+                  onClick={() => { (tab === 'dashboard' ? setDashProg : setMhsProg)(p); setMenuOpen(false); }}
+                >
+                  <span>{p === 'ALL' ? 'Semua' : programLabel(p)}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <button type="button" className="sidebar-item sidebar-settings" onClick={() => { setMenuOpen(false); navigate('/pengaturan'); }} title="Pengaturan" aria-label="Pengaturan">
+          <img src={gearIcon} alt="" width={20} height={20} className="gear-icon" />
+          <span>Pengaturan</span>
+        </button>
+        <button type="button" className="sidebar-item sidebar-logout" onClick={keluar} title="Logout" aria-label="Logout">
           <LogoutIcon className="tab-icon" />
           <span>Logout</span>
         </button>
@@ -583,7 +676,7 @@ export default function App() {
 
       <div className="app-main">
         <header className="topbar">
-          <div className="topbar-left">
+          <div className="topbar-left topbar-role">
             <RolePill peran={claims.super ? "superadmin" : "admin"} nama={profilAdmin.nama} judul={claims.super ? "Super Admin" : "Admin"} />
           </div>
           <div className="topbar-right">
@@ -596,7 +689,7 @@ export default function App() {
               ariaLabel="Periode"
               options={[...periodeList.map((pp) => ({ value: pp, label: pp })), { value: SEMUA, label: 'Semua periode' }]}
             />
-            <button className="icon-btn" onClick={() => navigate('/pengaturan')} title="Pengaturan" aria-label="Pengaturan">
+            <button className="icon-btn topbar-gear" onClick={() => navigate('/pengaturan')} title="Pengaturan" aria-label="Pengaturan">
               <img src={gearIcon} alt="" width={20} height={20} className="gear-icon" />
             </button>
           </div>
@@ -604,10 +697,11 @@ export default function App() {
         <div className="masthead-rule" />
 
         <main className="content">
-          {tab === 'dashboard' && <Dashboard mahasiswa={mhsPeriode} dosen={data.dosen} />}
+          {tab === 'dashboard' && <Dashboard mahasiswa={mhsPeriode} dosen={data.dosen} prog={dashProg} setProg={setDashProg} />}
           {tab === 'mahasiswa' && (
-            <Mahasiswa mahasiswa={mhsPeriode} allMahasiswa={data.mahasiswa} allDosen={data.dosen} periode={periode} periodeList={periodeList} daftarAngkatan={daftarAngkatan} konten={data.konten || {}} onSave={simpanMahasiswa} onDelete={hapusMahasiswa} />
+            <Mahasiswa programTab={mhsProg} setProgramTab={setMhsProg} jadwalRuang={jadwalRuang} mahasiswa={mhsPeriode} allMahasiswa={data.mahasiswa} allDosen={data.dosen} periode={periode} periodeList={periodeList} daftarAngkatan={daftarAngkatan} konten={data.konten || {}} onSave={simpanMahasiswa} onDelete={hapusMahasiswa} />
           )}
+          {FITUR_EKSPERIMENTAL && tab === 'ruang' && <PenggunaanRuangPortal mahasiswa={mhsPeriode} semuaMahasiswa={data.mahasiswa || []} jadwalRuang={jadwalRuang} dosen={data.dosen || []} aksi={aksiJadwalRuang} catatanSinkron={sinkronTidakMasuk} />}
           {tab === 'dosen' && (
             <Dosen dosen={data.dosen} mahasiswa={mhsPeriode} periodeLabel={periode === SEMUA ? 'semua periode' : periode} onSave={simpanDosen} onDelete={hapusDosen} />
           )}
@@ -615,6 +709,14 @@ export default function App() {
 
         <footer className="foot">SIMANTAP © 2026 Universitas Diponegoro</footer>
       </div>
+
+      <nav className="bottom-bar" aria-label="Menu utama">
+        {TABS.map((t) => (
+          <button key={t.key} type="button" className={'bottom-bar-item' + (tab === t.key ? ' active' : '')} onClick={() => setTab(t.key)} title={t.label} aria-label={t.label}>
+            <TabIcon tabKey={t.key} />
+          </button>
+        ))}
+      </nav>
     </div>
   );
 }

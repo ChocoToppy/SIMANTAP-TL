@@ -1,4 +1,7 @@
 import logoUndip from '../assets/logo-undip.png';
+import { BIDANG, KP_TEMA, labelPilihan } from './pilihan.js';
+// Daftar BIDANG/KP_TEMA bawaan + override admin (Pengaturan → Tema & Bidang) ada di pilihan.js.
+export { BIDANG, KP_TEMA };
 // ===================== helpers.js =====================
 // helpers.js — konstanta + semua logika murni (tanpa tampilan)
 
@@ -8,7 +11,7 @@ import logoUndip from '../assets/logo-undip.png';
 export const PROGRAMS = {
   TA: {
     label: 'Tugas Akhir',
-    stages: ['Pendaftaran', 'Penentuan Pembimbing', 'Seminar Proposal', 'Seminar Hasil', 'Sidang', 'Lulus'],
+    stages: ['Pendaftaran', 'Seminar Proposal', 'Seminar Hasil', 'Sidang', 'Lulus'],
     events: ['Seminar Proposal', 'Seminar Hasil', 'Sidang'],
     klasifikasi: true,
     syarat: true,
@@ -96,41 +99,11 @@ export const STAGES = PROGRAMS.TA.stages;
 
 export const KLASIFIKASI = ['Penelitian', 'Perencanaan'];
 
-// Bidang TA — kode + label. Tinggal tambah/ubah di sini.
-export const BIDANG = [
-  { kode: 'U', label: 'Udara' },
-  { kode: 'S', label: 'Sampah' },
-  { kode: 'DL', label: 'Drainase Lingkungan' },
-  { kode: 'AL', label: 'Air Limbah' },
-  { kode: 'AB', label: 'Air Bersih' },
-  { kode: 'K3L', label: 'K3L' },
-  { kode: 'MIX', label: 'Mixed' },
-];
-
-// Tema khusus Kerja Praktik (sesuai Ketentuan Khusus KP).
-export const KP_TEMA = [
-  { kode: 'PBPAM', label: 'Perencanaan Bangunan Pengolahan Air Minum' },
-  { kode: 'SPAM', label: 'Sistem Penyediaan Air Minum' },
-  { kode: 'K3', label: 'Kesehatan dan Keselamatan Kerja' },
-  { kode: 'B3', label: 'Pengelolaan Limbah Bahan Berbahaya dan Beracun (B3)' },
-  { kode: 'Drainase', label: 'Drainase / Penyaluran Air Buangan' },
-  { kode: 'PengolahanSampah', label: 'Pengolahan Sampah' },
-  { kode: 'SML', label: 'Sistem Manajemen Lingkungan' },
-  { kode: 'TeknologiBersih', label: 'Teknologi Bersih' },
-  { kode: 'ManajemenSampah', label: 'Manajemen Sampah' },
-  { kode: 'KualitasLingkungan', label: 'Pengelolaan Kualitas Lingkungan / Energi Terbarukan' },
-  //{ kode: 'PencemaranUdara', label: 'Pengendalian Pencemaran Udara' },
-  { kode: 'PemantauanUdara', label: 'Pemantauan Kualitas Udara' },
-  { kode: 'PengolahanAirLimbah', label: 'Perancangan Bangunan Pengolahan Air Limbah' },
-  //{ kode: 'Plumbing', label: 'Plumbing' }, 
-];
-
 // Hari (untuk jadwal seminar KP).
 export const HARI = ['Senin', 'Selasa', 'Rabu', 'Kamis', "Jum'at", 'Sabtu', 'Minggu'];
 
 export function bidangLabel(kode) {
-  const b = BIDANG.find((x) => x.kode === kode) || KP_TEMA.find((x) => x.kode === kode);
-  return b ? b.label : kode || '-';
+  return labelPilihan(kode) || kode || '-';
 }
 
 // ---------- Tanggal (disimpan sebagai 'YYYY-MM-DD') ----------
@@ -857,8 +830,8 @@ export const KP_DOKUMEN = [
   },
   {
     key: 'stPembimbing', stage: 'Bimbingan', label: 'ST Pembimbing KP', docType: 'ST Pembimbing KP',
-    syarat: 'Tersedia setelah surat balasan perusahaan diunggah dan admin menetapkan dosen pembimbing.',
-    eligible: (m) => tahapIndex('KP', m.tahap) >= tahapIndex('KP', 'Bimbingan') && !!m.pembimbing1,
+    syarat: 'Tersedia setelah surat balasan perusahaan diunggah, dan admin menetapkan dosen pembimbing serta nomor surat.',
+    eligible: (m) => tahapIndex('KP', m.tahap) >= tahapIndex('KP', 'Bimbingan') && !!m.pembimbing1 && !!m.nomorSurat,
     studentUpload: false,
   },
   {
@@ -904,8 +877,8 @@ export const MAGANG_DOKUMEN = [
   },
   {
     key: 'stPembimbingMagang', stage: 'Bimbingan', label: 'ST Pembimbing Magang', docType: 'ST Pembimbing Magang',
-    syarat: 'Tersedia setelah surat balasan perusahaan diunggah dan admin menetapkan dosen pembimbing.',
-    eligible: (m) => tahapIndex('MG', m.tahap) >= tahapIndex('MG', 'Bimbingan') && !!m.pembimbing1,
+    syarat: 'Tersedia setelah surat balasan perusahaan diunggah, dan admin menetapkan dosen pembimbing serta nomor surat.',
+    eligible: (m) => tahapIndex('MG', m.tahap) >= tahapIndex('MG', 'Bimbingan') && !!m.pembimbing1 && !!m.nomorSurat,
     studentUpload: false,
   },
   {
@@ -966,8 +939,8 @@ export const MKT_DOKUMEN = [
   },
   {
     key: 'stPembimbingMkt', stage: 'Bimbingan', label: 'ST Pembimbing MKT', docType: 'ST Pembimbing Magang',
-    syarat: 'Tersedia setelah surat balasan perusahaan diunggah dan admin menetapkan dosen pembimbing.',
-    eligible: (m) => tahapIndex('MG', m.tahap) >= tahapIndex('MG', 'Bimbingan') && !!m.pembimbing1,
+    syarat: 'Tersedia setelah surat balasan perusahaan diunggah, dan admin menetapkan dosen pembimbing serta nomor surat.',
+    eligible: (m) => tahapIndex('MG', m.tahap) >= tahapIndex('MG', 'Bimbingan') && !!m.pembimbing1 && !!m.nomorSurat,
     studentUpload: false,
   },
   {
@@ -995,13 +968,61 @@ export const MKT_DOKUMEN = [
   },
 ];
 
+// Dokumen per-tahap Tugas Akhir. Tata letaknya saja: label & syarat sudah
+// final, tapi isi tag template masih sementara. `event` = kegiatan yang jadwalnya
+// dipakai dokumen itu (TA punya 3 event, tidak seperti KP/Magang yang cuma satu).
+// docType null = belum ada template (kelayakan-ta) atau memang hanya unggahan
+// (berkas Semhas) — tampil tanpa tombol unduh.
+const jadwalFinal = (ev) => (m) => { const j = getJadwal(m, ev); return !!(j.dikonfirmasi && j.tanggal); };
+export const TA_DOKUMEN = [
+  {
+    key: 'persetujuanUgbTA', stage: 'Pendaftaran', label: 'Persetujuan UGB', docType: 'Persetujuan UGB TA',
+    syarat: 'Tersedia setelah pendaftaran diverifikasi admin. Unduh, tanda tangani, lalu unggah kembali.',
+    eligible: (m) => statusVerif(m).key === 'terverifikasi',
+  },
+  {
+    key: 'persetujuanDosbingTA', stage: 'Pendaftaran', label: 'Persetujuan Dosen Pembimbing', docType: 'Persetujuan Dosbing TA',
+    syarat: 'Tersedia setelah pendaftaran diverifikasi admin. Unduh, tanda tangani, lalu unggah kembali.',
+    eligible: (m) => statusVerif(m).key === 'terverifikasi',
+  },
+  {
+    key: 'kelayakanTA', stage: 'Pendaftaran', label: 'Surat Kelayakan TA', docType: null,
+    syarat: 'Tersedia setelah pendaftaran diverifikasi admin. Unduh, tanda tangani, lalu unggah kembali.',
+    eligible: (m) => statusVerif(m).key === 'terverifikasi',
+  },
+  {
+    key: 'baSemproTA', stage: 'Seminar Proposal', label: 'Berita Acara Seminar Proposal', docType: 'BA Sempro TA', event: 'Seminar Proposal',
+    syarat: 'Tersedia setelah jadwal Seminar Proposal dikonfirmasi admin.',
+    eligible: jadwalFinal('Seminar Proposal'),
+    studentUpload: false, adminUpload: true,
+  },
+  {
+    key: 'berkasSemhasTA', stage: 'Seminar Hasil', label: 'Berkas Persyaratan Seminar Hasil', docType: null,
+    syarat: 'Tersedia sejak tahap Seminar Hasil dimulai.',
+    catatan: 'Unggah satu file PDF berisi: (1) screenshot status "disetujui" oleh dosbing 1 dan 2, masing-masing 11x di SIAP (nama dan seluruh aktivitas harus terlihat) atau bukti manual pada aktivitas "Penetapan / pengujian proposal / Kelayakan"; (2) handout seminar proposal.',
+    eligible: (m) => tahapIndex('TA', m.tahap) >= tahapIndex('TA', 'Seminar Hasil'),
+  },
+  {
+    key: 'baSemhasTA', stage: 'Seminar Hasil', label: 'Berita Acara Seminar Hasil', docType: 'BA Semhas TA', event: 'Seminar Hasil',
+    syarat: 'Tersedia setelah jadwal Seminar Hasil dikonfirmasi admin.',
+    eligible: jadwalFinal('Seminar Hasil'),
+    studentUpload: false, adminUpload: true,
+  },
+  {
+    key: 'baSidangTA', stage: 'Sidang', label: 'Berita Acara Sidang', docType: 'BA Sidang TA', event: 'Sidang',
+    syarat: 'Tersedia setelah jadwal Sidang dikonfirmasi admin.',
+    eligible: jadwalFinal('Sidang'),
+    studentUpload: false, adminUpload: true,
+  },
+];
+
 // Satu sumber kebenaran KP_DOKUMEN/MAGANG_DOKUMEN/MKT_DOKUMEN + field Storage
 // tempat berkasnya disimpan pada record mahasiswa, dikunci per kode program.
 // Magang & MKT berbagi field Storage yang sama (dokumenMagang) — key-nya
 // sudah unik per jenis (mis. kelayakanMagang vs kelayakanMkt) jadi tidak
 // tabrakan meski disimpan di objek yang sama.
-const DOKUMEN_CONFIG = { KP: KP_DOKUMEN, MG: MAGANG_DOKUMEN };
-const DOKUMEN_FIELD = { KP: 'dokumenKP', MG: 'dokumenMagang' };
+const DOKUMEN_CONFIG = { KP: KP_DOKUMEN, MG: MAGANG_DOKUMEN, TA: TA_DOKUMEN };
+const DOKUMEN_FIELD = { KP: 'dokumenKP', MG: 'dokumenMagang', TA: 'dokumenTA' };
 // m opsional: kalau program === 'MG' dan m.jenisMagang === 'MKT', pakai
 // MKT_DOKUMEN alih-alih MAGANG_DOKUMEN. Tanpa m (mis. dipanggil hanya dengan
 // key+program dari kode lama), jatuh ke default MAGANG_DOKUMEN.
@@ -1052,6 +1073,7 @@ export function collectUploadPaths(m) {
   const paths = new Set();
   Object.values((m && m.dokumenKP) || {}).forEach((u) => { if (u && u.path) paths.add(u.path); });
   Object.values((m && m.dokumenMagang) || {}).forEach((u) => { if (u && u.path) paths.add(u.path); });
+  Object.values((m && m.dokumenTA) || {}).forEach((u) => { if (u && u.path) paths.add(u.path); });
   const pp = (m && m.perpanjangan) || {};
   if (pp.suratAdmin && pp.suratAdmin.path) paths.add(pp.suratAdmin.path);
   if (pp.suratFinal && pp.suratFinal.path) paths.add(pp.suratFinal.path);

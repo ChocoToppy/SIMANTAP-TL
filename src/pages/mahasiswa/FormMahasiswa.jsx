@@ -1,5 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { PROGRAMS, programOf, stagesFor, eventsFor, rolesFor, syaratLabel, SEMUA, buatId, todayISO, RUANG, jamTampil, cariBentrok, waMahasiswa, tahapBerikut, tahapSebelumnya, eventAktif, HARI, berkasSyarat, catatAktivitas, formatTanggal, normalizeUrl, dokumenFieldFor, dosenAktifUntuk } from '../../utils/helpers.js';
+import { opsiRuang, periksaUsulanRuang, teksBentrokRuang, milikProgram } from '../../modules/ruang';
+import { FITUR_EKSPERIMENTAL } from '../../utils/config.js';
 import { Field } from '../../components/ui.jsx';
 import { generateDocument, getTemplateConfig } from '../../utils/documentGenerator.js';
 import { readFileForUpload } from '../../utils/fileUpload.js';
@@ -11,7 +13,8 @@ import { FormMahasiswaGeneric } from './FormMahasiswaGeneric.jsx';
 // state & handler; tata letaknya sendiri (yang beda jauh untuk KP vs program
 // lain) dirender oleh FormMahasiswaKP.jsx / FormMahasiswaGeneric.jsx sebagai
 // komponen presentasional yang menerima semuanya lewat props.
-export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, periodeList, daftarAngkatan = [], konten = {}, defaultProgram = 'TA', onCancel, onSave }) {
+export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, periodeList, daftarAngkatan = [], konten = {}, defaultProgram = 'TA', jadwalRuang = null, urutan = [], onPindah = null, sudahPindah = false, onCancel, onSave }) {
+  const daftarRuang = opsiRuang(jadwalRuang, RUANG);
   const baru = !awal;
   const [err, setErr] = useState('');
   const [m, setM] = useState(() => {
@@ -30,6 +33,27 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
     return { ...base, program: PROGRAMS[base.program] ? base.program : 'TA', jadwal: base.jadwal || {} };
   });
 
+  // Pindah ke entri sebelumnya/berikutnya sesuai urutan tabel (filter/sort aktif).
+  // Form di-remount per entri (key di Mahasiswa.jsx), jadi ubahan yang belum
+  // disimpan akan hilang — minta konfirmasi dulu kalau ada.
+  const mAwal = useRef(null);
+  if (mAwal.current === null) mAwal.current = JSON.stringify(m);
+  const posisi = onPindah ? urutan.indexOf(m.id) : -1;
+  function pindah(arah) {
+    const tujuan = urutan[posisi + arah];
+    if (!tujuan) return;
+    if (JSON.stringify(m) !== mAwal.current && !window.confirm('Ada perubahan yang belum disimpan. Pindah entri akan membuangnya.\n\nTetap pindah?')) return;
+    onPindah(tujuan);
+  }
+  const navEntri = (!baru && posisi >= 0 && urutan.length > 1) ? (
+    <div className="entry-nav">
+      <button type="button" className="btn btn-sm" disabled={posisi <= 0} onClick={() => pindah(-1)} title="Entri sebelumnya" aria-label="Entri sebelumnya">‹</button>
+      <span className="entry-nav-pos">{posisi + 1} / {urutan.length}</span>
+      <button type="button" className="btn btn-sm" disabled={posisi >= urutan.length - 1} onClick={() => pindah(1)} title="Entri berikutnya" aria-label="Entri berikutnya">›</button>
+    </div>
+  ) : null;
+  const modalOpsi = { stabil: !!navEntri, tanpaAnimasi: sudahPindah };
+
   const set = (k, v) => setM((prev) => ({ ...prev, [k]: v }));
   const setPP = (k, v) => setM((prev) => ({ ...prev, perpanjangan: { ...(prev.perpanjangan || {}), [k]: v } }));
   const setTahap = (v) => setM((prev) => {
@@ -46,6 +70,15 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
   });
   const dosenByKode = useMemo(() => Object.fromEntries((allDosen || []).map((d) => [d.kode, d])), [allDosen]);
   const bentrokLive = useMemo(() => cariBentrok(allMahasiswa, m), [allMahasiswa, m]);
+  // Bentrok dengan jadwal ruang (kuliah/kegiatan) — peringatan untuk admin, boleh tetap disimpan.
+  const bentrokRuangLive = useMemo(() => {
+    if (!FITUR_EKSPERIMENTAL || !jadwalRuang) return [];
+    return Object.entries(m.jadwal || {}).flatMap(([ev, j]) => {
+      if (!j || !j.tanggal || !j.jamMulai || !j.jamSelesai || !j.ruang) return [];
+      const { bentrok } = periksaUsulanRuang(jadwalRuang, { tanggal: j.tanggal, jamMulai: j.jamMulai, jamSelesai: j.jamSelesai, ruang: j.ruang }, { abaikan: milikProgram(m.id, ev) });
+      return bentrok.length ? [`${ev}: ${j.ruang} terpakai — ${teksBentrokRuang(bentrok)}`] : [];
+    });
+  }, [jadwalRuang, m.jadwal]);
   const [nomorDisalin, setNomorDisalin] = useState(false);
   const setJadwal = (ev, key, val) =>
     setM((prev) => ({
@@ -140,7 +173,8 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
     const cb = cariBentrok(allMahasiswa, calon);
     // Bentrok jadwal HANYA peringatan, tidak mengunci (boleh jadwal bersamaan).
     if (masalah.length) { setErr('Tidak bisa menyimpan:\n• ' + masalah.join('\n• ')); return; }
-    if (cb.bentrok.length && !window.confirm('Ada bentrok jadwal:\n• ' + cb.bentrok.join('\n• ') + '\n\nTetap simpan?')) return;
+    const semuaBentrok = [...cb.bentrok, ...bentrokRuangLive.map((x) => 'Ruang: ' + x)];
+    if (semuaBentrok.length && !window.confirm('Ada bentrok jadwal:\n• ' + semuaBentrok.join('\n• ') + '\n\nTetap simpan?')) return;
     setErr('');
     onSave(baru ? catatAktivitas(calon, 'dibuat') : calon);
   }
@@ -157,7 +191,9 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
   const events = eventsFor(m.program);
   const roles = rolesFor(m.program);
   const pembimbing1Label = roles.pembimbing === 1 ? (roles.pembimbingLabel || 'Pembimbing') : 'Pembimbing 1';
-  const penguji1Label = roles.penguji === 1 ? 'Penguji' : 'Penguji 1';
+  // TA: penguji 1 = ketua, penguji 2 = anggota (ditetapkan admin saat tahap Sidang).
+  const penguji1Label = m.program === 'TA' ? 'Ketua Penguji' : (roles.penguji === 1 ? 'Penguji' : 'Penguji 1');
+  const penguji2Label = m.program === 'TA' ? 'Anggota Penguji' : 'Penguji 2';
   const p = m.pendaftaran || {};
 
   // ----- Blok kontak mahasiswa (dipakai di kedua tata letak) -----
@@ -191,6 +227,11 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
       {bentrokLive.bentrok.length > 0 && (
         <div className="callout callout-amber field-full" style={{ whiteSpace: 'pre-wrap' }}>
           ⚠ Peringatan bentrok jadwal (boleh tetap disimpan):{'\n• ' + bentrokLive.bentrok.join('\n• ')}
+        </div>
+      )}
+      {bentrokRuangLive.length > 0 && (
+        <div className="callout callout-amber field-full" style={{ whiteSpace: 'pre-wrap' }}>
+          🏫 Ruang bentrok dengan jadwal ruang (boleh tetap disimpan):{'\n• ' + bentrokRuangLive.join('\n• ')}
         </div>
       )}
       {bentrokLive.kelompok.length > 0 && (
@@ -274,8 +315,8 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
           <Field label="Ruang">
             <select value={j.ruang || ''} onChange={(e) => setJadwal(ev, 'ruang', e.target.value)}>
               <option value="">— pilih ruang —</option>
-              {RUANG.map((r) => <option key={r} value={r}>{r}</option>)}
-              {j.ruang && !RUANG.includes(j.ruang) && <option value={j.ruang}>{j.ruang}</option>}
+              {daftarRuang.map((r) => <option key={r} value={r}>{r}</option>)}
+              {j.ruang && !daftarRuang.includes(j.ruang) && <option value={j.ruang}>{j.ruang}</option>}
             </select>
           </Field>
         </div>
@@ -318,16 +359,16 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
     );
   };
 
-  if (m.program === 'KP' || m.program === 'MG') {
+  if (['KP', 'MG', 'TA'].includes(m.program)) {
     return (
       <FormMahasiswaKP
         m={m} setM={setM} set={set} gantiProgram={gantiProgram} setTahap={setTahap} periodeList={periodeList} daftarAngkatan={daftarAngkatan}
-        roles={roles} pembimbing1Label={pembimbing1Label} penguji1Label={penguji1Label} dosenOpts={dosenOpts} stages={stages}
+        roles={roles} pembimbing1Label={pembimbing1Label} penguji1Label={penguji1Label} penguji2Label={penguji2Label} dosenOpts={dosenOpts} stages={stages}
         alurTahapBlok={alurTahapBlok} notifikasiBlok={notifikasiBlok} peringatanBlok={peringatanBlok}
         tahapTab={tahapTab} setTahapTab={setTahapTab} p={p} events={events} jadwalBlok={jadwalBlok}
         dosenByKode={dosenByKode} konten={konten} uploadAdminDokumenKP={uploadAdminDokumenKP} hapusAdminDokumenKP={hapusAdminDokumenKP}
-        setPP={setPP} unduhPerpanjanganKP={unduhPerpanjanganKP} dlBusyKP={dlBusyKP}
-        baru={baru} onCancel={onCancel} submit={submit}
+        setPP={setPP} unduhPerpanjanganKP={unduhPerpanjanganKP} dlBusyKP={dlBusyKP} ppBusy={ppBusy} ppErr={ppErr} berikanSuratPerpanjangan={berikanSuratPerpanjangan}
+        baru={baru} onCancel={onCancel} submit={submit} navEntri={navEntri} modalOpsi={modalOpsi}
       />
     );
   }
@@ -338,7 +379,7 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
       roles={roles} pembimbing1Label={pembimbing1Label} penguji1Label={penguji1Label} dosenOpts={dosenOpts} stages={stages} events={events} jadwalBlok={jadwalBlok}
       alurTahapBlok={alurTahapBlok} notifikasiBlok={notifikasiBlok} peringatanBlok={peringatanBlok} p={p}
       dosenByKode={dosenByKode} ppBusy={ppBusy} ppErr={ppErr} berikanSuratPerpanjangan={berikanSuratPerpanjangan}
-      baru={baru} onCancel={onCancel} submit={submit}
+      baru={baru} onCancel={onCancel} submit={submit} navEntri={navEntri} modalOpsi={modalOpsi}
     />
   );
 }

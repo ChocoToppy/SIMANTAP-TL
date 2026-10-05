@@ -4,7 +4,7 @@ import { Empty, TextSizeToggle, ThemeToggle, TabIcon } from '../components/ui.js
 import { readFileForUpload } from '../utils/fileUpload.js';
 import logoTl from '../assets/logo-tl.png';
 import { AkunForm } from './portal/AkunForm.jsx';
-import { PenggunaanRuangPortal } from './portal/PenggunaanRuangPortal.jsx';
+import { PenggunaanRuangPortal } from '../modules/ruang';
 import { KartuPengajuan } from './portal/KartuPengajuan.jsx';
 import { FormPendaftaran } from './portal/FormPendaftaran.jsx';
 import { FormJadwalMhs } from './portal/FormJadwalMhs.jsx';
@@ -23,7 +23,7 @@ const PORTAL_TABS = [
   { key: 'akun', label: 'Akun' },
 ];
 
-export function Portal({ nim, nama, email, mahasiswa, allDosen, periodeBuka = [], angkatanAktif = [], panduan = [], konten = {}, onSave, onSimpanAkun, onLogout, onOpenPanduan, initialTab = 'pengajuan' }) {
+export function Portal({ nim, nama, email, mahasiswa, allDosen, periodeBuka = [], angkatanAktif = [], panduan = [], konten = {}, jadwalRuang = null, onSave, onSimpanAkun, onLogout, onOpenPanduan, initialTab = 'pengajuan' }) {
   const mine = mahasiswa.filter((m) => m.owner === nim);
   const [tab, setTab] = useState(initialTab);
   const [view, setView] = useState({ mode: 'list' });
@@ -120,13 +120,14 @@ export function Portal({ nim, nama, email, mahasiswa, allDosen, periodeBuka = []
                 allDosen={allDosen}
                 periodeBuka={periodeBuka}
                 angkatanAktif={angkatanAktif}
+                konten={konten}
                 onCancel={() => setView({ mode: 'list' })}
                 onSave={simpan}
               />
             )}
 
             {view.mode === 'jadwal' && editing && (
-              <FormJadwalMhs awal={editing} ev={view.ev || eventAktif(editing)} konten={konten} onCancel={() => setView({ mode: 'list' })} onSave={simpan} />
+              <FormJadwalMhs awal={editing} ev={view.ev || eventAktif(editing)} konten={konten} jadwalRuang={jadwalRuang} onCancel={() => setView({ mode: 'list' })} onSave={simpan} />
             )}
 
             {(view.mode === 'pp-minta' || view.mode === 'pp-final') && editing && (
@@ -135,7 +136,7 @@ export function Portal({ nim, nama, email, mahasiswa, allDosen, periodeBuka = []
           </>
         )}
 
-        {tab === 'ruang' && <PenggunaanRuangPortal mahasiswa={mahasiswa} />}
+        {tab === 'ruang' && <PenggunaanRuangPortal mahasiswa={mahasiswa} jadwalRuang={jadwalRuang} />}
 
         {tab === 'akun' && <AkunForm nama={nama} nim={nim} email={email} onSimpan={onSimpanAkun} onLogout={onLogout} />}
       </main>

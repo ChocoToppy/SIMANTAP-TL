@@ -198,7 +198,7 @@ function KpDosenActions({ m, dosenByKode, onGradeSave }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
-      <button type="button" className="btn" onClick={unduhSuratTugas} disabled={dlBusy}>{dlBusy ? 'Menyiapkan PDF…' : 'Unduh Surat Tugas (PDF)'}</button>
+      <button type="button" className="btn" onClick={unduhSuratTugas} disabled={dlBusy || !m.nomorSurat} title={m.nomorSurat ? undefined : 'Menunggu admin menetapkan nomor surat'}>{dlBusy ? 'Menyiapkan PDF…' : 'Unduh Surat Tugas (PDF)'}</button>
       <label className="field" style={{ margin: 0 }}>
         <span className="field-label">Nilai Seminar KP</span>
         <select
