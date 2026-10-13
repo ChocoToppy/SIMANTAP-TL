@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { catatAktivitas, dokumenConfigFor, dokumenFieldFor, eventAktif, programOf } from '../utils/helpers.js';
+import { catatAktivitas, dokumenConfigFor, dokumenFieldFor, eventAktif, programOf, programLabel } from '../utils/helpers.js';
+import { PROGRAM_KEYS_PENDAFTARAN } from './portal/shared.js';
 import { Empty, TextSizeToggle, ThemeToggle, TabIcon } from '../components/ui.jsx';
 import { readFileForUpload } from '../utils/fileUpload.js';
 import logoTl from '../assets/logo-tl.png';
 import { AkunForm } from './portal/AkunForm.jsx';
-import { PenggunaanRuangPortal } from '../modules/ruang';
+import { JadwalMahasiswa } from './portal/JadwalMahasiswa.jsx';
 import { KartuPengajuan } from './portal/KartuPengajuan.jsx';
+import { HalamanDokumen } from './portal/HalamanDokumen.jsx';
 import { FormPendaftaran } from './portal/FormPendaftaran.jsx';
 import { FormJadwalMhs } from './portal/FormJadwalMhs.jsx';
 import { FormPerpanjangan } from './portal/FormPerpanjangan.jsx';
@@ -19,12 +21,15 @@ import { FormPerpanjangan } from './portal/FormPerpanjangan.jsx';
 
 const PORTAL_TABS = [
   { key: 'pengajuan', label: 'Pengajuan' },
-  { key: 'ruang', label: 'Penggunaan Ruang' },
+  { key: 'ruang', label: 'Jadwal' },
   { key: 'akun', label: 'Akun' },
 ];
 
-export function Portal({ nim, nama, email, mahasiswa, allDosen, periodeBuka = [], angkatanAktif = [], panduan = [], konten = {}, jadwalRuang = null, onSave, onSimpanAkun, onLogout, onOpenPanduan, initialTab = 'pengajuan' }) {
+export function Portal({ nim, nama, email, mahasiswa, allDosen, periodeBuka = [], angkatanAktif = [], panduan = [], konten = {}, jadwalRuang = null, onSave, onDelete, onSimpanAkun, onLogout, onOpenPanduan, initialTab = 'pengajuan' }) {
   const mine = mahasiswa.filter((m) => m.owner === nim);
+  // Satu pengajuan per program (lihat idPengajuan & firestore.rules).
+  const programTerpakai = mine.map((m) => programOf(m));
+  const semuaTerpakai = PROGRAM_KEYS_PENDAFTARAN.every((k) => programTerpakai.includes(k));
   const [tab, setTab] = useState(initialTab);
   const [view, setView] = useState({ mode: 'list' });
 
@@ -55,6 +60,13 @@ export function Portal({ nim, nama, email, mahasiswa, allDosen, periodeBuka = []
     let rec = { ...m, [field]: dokumen };
     rec = catatAktivitas(rec, 'hapusBerkas', label);
     onSave(rec);
+  }
+
+  // Tautan yang dikirim dari halaman dokumen (saat ini hanya bukti Pembukuan KP
+  // → m.pembukuan.berkasLink). Tetap di halaman dokumen setelah tersimpan.
+  function kirimTautan(m, field, url) {
+    const rec = { ...m, [field]: { ...(m[field] || {}), berkasLink: url } };
+    onSave(catatAktivitas(rec, field));
   }
 
   const editing = view.id ? mine.find((m) => m.id === view.id) : null;
@@ -93,7 +105,8 @@ export function Portal({ nim, nama, email, mahasiswa, allDosen, periodeBuka = []
               <div className="portal">
                 <div className="toolbar">
                   <h2 className="page-title">Pengajuan saya</h2>
-                  <button className="btn btn-primary push" onClick={() => setView({ mode: 'daftar' })}>+ Ajukan pendaftaran</button>
+                  <button className="btn btn-primary push" onClick={() => setView({ mode: 'daftar' })} disabled={semuaTerpakai}
+                    title={semuaTerpakai ? 'Setiap program hanya bisa diajukan sekali. Hapus pengajuan lama untuk membuat yang baru.' : undefined}>+ Ajukan pendaftaran</button>
                 </div>
                 {mine.length === 0 ? (
                   <Empty>Belum ada pengajuan. Klik "Ajukan pendaftaran" untuk memulai.</Empty>
@@ -102,10 +115,10 @@ export function Portal({ nim, nama, email, mahasiswa, allDosen, periodeBuka = []
                     {mine.map((m) => (
                       <KartuPengajuan key={m.id} m={m} allDosen={allDosen} konten={konten} panduan={panduan}
                         onEdit={() => setView({ mode: 'edit', id: m.id })}
+                        onHapus={() => { if (window.confirm(`Hapus pengajuan ${programLabel(programOf(m))}? Semua berkas yang sudah diunggah ikut terhapus.`)) onDelete(m.id); }}
                         onJadwal={(ev) => setView({ mode: 'jadwal', id: m.id, ev })}
                         onPerpanjangan={(mode) => setView({ mode: 'pp-' + mode, id: m.id })}
-                        onUploadDokumenKP={(key, file) => uploadDokumenKP(m, key, file)}
-                        onDeleteDokumenKP={(key) => hapusDokumenKP(m, key)} />
+                        onDokumen={() => setView({ mode: 'dokumen', id: m.id })} />
                     ))}
                   </div>
                 )}
@@ -121,9 +134,18 @@ export function Portal({ nim, nama, email, mahasiswa, allDosen, periodeBuka = []
                 periodeBuka={periodeBuka}
                 angkatanAktif={angkatanAktif}
                 konten={konten}
+                programTerpakai={programTerpakai}
                 onCancel={() => setView({ mode: 'list' })}
                 onSave={simpan}
               />
+            )}
+
+            {view.mode === 'dokumen' && editing && (
+              <HalamanDokumen m={editing} allDosen={allDosen} konten={konten}
+                onBack={() => setView({ mode: 'list' })}
+                onUpload={(key, file) => uploadDokumenKP(editing, key, file)}
+                onDeleteUpload={(key) => hapusDokumenKP(editing, key)}
+                onKirimTautan={(field, url) => kirimTautan(editing, field, url)} />
             )}
 
             {view.mode === 'jadwal' && editing && (
@@ -136,7 +158,7 @@ export function Portal({ nim, nama, email, mahasiswa, allDosen, periodeBuka = []
           </>
         )}
 
-        {tab === 'ruang' && <PenggunaanRuangPortal mahasiswa={mahasiswa} jadwalRuang={jadwalRuang} />}
+        {tab === 'ruang' && <JadwalMahasiswa semua={mahasiswa} />}
 
         {tab === 'akun' && <AkunForm nama={nama} nim={nim} email={email} onSimpan={onSimpanAkun} onLogout={onLogout} />}
       </main>

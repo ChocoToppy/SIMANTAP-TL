@@ -22,12 +22,37 @@ service firebase.storage {
         && akunDoc(mhsDoc(mahasiswaId).owner).uid == request.auth.uid;
     }
 
+    // Berkas yang hanya diunggah admin: sama dengan dokumenAdmin() di
+    // firestore.rules, ditambah surat perpanjangan dari admin.
+    function berkasAdmin() {
+      return ['stPembimbing', 'baSeminar', 'stPembimbingMagang', 'monevMagang', 'baExpo',
+              'stPembimbingMkt', 'monevMkt', 'baExpoMkt', 'baSemproTA', 'baSemhasTA', 'baSidangTA',
+              'perpanjangan-admin'];
+    }
+    function pernahVerif(m) {
+      return m.get('verifikasi', 'baru') == 'terverifikasi' || m.get('pernahTerverifikasi', false) == true;
+    }
+    // Sama dengan pemeriksaan readFileForUpload di utils/fileUpload.js.
+    function pdfSah(fileName) {
+      return request.resource.size <= 25000000
+        && (request.resource.contentType == 'application/pdf' || fileName.matches('.*[.][pP][dD][fF]$'));
+    }
+
     // Berkas mahasiswa (proposal, laporan, dokumen KP, dst.) disimpan per
-    // mahasiswaId (= id dokumen mahasiswa/{id}) — akses mengikuti aturan yang
-    // sama seperti Firestore: admin bebas, dosen hanya untuk mahasiswa yang
-    // dibimbing/diuji, mahasiswa hanya untuk berkas miliknya sendiri.
+    // mahasiswaId (= id dokumen mahasiswa/{id}) di uploads/{id}/{key}/{berkas}.
+    // Baca: admin, dosen yang membimbing/menguji, dan mahasiswa pemiliknya.
+    // Tulis: seperti di aplikasi — admin bebas; mahasiswa hanya berkasnya sendiri
+    // (bukan berkas admin), PDF ≤ 25 MB, setelah pengajuan diverifikasi; dosen
+    // tidak mengunggah apa pun.
     match /uploads/{mahasiswaId}/{allPaths=**} {
-      allow read, write: if isAdmin() || isAssignedLecturer(mahasiswaId) || isOwnerStudent(mahasiswaId);
+      allow read: if isAdmin() || isAssignedLecturer(mahasiswaId) || isOwnerStudent(mahasiswaId);
+      allow write: if isAdmin();
+    }
+    match /uploads/{mahasiswaId}/{key}/{fileName} {
+      allow create, update: if isOwnerStudent(mahasiswaId) && !(key in berkasAdmin())
+        && pdfSah(fileName) && pernahVerif(mhsDoc(mahasiswaId));
+      // Hapus: berkas yang diganti/dihapus, dan seluruh folder saat pengajuan dihapus.
+      allow delete: if isOwnerStudent(mahasiswaId) && !(key in berkasAdmin());
     }
   }
 }

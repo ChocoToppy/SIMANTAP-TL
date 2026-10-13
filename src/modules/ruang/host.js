@@ -17,4 +17,4 @@ export {
 // --- Infrastruktur ---
 export { loadXLSX } from '../../utils/exportUtils.js'; // pemuat pustaka Excel
 export { db } from '../../utils/firebase.js'; // instance Firestore
-export { FITUR_EKSPERIMENTAL } from '../../utils/config.js'; // flag fitur
+export { FITUR_RUANG } from '../../utils/config.js'; // flag fitur

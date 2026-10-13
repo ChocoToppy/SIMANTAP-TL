@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { Modal, Field, Badge } from '../host.js';
 import { NAMA_HARI } from '../logic/jadwalRuang.js';
-import { FLAG, tebakLabelSemester } from '../logic/jadwalKuliahRekap.js';
-import { rancangImpor } from '../logic/ruangBooking.js';
+import { FLAG, tebakLabelSemester, terapkanSuntinganRuang } from '../logic/jadwalKuliahRekap.js';
+import { rancangImpor, ruangPersis } from '../logic/ruangBooking.js';
 
 const URUT_FLAG = ['bentrok', 'waktu-salah', 'ok', 'gabungan', 'tanpa-ruang', 'ruang-luar', 'belum'];
 
@@ -15,11 +15,16 @@ export function ImporRekapModal({ hasil, ruang, semesterAda, sibuk, galat, onImp
   const [f, setF] = useState(() => ({ label: tebakLabelSemester(hasil.sumber), mulai: '', selesai: '' }));
   const [err, setErr] = useState('');
   const [semua, setSemua] = useState(false);
+  // Suntingan ruang sebelum impor: ganti nama / gabungkan (nama sama) / lewati.
+  const [peta, setPeta] = useState(() => Object.fromEntries(hasil.ruang.map((n) => [n, { nama: n, lewati: false }])));
+  const ubahRuang = (n, patch) => setPeta((p) => ({ ...p, [n]: { ...p[n], ...patch } }));
+  const efektif = useMemo(() => terapkanSuntinganRuang(hasil, peta), [hasil, peta]);
+  const jumlahKelas = useMemo(() => hasil.slots.reduce((a, x) => ({ ...a, [x.ruang]: (a[x.ruang] || 0) + 1 }), {}), [hasil]);
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
 
   const hitung = useMemo(() => hasil.rows.reduce((a, r) => ({ ...a, [r.flag]: (a[r.flag] || 0) + 1 }), {}), [hasil]);
   const periode = mode === 'ada' ? semesterAda : f;
-  const ruangBaru = useMemo(() => rancangImpor(hasil, ruang, { id: '_', mulai: periode.mulai || '2000-01-01', selesai: periode.selesai || '2000-01-01' }).ruangBaru, [hasil, ruang, periode.mulai, periode.selesai]);
+  const ruangBaru = useMemo(() => rancangImpor(efektif, ruang, { id: '_', mulai: periode.mulai || '2000-01-01', selesai: periode.selesai || '2000-01-01' }).ruangBaru, [efektif, ruang, periode.mulai, periode.selesai]);
   const baris = useMemo(() => {
     const urut = hasil.rows.slice().sort((a, b) => URUT_FLAG.indexOf(a.flag) - URUT_FLAG.indexOf(b.flag));
     return semua ? urut : urut.filter((r) => r.flag !== 'ok');
@@ -31,10 +36,10 @@ export function ImporRekapModal({ hasil, ruang, semesterAda, sibuk, galat, onImp
       if (!f.mulai || !f.selesai || f.selesai < f.mulai) { setErr('Tanggal mulai dan selesai perkuliahan belum valid.'); return; }
     }
     setErr('');
-    onImpor(mode === 'baru' ? { baru: { label: f.label.trim(), mulai: f.mulai, selesai: f.selesai } } : { baru: null });
+    onImpor({ baru: mode === 'baru' ? { label: f.label.trim(), mulai: f.mulai, selesai: f.selesai } : null, hasil: efektif });
   }
 
-  const jumlahMasuk = (hitung.ok || 0) + (hitung.bentrok || 0);
+  const jumlahMasuk = efektif.slots.length;
   const footer = (
     <>
       <button className="btn" onClick={onBatal} disabled={sibuk}>Batal</button>
@@ -44,7 +49,7 @@ export function ImporRekapModal({ hasil, ruang, semesterAda, sibuk, galat, onImp
 
   return (
     <Modal title="Impor jadwal kuliah" onClose={sibuk ? undefined : onBatal} footer={footer} wide>
-      <p style={{ marginTop: 0 }}><strong>{hasil.sumber}</strong>: {hasil.rows.length} baris terbaca, <strong>{jumlahMasuk}</strong> akan diimpor ke {hasil.ruang.length} ruang.</p>
+      <p style={{ marginTop: 0 }}><strong>{hasil.sumber}</strong>: {hasil.rows.length} baris terbaca, <strong>{jumlahMasuk}</strong> akan diimpor ke {efektif.ruang.length} ruang.</p>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
         {URUT_FLAG.filter((k) => hitung[k]).map((k) => <Badge key={k} tone={FLAG[k].tone}>{FLAG[k].teks}: {hitung[k]}</Badge>)}
       </div>
@@ -69,6 +74,31 @@ export function ImporRekapModal({ hasil, ruang, semesterAda, sibuk, galat, onImp
         <div className="hint" style={{ marginBottom: 0 }}>Libur, UTS, dan UAS bisa ditambahkan sesudahnya lewat “Ubah semester” (blackout).</div>
       </div>
 
+      <details className="callout" style={{ marginBottom: 12 }}>
+        <summary><strong>Ruang ({hasil.ruang.length})</strong> — ubah nama, gabungkan, atau lewati sebelum impor</summary>
+        <div className="hint">Samakan nama dua ruang untuk menggabungkannya. Ruang yang dilewati tidak diimpor beserta kelasnya.</div>
+        <div className="jr-scroll" style={{ maxHeight: 220 }}>
+          <table className="tbl">
+            <thead><tr><th>Di berkas</th><th>Nama ruang</th><th>Kelas</th><th>Status</th><th>Lewati</th></tr></thead>
+            <tbody>
+              {hasil.ruang.map((n) => {
+                const p = peta[n];
+                const ada = ruang.some((r) => ruangPersis(r.nama, p.nama));
+                return (
+                  <tr key={n} style={p.lewati ? { opacity: 0.5 } : undefined}>
+                    <td className="cell-sub">{n}</td>
+                    <td><input list="ruang-ada" value={p.nama} disabled={p.lewati} onChange={(e) => ubahRuang(n, { nama: e.target.value })} /></td>
+                    <td className="cell-sub">{jumlahKelas[n] || 0}</td>
+                    <td>{p.lewati ? <span className="muted">—</span> : <Badge tone={ada ? 'green' : 'amber'}>{ada ? 'Sudah ada' : 'Baru'}</Badge>}</td>
+                    <td><input type="checkbox" checked={p.lewati} onChange={(e) => ubahRuang(n, { lewati: e.target.checked })} /></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <datalist id="ruang-ada">{ruang.map((r) => <option key={r.id} value={r.nama} />)}</datalist>
+        </div>
+      </details>
       {ruangBaru.length > 0 && <div className="hint">Ruang baru yang akan dibuat: {ruangBaru.map((r) => r.nama).join(', ')}.</div>}
       {hitung.bentrok > 0 && <div className="callout callout-amber" style={{ marginBottom: 8 }}>⚠ {hitung.bentrok} baris bentrok (ruang & jam beririsan dengan kelas lain di berkas). Tetap diimpor — periksa dengan pemberi jadwal.</div>}
 

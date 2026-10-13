@@ -1,5 +1,6 @@
 import logoUndip from '../assets/logo-undip.png';
 import { BIDANG, KP_TEMA, labelPilihan } from './pilihan.js';
+import { FITUR_EKSPERIMENTAL } from './config.js';
 // Daftar BIDANG/KP_TEMA bawaan + override admin (Pengaturan → Tema & Bidang) ada di pilihan.js.
 export { BIDANG, KP_TEMA };
 // ===================== helpers.js =====================
@@ -15,17 +16,21 @@ export const PROGRAMS = {
     events: ['Seminar Proposal', 'Seminar Hasil', 'Sidang'],
     klasifikasi: true,
     syarat: true,
-    pembimbing: 2,
+    // Sempro & Semhas: pembimbing + penguji 1. Sidang: pembimbing + penguji 1 & 2.
+    pembimbing: 1,
     penguji: 2,
+    pembimbingLabel: 'Dosen Pembimbing',
   },
   KP: {
     label: 'Kerja Praktik',
-    stages: ['Pendaftaran', 'Bimbingan', 'Seminar KP', 'Lulus'],
-    events: ['Seminar KP'],
+    // Pembukuan: mahasiswa mengirim tautan bukti laporan KP sudah diarsipkan
+    // & ditandatangani (m.pembukuan), tanpa jadwal.
+    stages: ['Pendaftaran', 'Bimbingan', 'Pembukuan', 'Lulus'],
+    events: [],
     klasifikasi: false,
     pembimbing: 1,
     penguji: 0,
-    pembimbingLabel: 'Dosen Pembimbing/Penguji',
+    pembimbingLabel: 'Dosen Pembimbing',
   },
   CAP: {
     label: 'Capstone Design',
@@ -79,6 +84,11 @@ export function judulLabelFor(m) {
   if (programOf(m) === 'MG') return 'Judul Magang';
   return 'Judul';
 }
+// docType surat perpanjangan per program (KP, TA, Magang/MKT).
+export function perpanjanganDocType(m) {
+  const prog = programOf(m);
+  return prog === 'KP' ? 'Perpanjangan KP' : prog === 'TA' ? 'Perpanjangan TA' : 'Perpanjangan Magang';
+}
 export function stagesFor(program) { return (PROGRAMS[program] || PROGRAMS.TA).stages; }
 export function eventsFor(program) { return (PROGRAMS[program] || PROGRAMS.TA).events; }
 export function punyaKlasifikasi(program) { return (PROGRAMS[program] || PROGRAMS.TA).klasifikasi; }
@@ -99,7 +109,7 @@ export const STAGES = PROGRAMS.TA.stages;
 
 export const KLASIFIKASI = ['Penelitian', 'Perencanaan'];
 
-// Hari (untuk jadwal seminar KP).
+// Hari (untuk isian hari pada jadwal kegiatan).
 export const HARI = ['Senin', 'Selasa', 'Rabu', 'Kamis', "Jum'at", 'Sabtu', 'Minggu'];
 
 export function bidangLabel(kode) {
@@ -189,7 +199,7 @@ export function hitungBebanRinci(mahasiswa, kodeDosen, opts) {
     pengujiTA: ta.penguji,
     bimbinganCAP: cap.bimbingan,
     pengujiCAP: cap.penguji,
-    bimbinganKP: kp.bimbingan, // KP: 1 pembimbing/penguji, dihitung sebagai bimbingan
+    bimbinganKP: kp.bimbingan, // KP: 1 pembimbing
     bimbinganMG: mg.bimbingan, // Magang: 1 pembimbing/penguji
     bimbinganS2: s2.bimbingan,
     pengujiS2: s2.penguji,
@@ -219,6 +229,11 @@ export function dosenAktifUntuk(allDosen, ...current) {
 }
 export function buatId() {
   return 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+// ID pengajuan buatan mahasiswa: satu dokumen per (NIM, program). Harus sama
+// persis dengan aturan create di firestore.rules.
+export function idPengajuan(nim, program) {
+  return `${nim}_${program}`;
 }
 
 // ===================== Verifikasi pendaftaran =====================
@@ -317,10 +332,32 @@ export function jamTampil(j) {
   return (j && j.jam) || '';
 }
 
+// Jadwal kegiatan yang DIGANTI (tanggal/jam/ruang berubah, atau hasilnya dihapus) dan sebelumnya
+// sudah final/berhasil dinilai dipindah ke m.riwayatJadwal supaya mahasiswa punya log lengkap.
+// Usulan yang belum dikonfirmasi tidak diarsipkan (cuma draf yang diubah-ubah).
+export function arsipkanJadwal(lama, baru) {
+  if (!lama) return baru;
+  const arsip = [];
+  Object.keys(lama.jadwal || {}).forEach((ev) => {
+    const a = lama.jadwal[ev] || {};
+    const b = (baru.jadwal || {})[ev] || {};
+    if (!a.tanggal || !(a.dikonfirmasi || a.hasil)) return;
+    const berubah = a.tanggal !== b.tanggal || a.jamMulai !== b.jamMulai || a.ruang !== b.ruang || (a.hasil && a.hasil !== b.hasil);
+    if (berubah) arsip.push({ ev, ...a, diarsipkan: new Date().toISOString() });
+  });
+  return arsip.length ? { ...baru, riwayatJadwal: [...(baru.riwayatJadwal || lama.riwayatJadwal || []), ...arsip] } : baru;
+}
+
 export function beririsan(a, b) { return a[0] < b[1] && b[0] < a[1]; }
 
 export function dosenTerlibat(m) {
   return [m.pembimbing1, m.pembimbing2, m.penguji1, m.penguji2].filter(Boolean);
+}
+
+// Dosen yang hadir pada satu kegiatan. TA: penguji 2 hanya ikut Sidang.
+export function dosenEvent(m, ev) {
+  if (programOf(m) === 'TA' && ev !== 'Sidang') return [m.pembimbing1, m.penguji1].filter(Boolean);
+  return dosenTerlibat(m);
 }
 
 // Kumpulkan semua event terjadwal (punya tanggal) dari daftar mahasiswa.
@@ -334,7 +371,7 @@ export function kumpulkanEvent(mahasiswa) {
       out.push({
         key: m.id + '|' + ev, m, ev, tanggal: j.tanggal,
         ruang: j.ruang || '', jam: jamTampil(j), rentang: rentangJadwal(j),
-        dosen: dosenTerlibat(m),
+        dosen: dosenEvent(m, ev),
       });
     });
   });
@@ -351,7 +388,6 @@ export function kumpulkanEvent(mahasiswa) {
 export function cariBentrok(semuaMahasiswa, calonM) {
   const lain = (semuaMahasiswa || []).filter((x) => x.id !== calonM.id && !x.dibatalkan);
   const lainEvents = kumpulkanEvent(lain);
-  const myDosen = dosenTerlibat(calonM);
   const pesanBentrok = [];
   const pesanKelompok = [];
   
@@ -363,6 +399,7 @@ export function cariBentrok(semuaMahasiswa, calonM) {
     if (!j.tanggal) return;
     const rentang = rentangJadwal(j);
     if (!rentang) return; // tak bisa cek tanpa jam mulai/selesai
+    const myDosen = dosenEvent(calonM, ev);
     lainEvents.forEach((e) => {
       if (e.tanggal !== j.tanggal || !e.rentang) return;
       if (!beririsan(rentang, e.rentang)) return;
@@ -688,7 +725,11 @@ export function dokTA(jenis, m, dosenByKode = {}, ev = '') {
   if (jenis === 'perpanjangan') {
     const pp = m.perpanjangan || {};
     const mulai = m.tanggalMulai ? formatTanggal(m.tanggalMulai) : '..........';
-    const akhir = m.batasAkhir ? formatTanggal(m.batasAkhir) : '..........';
+    // Akhir periode sebelum perpanjangan terakhir yang disetujui (lihat utils/perpanjangan.js),
+    // supaya mencetak ulang setelah batas akhir maju tidak menggeser tanggal di surat.
+    const riwayatPp = pp.riwayat || [];
+    const akhirIso = riwayatPp.length ? riwayatPp[riwayatPp.length - 1].dari : m.batasAkhir;
+    const akhir = akhirIso ? formatTanggal(akhirIso) : '..........';
     const alasanTahap = pp.alasan ? `Alasan: ${pp.alasan}` : 'Alasan: ..........................................................';
     return `Kepada Yth. Koordinator Tugas Akhir\nDepartemen Teknik Lingkungan, Fakultas Teknik Undip\n\nHal: Permohonan Perpanjangan Tugas Akhir\n\nDengan hormat, saya yang bertanda tangan di bawah ini:\n  Nama     : ${nama}\n  NIM      : ${nim}\n  Judul TA : ${judul}\n  Waktu TA : ${mulai} s.d. ${akhir}\n\nMemohon perpanjangan penyelesaian Tugas Akhir selama 1 (satu) bulan.\n${alasanTahap}\n\nDemikian surat ini dibuat untuk dapat dipergunakan sebagaimana perlunya.\n\nSemarang, ${pp.tanggalDiminta ? formatTanggal(pp.tanggalDiminta) : tglSurat}\nPemohon,\n\n\n${nama}\nNIM. ${nim}\n\nMenyetujui,\nDosen Pembimbing I                         Dosen Pembimbing II\n\n\n${p1}                     ${p2}\nNIP. ${p1n}               NIP. ${p2n}\n\n============================================================\n\nPERPANJANGAN TUGAS AKHIR\nNo: ............................................\n\nMahasiswa berikut ini:\n  Nama            : ${nama}\n  NIM             : ${nim}\n  Dosen Pemb. I   : ${p1}\n  Dosen Pemb. II  : ${p2}\n  Judul           : ${judul}\n\nBerdasarkan Surat Tugas terdahulu yang berakhir pada tanggal ${akhir}, dan mengingat\nTugas Akhir mahasiswa tersebut belum dapat diselesaikan, maka diberikan perpanjangan\nwaktu penyelesaian Tugas Akhir selama 1 (satu) bulan terhitung sejak ${akhir}.\n\nSemarang, ${tglSurat}\nDepartemen Teknik Lingkungan, Fakultas Teknik, Universitas Diponegoro\nKetua,\n\n\n${K}\nNIP. ${KN}`;
   }
@@ -697,7 +738,7 @@ export function dokTA(jenis, m, dosenByKode = {}, ev = '') {
 
 // ===================== Alur tahap (state machine) =====================
 // Durasi baku tiap kegiatan (menit) + jam kerja.
-export const DURASI_EVENT = { 'Seminar Proposal': 60, 'Seminar Hasil': 60, 'Sidang': 120, 'Expo': 60, 'Seminar KP': 60 };
+export const DURASI_EVENT = { 'Seminar Proposal': 60, 'Seminar Hasil': 60, 'Sidang': 120, 'Expo': 60 };
 export const JAM_KERJA = { mulai: '08:00', selesai: '16:30' };
 export function durasiEvent(ev) { return DURASI_EVENT[ev] || 60; }
 
@@ -741,16 +782,15 @@ export function eventAktif(m) {
   return eventsFor(programOf(m)).includes(t) ? t : null;
 }
 
-// Key dokumen "Persetujuan" yang membuka tombol "Ajukan jadwal" event utama
-// (Seminar KP untuk KP, Expo untuk Magang/MKT) begitu mahasiswa
+// Key dokumen "Persetujuan" yang membuka tombol "Ajukan jadwal" Expo
+// Magang/MKT begitu mahasiswa
 // mengunggahnya — dicek murni dari keberadaan berkasnya, TIDAK dari tahap
 // saat ini, supaya begitu terunggah tombolnya tetap ada (persisten) baik
 // sebelum admin resmi memindahkan tahap dari "Bimbingan" MAUPUN sesudah
 // mahasiswa lulus (jejak riwayat jadwal tetap terlihat). Hanya berlaku
-// untuk program dengan satu event tunggal (KP, Magang/MKT); TA/CAP/S2
+// untuk program dengan satu event tunggal (Magang/MKT); TA/CAP/S2
 // (event berjenjang: sempro -> semhas -> sidang) tidak punya jalur ini.
 const PERSETUJUAN_AWAL_KEY = {
-  KP: () => 'persetujuanSmkp',
   MG: (m) => (jenisMagangOf(m) === 'MKT' ? 'persetujuanSmkpMkt' : 'persetujuanSmMagang'),
 };
 export function bolehUsulEventAwal(m) {
@@ -777,7 +817,6 @@ export const BERKAS_SYARAT = {
   'Seminar Hasil': ['Draft laporan lengkap', 'Lembar persetujuan', 'Kartu bimbingan', 'Bukti lulus Seminar Proposal'],
   'Sidang': ['Draft akhir', 'Hasil cek Turnitin', 'Lembar persetujuan pembimbing', 'Kartu bimbingan', 'Bukti lulus Seminar Hasil'],
   'Expo': ['Poster/produk', 'Laporan akhir', 'Lembar persetujuan pembimbing'],
-  'Seminar KP': ['Lembar persetujuan & asistensi', 'Lembar kehadiran seminar min. 3x', 'Handout/draft artikel jurnal', 'Draft laporan KP'],
 };
 export function berkasSyarat(ev, konten = {}) {
   const override = (konten && konten.berkasSyarat) || {};
@@ -830,20 +869,18 @@ export const KP_DOKUMEN = [
   },
   {
     key: 'stPembimbing', stage: 'Bimbingan', label: 'ST Pembimbing KP', docType: 'ST Pembimbing KP',
-    syarat: 'Tersedia setelah surat balasan perusahaan diunggah, dan admin menetapkan dosen pembimbing serta nomor surat.',
-    eligible: (m) => tahapIndex('KP', m.tahap) >= tahapIndex('KP', 'Bimbingan') && !!m.pembimbing1 && !!m.nomorSurat,
+    syarat: `Tersedia setelah surat balasan perusahaan diunggah dan admin menetapkan dosen pembimbing${FITUR_EKSPERIMENTAL ? ' serta nomor surat' : ''}.`,
+    eligible: (m) => tahapIndex('KP', m.tahap) >= tahapIndex('KP', 'Bimbingan') && !!m.pembimbing1 && (!FITUR_EKSPERIMENTAL || !!m.nomorSurat),
     studentUpload: false,
   },
   {
-    key: 'persetujuanSmkp', stage: 'Bimbingan', label: 'Persetujuan SMKP', docType: 'Persetujuan SMKP',
-    syarat: 'Tersedia sejak tahap Bimbingan dimulai. Unduh, tanda tangani, lalu unggah kembali.',
-    eligible: (m) => tahapIndex('KP', m.tahap) >= tahapIndex('KP', 'Bimbingan'),
-  },
-  {
-    key: 'baSeminar', stage: 'Seminar KP', label: 'Berita Acara Seminar KP', docType: 'BA Seminar KP',
-    syarat: 'Tersedia setelah jadwal Seminar KP dikonfirmasi admin.',
-    eligible: (m) => { const j = getJadwal(m, 'Seminar KP'); return !!(j.dikonfirmasi && j.tanggal); },
-    studentUpload: false, adminUpload: true,
+    // Bukan berkas: mahasiswa mengirim tautan Google Drive, disimpan di
+    // m.pembukuan.berkasLink (linkField). Hanya bisa diisi saat tahap Pembukuan.
+    key: 'pembukuan', stage: 'Pembukuan', label: 'Bukti Pembukuan KP', docType: null,
+    syarat: 'Tersedia saat tahap Pembukuan dimulai.',
+    catatan: 'Tautan Google Drive berisi bukti bahwa laporan KP sudah diarsipkan dan ditandatangani.',
+    eligible: (m) => m.tahap === 'Pembukuan',
+    studentUpload: false, linkInput: true, linkField: 'pembukuan',
   },
 ];
 
@@ -877,8 +914,8 @@ export const MAGANG_DOKUMEN = [
   },
   {
     key: 'stPembimbingMagang', stage: 'Bimbingan', label: 'ST Pembimbing Magang', docType: 'ST Pembimbing Magang',
-    syarat: 'Tersedia setelah surat balasan perusahaan diunggah, dan admin menetapkan dosen pembimbing serta nomor surat.',
-    eligible: (m) => tahapIndex('MG', m.tahap) >= tahapIndex('MG', 'Bimbingan') && !!m.pembimbing1 && !!m.nomorSurat,
+    syarat: `Tersedia setelah surat balasan perusahaan diunggah dan admin menetapkan dosen pembimbing${FITUR_EKSPERIMENTAL ? ' serta nomor surat' : ''}.`,
+    eligible: (m) => tahapIndex('MG', m.tahap) >= tahapIndex('MG', 'Bimbingan') && !!m.pembimbing1 && (!FITUR_EKSPERIMENTAL || !!m.nomorSurat),
     studentUpload: false,
   },
   {
@@ -899,7 +936,7 @@ export const MAGANG_DOKUMEN = [
     linkEksternal: '', linkLabel: 'Dokumen Monev', linkConfigurable: true, linkButton: true,
   },
   {
-    // Sama seperti baSeminar KP: diisi admin, bukan mahasiswa.
+    // Diunggah admin, bukan mahasiswa.
     key: 'baExpo', stage: 'Expo', label: 'Berita Acara Expo Magang', docType: 'BA Expo Magang',
     syarat: 'Tersedia setelah jadwal Expo dikonfirmasi admin.',
     eligible: (m) => { const j = getJadwal(m, 'Expo'); return !!(j.dikonfirmasi && j.tanggal); },
@@ -939,8 +976,8 @@ export const MKT_DOKUMEN = [
   },
   {
     key: 'stPembimbingMkt', stage: 'Bimbingan', label: 'ST Pembimbing MKT', docType: 'ST Pembimbing Magang',
-    syarat: 'Tersedia setelah surat balasan perusahaan diunggah, dan admin menetapkan dosen pembimbing serta nomor surat.',
-    eligible: (m) => tahapIndex('MG', m.tahap) >= tahapIndex('MG', 'Bimbingan') && !!m.pembimbing1 && !!m.nomorSurat,
+    syarat: `Tersedia setelah surat balasan perusahaan diunggah dan admin menetapkan dosen pembimbing${FITUR_EKSPERIMENTAL ? ' serta nomor surat' : ''}.`,
+    eligible: (m) => tahapIndex('MG', m.tahap) >= tahapIndex('MG', 'Bimbingan') && !!m.pembimbing1 && (!FITUR_EKSPERIMENTAL || !!m.nomorSurat),
     studentUpload: false,
   },
   {
@@ -971,8 +1008,7 @@ export const MKT_DOKUMEN = [
 // Dokumen per-tahap Tugas Akhir. Tata letaknya saja: label & syarat sudah
 // final, tapi isi tag template masih sementara. `event` = kegiatan yang jadwalnya
 // dipakai dokumen itu (TA punya 3 event, tidak seperti KP/Magang yang cuma satu).
-// docType null = belum ada template (kelayakan-ta) atau memang hanya unggahan
-// (berkas Semhas) — tampil tanpa tombol unduh.
+// docType null = belum ada template (kelayakan-ta) — tampil tanpa tombol unduh.
 const jadwalFinal = (ev) => (m) => { const j = getJadwal(m, ev); return !!(j.dikonfirmasi && j.tanggal); };
 export const TA_DOKUMEN = [
   {
@@ -995,12 +1031,6 @@ export const TA_DOKUMEN = [
     syarat: 'Tersedia setelah jadwal Seminar Proposal dikonfirmasi admin.',
     eligible: jadwalFinal('Seminar Proposal'),
     studentUpload: false, adminUpload: true,
-  },
-  {
-    key: 'berkasSemhasTA', stage: 'Seminar Hasil', label: 'Berkas Persyaratan Seminar Hasil', docType: null,
-    syarat: 'Tersedia sejak tahap Seminar Hasil dimulai.',
-    catatan: 'Unggah satu file PDF berisi: (1) screenshot status "disetujui" oleh dosbing 1 dan 2, masing-masing 11x di SIAP (nama dan seluruh aktivitas harus terlihat) atau bukti manual pada aktivitas "Penetapan / pengujian proposal / Kelayakan"; (2) handout seminar proposal.',
-    eligible: (m) => tahapIndex('TA', m.tahap) >= tahapIndex('TA', 'Seminar Hasil'),
   },
   {
     key: 'baSemhasTA', stage: 'Seminar Hasil', label: 'Berita Acara Seminar Hasil', docType: 'BA Semhas TA', event: 'Seminar Hasil',
@@ -1053,6 +1083,7 @@ export function dokumenStatus(program, m, konten = {}) {
       } : {}),
       eligible: d.eligible(m),
       upload: (m[field] || {})[d.key] || null,
+      ...(d.linkInput ? { linkTerkirim: (m[d.linkField] || {}).berkasLink || '' } : {}),
     };
   });
 }
@@ -1101,6 +1132,7 @@ export const AKTIVITAS_LABEL = {
   unggah: 'Mengunggah dokumen',
   hapusBerkas: 'Menghapus dokumen',
   tahapBimbingan: 'Memasuki tahap Bimbingan (surat balasan perusahaan diterima)',
+  pembukuan: 'Mengirim tautan bukti pembukuan KP',
   perpanjanganMinta: 'Mengajukan perpanjangan',
   perpanjanganFinal: 'Mengunggah surat perpanjangan final',
 };
@@ -1114,6 +1146,7 @@ export const AKTIVITAS_WARNA = {
   unggah: 'violet',
   hapusBerkas: 'red',
   tahapBimbingan: 'green',
+  pembukuan: 'blue',
   perpanjanganMinta: 'amber',
   perpanjanganFinal: 'green',
 };
@@ -1128,6 +1161,7 @@ export const AKTIVITAS_LABEL_SINGKAT = {
   unggah: 'Unggah',
   hapusBerkas: 'Hapus',
   tahapBimbingan: 'Bimbingan',
+  pembukuan: 'Pembukuan',
   perpanjanganMinta: 'Perpanjangan',
   perpanjanganFinal: 'Final',
 };

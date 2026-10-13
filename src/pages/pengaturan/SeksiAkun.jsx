@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Empty } from '../../components/ui.jsx';
+import { Empty, KotakCari } from '../../components/ui.jsx';
 
 // ----- Daftar akun mahasiswa + reset password -----
 // Password disimpan & diverifikasi oleh Firebase Authentication — TIDAK
@@ -71,12 +71,7 @@ export function SeksiAkun({ daftar, onReset, onToggleAktif, onDelete }) {
         "Hapus" menghapus akun secara permanen (login + data KP terkait) — gunakan untuk
         membersihkan akun dummy/uji coba, bukan untuk akun mahasiswa aktif.
       </p>
-      <input
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        placeholder="Cari nama atau NIM…"
-        style={{ marginBottom: 12, maxWidth: 320 }}
-      />
+      <KotakCari q={q} setQ={setQ} placeholder="Cari nama atau NIM…" style={{ marginBottom: 12, maxWidth: 320 }} />
       {rows.length === 0 ? (
         <Empty>Tidak ada akun yang cocok.</Empty>
       ) : (

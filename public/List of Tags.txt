@@ -42,6 +42,7 @@ kelayakan-magang / kelayakan-mkt
 {nim}
 {nama_dosen_wali}
 {nip_dosen_wali}
+{tgl_cetak}
 
 kelayakan-proposal-magang
 
@@ -186,17 +187,8 @@ kelayakan-proposal-kp
 {judul_kp}
 {tgl_cetak}
 
-persetujuan-smkp
-
-{nama_mhs}
-{nim}
-{judul_kp}
-{tgl_cetak}
-{nama_dosen1}
-{nip1}
-
-{nama_dosen_wali} NOT YET in this template — add if it should show wali dosen
-{nip_dosen_wali} NOT YET in this template — add if it should show wali dosen
+persetujuan-smkp — REMOVED from the app (2026-10-12). The Seminar KP stage no
+longer exists; the .docx stays in public/doc-templates/KP/ but nothing renders it.
 
 perpanjangan-kp
 
@@ -224,27 +216,58 @@ pembimbing-kp-st
 {akhir_kp}
 {tgl_cetak}
 
-seminar-kp-ba
-
-{no_surat}
-{nama_mhs}
-{nim}
-{judul_kp}
-{hari_smkp}
-{tanggal_smkp}
-{tgl_smkp}
-{waktu_smkp}
-{tempat_smkp}
-{tgl_cetak}
-{nama_dosen1}
-{nip1}
+seminar-kp-ba — REMOVED from the app (2026-10-12), same reason as persetujuan-smkp.
+KP now ends with a "Pembukuan" stage where the student submits a link (no template).
 
 
-perpanjangan-ta
+Tugas Akhir (TA)
+
+Shared by every TA document: {tema_ta} = the Topik/bidang label picked in the
+registration form (bidangLabel(m.bidang)). Every TA payload also sends
+{tgl_cetak}, {nama_dosen_wali}, {nip_dosen_wali} even where a template doesn't use them.
+
+NOTE (2026-10-12): TA now has 1 Pembimbing + 2 Penguji (Pembimbing 2 removed).
+  Sempro & Semhas: Pembimbing + Penguji 1. Sidang: Pembimbing + Penguji 1 + Penguji 2.
+  Dosen tags are numbered in that order:
+    {nama_dosen1}/{nip1} = Pembimbing (every TA document)
+    {nama_dosen2}/{nip2} = Penguji 1 (ba-sempro-ta, ba-expo-ta, ba-sidang-ta)
+    {nama_dosen3}/{nip3} = Penguji 2 (ba-sidang-ta only)
+  {nama_dosen4}/{nip4} is no longer sent. Templates that still contain a tag the app
+  no longer sends will print "undefined" there until the tag is removed from the .docx.
+
+persetujuan-ugb
 
 {nama_mhs}
 {nim}
 {judul_ta}
+{topik_ta} - this file uses {topik_ta}, not {tema_ta}; documentGenerator.js sends both
+  (same value). Rename to {tema_ta} in the .docx whenever convenient and drop the alias.
+{tgl_cetak} (sent, not in the template yet)
+{nama_dosen1} / {nip1} (sent, not in the template yet)
+
+persetujuan-dosbing
+
+documentGenerator.js reads TA/persetujuan-dosbing.docx; the working copy is currently
+"persetujuan-dosbing (WiP).docx" (uses {nama_mhs} {nim} {nama_dosen1} {nip1}).
+Available from documentGenerator.js:
+{nama_mhs}
+{nim}
+{judul_ta}
+{tema_ta}
+{tgl_cetak}
+{nama_dosen1}
+{nip1}
+{nama_dosen_wali}
+{nip_dosen_wali}
+
+perpanjangan-ta
+
+{no_surat}
+{nama_mhs}
+{nim}
+{judul_ta}
+{judul_TA} - the template has both spellings; both are sent
+{tema_ta} (sent, not in the template yet)
 {mulai_ta}
 {akhir_ta}
 {mulai_ta_pp1}
@@ -254,85 +277,83 @@ perpanjangan-ta
 {tgl_surat_ppta}
 {nama_dosen1}
 {nip1}
-{nama_dosen2}
-{nip2}
-{no_surat}
+{nama_dosen2}/{nip2} - NO LONGER SENT (single pembimbing). Still in the template:
+  remove the Dosen Pembimbing II row from perpanjangan-ta.docx.
 
-st-pembimbing-ta
+st-pembimbing-ta - NOT wired in documentGenerator.js yet (no docType/case)
 
 {no_surat}
-{nama_dosen1}
-{nip1}
-{nama_dosen2}
-{nip2}
 {nama_mhs}
 {nim}
 {judul_ta}
 {mulai_ta}
 {akhir_ta}
+{nama_dosen1}
+{nip1}
+{nama_dosen2}/{nip2} - template still has these; drop them when wiring this (single pembimbing)
 
 ba-sempro-ta
 
 {no_surat}
-{nama_dosen1}
-{nip1}
-{nama_dosen2}
-{nip2}
 {nama_mhs}
 {nim}
 {judul_ta}
+{tema_ta} (sent, not in the template yet)
 {tgl_sempro}
 {waktu_sempro}
 {tempat_sempro}
 {tgl_surat_sempro}
-{tgl_sempro}
-{tempat_sempro}
+{nama_dosen1} - Pembimbing
+{nip1}
+{nama_dosen2} - Penguji (was Pembimbing 2; relabel the row in the .docx)
+{nip2}
 
-ba-expo-ta 
+ba-expo-ta (BA Semhas)
 
 {no_surat}
-{nama_dosen1}
-{nip1}
-{nama_dosen2}
-{nip2}
 {nama_mhs}
 {nim}
 {judul_ta}
+{tema_ta} (sent, not in the template yet)
 {tgl_expo}
 {waktu_expo}
 {tempat_expo}
+{nama_dosen1} - Pembimbing
+{nip1}
+{nama_dosen2} - Penguji (was Pembimbing 2; relabel the row in the .docx)
+{nip2}
 
 ba-sidang-ta
 
 {no_surat}
-{nama_dosen1}
-{nama_dosen2}
-{nama_dosen3}
-{nama_dosen4}
-{nip1}
-{nip2}
-{nip3}
-{nip4}
 {nama_mhs}
 {nim}
 {judul_ta}
+{tema_ta} (sent, not in the template yet)
 {hari_sidang}
 {tgl_sidang}
 {waktu_sidang}
 {tempat_sidang}
-{tgl_sidang}
+{nama_dosen1} - Pembimbing
+{nip1}
+{nama_dosen2} - Penguji 1 (was Pembimbing 2)
+{nip2}
+{nama_dosen3} - Penguji 2 (was Ketua Penguji)
+{nip3}
+{nama_dosen4}/{nip4} - NO LONGER SENT; remove the 4th dosen row from ba-sidang-ta.docx
 
-pengesahan-ta
+pengesahan-ta - NOT wired in documentGenerator.js yet (no docType/case)
 
 {nama_mhs}
 {nim}
 {judul_ta}
-{nama_dosen1}
-{nama_dosen2}
-{nama_dosen3}
-{nama_dosen4}
-{nip1}
-{nip2}
-{nip3}
-{nip4}
 {tgl_sidang}
+{nama_dosen1}
+{nip1}
+{nama_dosen2}
+{nip2}
+{nama_dosen3}
+{nip3}
+{nama_dosen4}
+{nip4}
+  - when wiring this, use the same numbering as ba-sidang-ta (3 dosen, no {nama_dosen4})

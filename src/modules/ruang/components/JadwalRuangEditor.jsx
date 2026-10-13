@@ -14,13 +14,10 @@ export function JadwalRuangEditor({ data, dosen, mahasiswa, semester, aksi }) {
   const bukaBaru = (info) => setEdit({ tanggal: todayISO(), ...info });
   return (
     <>
-      <div className="toolbar" style={{ marginBottom: 8 }}>
-        <button className="btn btn-primary btn-sm" onClick={() => bukaBaru({})}>+ Booking baru</button>
-        <span className="hint" style={{ margin: 0 }}>Klik sel kosong untuk menambah, klik blok untuk mengubah atau membatalkan.</span>
-      </div>
       <JadwalRuangGrid
         data={data}
         semester={semester}
+        aksiKanan={<button className="btn btn-primary btn-sm" onClick={() => bukaBaru({})}>+ Booking baru</button>}
         onKosong={(info) => bukaBaru(info)}
         onBlok={(slot, tanggal) => {
           const booking = data.bookings.find((b) => b.id === slot.id);

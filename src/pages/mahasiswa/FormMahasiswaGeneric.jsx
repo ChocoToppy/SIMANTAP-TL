@@ -3,8 +3,11 @@ import { PROGRAM_KEYS, programLabel, punyaKlasifikasi, KLASIFIKASI, ringkasPenda
 import { bidangUntukPilihan } from '../../utils/pilihan.js';
 import { cetakSuratPDF } from '../../utils/exportUtils.js';
 import { Field, Modal, FileDropZone } from '../../components/ui.jsx';
+import { LinkBerkasRow } from './LinkBerkasRow.jsx';
 import { RiwayatAktivitas } from './AktivitasCells.jsx';
 import { NomorSuratPanel } from './NomorSuratPanel.jsx';
+import { PersetujuanPerpanjangan } from './PersetujuanPerpanjangan.jsx';
+import { PengingatPesan } from './PengingatPesan.jsx';
 
 // Tata letak generik (non-KP) di dalam modal FormMahasiswa (lihat
 // FormMahasiswa.jsx) — dipakai untuk TA, Capstone Design, Magang, Tesis S2.
@@ -12,10 +15,10 @@ import { NomorSuratPanel } from './NomorSuratPanel.jsx';
 // presentasional (props saja).
 export function FormMahasiswaGeneric({
   m, setM, set, gantiProgram, periodeList, daftarAngkatan = [],
-  roles, pembimbing1Label, penguji1Label, dosenOpts, stages, events, jadwalBlok,
+  roles, pembimbing1Label, penguji1Label, dosenOpts, bebanBlok, stages, events, jadwalBlok,
   alurTahapBlok, notifikasiBlok, peringatanBlok, p,
   dosenByKode, ppBusy, ppErr, berikanSuratPerpanjangan,
-  baru, onCancel, submit, navEntri, modalOpsi,
+  verifAwal, baru, onCancel, submit, navEntri, modalOpsi,
 }) {
   return (
     <Modal
@@ -33,16 +36,16 @@ export function FormMahasiswaGeneric({
       <div className="form-grid">
         <div className="sched field-full">
           <div className="sched-title">Verifikasi pendaftaran</div>
-          {(ringkasPendaftaran(p).length > 0 || p.berkasLink) ? (
+          {ringkasPendaftaran(p).length > 0 ? (
             <div className="verif-info">
               {ringkasPendaftaran(p).map((r) => (
                 <div key={r.label}>{r.label}: <strong>{r.nilai}</strong></div>
               ))}
-              {p.berkasLink
-                ? <div>Berkas: <a href={normalizeUrl(p.berkasLink)} target="_blank" rel="noreferrer">buka link</a></div>
-                : <div className="muted">Berkas belum dilampirkan.</div>}
             </div>
           ) : <div className="hint">Data dibuat manual oleh admin (tanpa pengajuan mahasiswa).</div>}
+          <div style={{ marginTop: 10 }}>
+            <LinkBerkasRow label="Link berkas pendaftaran" url={p.berkasLink} onUbah={(v) => setM((prev) => ({ ...prev, pendaftaran: { ...(prev.pendaftaran || {}), berkasLink: v } }))} diperiksa={p.berkasDiperiksa} onDiperiksa={(v) => setM((prev) => ({ ...prev, pendaftaran: { ...(prev.pendaftaran || {}), berkasDiperiksa: v } }))} />
+          </div>
           <div className="sched-grid" style={{ marginTop: 10 }}>
             <Field label="Status verifikasi">
               <select value={m.verifikasi || 'terverifikasi'} onChange={(e) => set('verifikasi', e.target.value)}>
@@ -54,6 +57,7 @@ export function FormMahasiswaGeneric({
             <NomorSuratPanel m={m} setM={setM} baru={baru} />
           </div>
           <div className="hint" style={{ marginTop: 6 }}>Nomor surat ini dipakai untuk semua surat program ini — ambil saat verifikasi pertama kali.</div>
+          <PengingatPesan m={m} set={set} verifAwal={verifAwal} />
         </div>
 
         {!baru && <RiwayatAktivitas m={m} />}
@@ -103,6 +107,10 @@ export function FormMahasiswaGeneric({
         {roles.penguji >= 2 && (
           <Field label="Penguji 2"><select value={m.penguji2} onChange={(e) => set('penguji2', e.target.value)}>{dosenOpts}</select></Field>
         )}
+        <div className="field-full beban-mini-grid">
+          {bebanBlok('bimbingan')}
+          {roles.penguji >= 1 && bebanBlok('penguji')}
+        </div>
 
         <Field label="Tahap saat ini">
           <select value={m.tahap} onChange={(e) => set('tahap', e.target.value)}>
@@ -140,6 +148,7 @@ export function FormMahasiswaGeneric({
             {(m.perpanjangan && m.perpanjangan.diminta)
               ? <div className="verif-info"><div>Alasan mahasiswa: <strong>{m.perpanjangan.alasan || '—'}</strong>{m.perpanjangan.tanggalDiminta ? ` · ${formatTanggal(m.perpanjangan.tanggalDiminta)}` : ''}</div></div>
               : <div className="hint">Belum ada pengajuan perpanjangan dari mahasiswa.</div>}
+            <PersetujuanPerpanjangan m={m} setM={setM} />
             {(m.perpanjangan || {}).suratAdmin
               ? <div className="callout callout-green">Surat diberikan ke mahasiswa: <a href={m.perpanjangan.suratAdmin.url || m.perpanjangan.suratAdmin.dataUrl} target="_blank" rel="noreferrer">{m.perpanjangan.suratAdmin.fileName}</a></div>
               : <div className="hint">Surat perpanjangan belum diberikan ke mahasiswa.</div>}

@@ -321,6 +321,8 @@ html[data-theme="dark"] .btn:hover { background: rgba(241, 241, 238, 0.08); }
 html[data-theme="dark"] .btn.ghost:hover { background: rgba(241, 241, 238, 0.08); }
 .btn-amber { background: var(--amber-bg); border: 1px solid var(--amber); color: var(--amber-text); }
 .btn-amber:hover { background: var(--amber-border); border-color: var(--amber); }
+.btn-red { background: var(--red-bg); border: 1px solid var(--red); color: var(--red-text); }
+.btn-red:hover { background: var(--red-border); border-color: var(--red); }
 /* Solid, seperti .btn-primary tapi kuning — dipakai untuk tombol yang perlu
    menonjol jelas sebagai "sedang aktif" (mis. tombol Kolom saat ada kolom
    disembunyikan), bukan cuma outline halus seperti .btn-amber. */
@@ -444,6 +446,33 @@ html[data-theme="dark"] .kp-dok-toggle:hover { background: rgba(241, 241, 238, 0
   background: var(--accent-weak); font-family: var(--font-heading); font-weight: 700; font-size: 0.95rem;
 }
 .kp-dok-body { padding: 16px 18px; border-top: 1px solid var(--border-strong); }
+.kp-dok-panel { margin-top: 8px; }
+/* Dokumen sebagai daftar bergaris (bukan kotak di dalam kotak): tiap dokumen
+   dipisah garis tipis, sesuai gaya broadsheet halaman lain. */
+.kp-dok-group { display: flex; flex-direction: column; }
+.kp-dok-item { display: flex; flex-direction: column; gap: 4px; padding: 12px 0; min-width: 0; }
+.kp-dok-item + .kp-dok-item, .ff-slot + .ff-slot .kp-dok-item { border-top: 1px solid var(--border); }
+.kp-dok-group > :first-child .kp-dok-item, .kp-dok-group > .kp-dok-item:first-child { padding-top: 4px; }
+.kp-dok-item-head { display: flex; align-items: baseline; justify-content: space-between; gap: 6px 10px; flex-wrap: wrap; }
+.kp-dok-item-nama { font-weight: 600; font-size: 0.92rem; line-height: 1.35; min-width: 0; }
+.kp-dok-berkas { font-size: 0.82rem; overflow-wrap: anywhere; }
+.kp-dok-berkas a { color: var(--green-text); }
+.kp-dok-tgl { color: var(--muted); }
+.kp-dok-aksi { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
+.kp-dok-drop { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 6px; }
+.kp-dok-drop > :first-child { align-self: stretch; }
+/* Pilihan tahap dokumen (layar sempit): semua tahap terlihat sekaligus,
+   tahap mahasiswa saat ini ditandai "sekarang". */
+.kp-dok-pills { display: none; }
+.kp-dok-pill {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px;
+  background: var(--bg); color: var(--text); border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  font-family: var(--font-heading); font-weight: 600; font-size: 0.85rem; cursor: pointer;
+}
+.kp-dok-pill.active { background: var(--text); color: var(--bg); border-color: var(--text); }
+.kp-dok-pill-now { font-size: 0.7rem; font-weight: 600; color: var(--amber-text); }
+.kp-dok-pill.active .kp-dok-pill-now { color: inherit; opacity: 0.8; }
+.kp-dok-pill:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* ---------- Dashboard ---------- */
 .dashboard { display: flex; flex-direction: column; gap: 22px; }
@@ -475,6 +504,29 @@ html[data-theme="dark"] .kp-dok-toggle:hover { background: rgba(241, 241, 238, 0
 .fill-red { background: var(--red); }
 .fill-green { background: var(--accent); }
 .bar-val { width: 26px; text-align: right; font-size: 0.8rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* Nomor surat manual: isian + tombol lampu (panduan format) sebaris */
+.nomor-surat-row { display: flex; gap: 8px; align-items: stretch; }
+.nomor-surat-row input { flex: 1; min-width: 0; }
+.nomor-surat-row .lampu-btn { height: auto; width: auto; aspect-ratio: 1; color: var(--muted); }
+.nomor-surat-row .lampu-btn:hover,
+.nomor-surat-row .lampu-btn.aktif { color: var(--amber); }
+.nomor-surat-row .lampu-btn.aktif { background: var(--amber-bg); border-color: var(--amber); }
+
+/* Dashboard: grafik pembimbing dipecah per program */
+.beban-grup + .beban-grup { margin-top: 18px; }
+.beban-grup-title { font-size: 0.8rem; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+
+/* Grafik beban ringkas di form mahasiswa (BebanDosenMini.jsx) */
+.beban-mini { margin-top: 14px; }
+.beban-mini-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; }
+.beban-mini-grid .beban-mini { margin-top: 0; }
+/* Beberapa kolom (dibaca kiri→kanan, baris demi baris) supaya daftar dosen yang panjang tidak perlu banyak scroll. */
+.beban-mini-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); column-gap: 28px; row-gap: 6px; }
+.beban-mini .bar-key { width: 40px; }
+.beban-mini .bar-track { height: 8px; }
+.beban-mini .bar-row.dipilih .bar-key,
+.beban-mini .bar-row.dipilih .bar-val { color: var(--text); font-weight: 700; }
 
 .attn { list-style: none; margin: 0; padding: 0; }
 .attn li {
@@ -526,6 +578,12 @@ html[data-theme="dark"] .kp-dok-toggle:hover { background: rgba(241, 241, 238, 0
    tinggi sendiri-sendiri dari padding (bukan nilai tetap), jadi baris toolbar
    kelihatan tidak rata. */
 .toolbar .search { height: 36px; box-sizing: border-box; }
+/* flex supaya tinggi wrap = tinggi input (tanpa celah baseline inline), jadi ✕ pas di tengah. */
+.search-wrap { position: relative; display: flex; align-items: center; }
+.toolbar .search-wrap .search { padding-right: 34px; }
+.cari-wrap { position: relative; display: flex; align-items: center; width: 100%; }
+.cari-wrap > input { width: 100%; padding-right: 34px; }
+.search-clear { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; padding: 0; }
 /* Desktop: kotak cari melebar mengisi sisa baris, sehingga Filter · Kolom · Ekspor · Tambah
    rapat di kanan. (Kolom dan Ekspor sama-sama .exp-wrap dengan margin-left:auto; tanpa sisa
    ruang untuk dibagi, keduanya tidak lagi terpisah.) Mobile punya aturan sendiri di bawah. */
@@ -867,12 +925,133 @@ html[data-theme="dark"] .icon-btn-outline:hover { background: rgba(241, 241, 238
 @media (max-width: 780px) {
   .cards { grid-template-columns: 1fr; }
 }
-.kartu { display: flex; flex-direction: column; gap: 8px; border-top: 3px solid var(--text); }
-.kartu-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.kartu { display: flex; flex-direction: column; gap: 12px; border-top: 3px solid var(--text); }
+.kartu-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .kartu-prog { font-size: 0.7rem; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .08em; }
 .kartu-head-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .kartu-judul { font-size: 1.05rem; font-weight: 600; line-height: 1.4; }
-.kartu-aksi { margin-top: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.kartu-aksi { padding-top: 12px; border-top: 1px solid var(--border); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.kartu-status { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.kartu-status > .callout { align-self: stretch; }
+.kartu-dosen { margin: 0; display: flex; flex-direction: column; gap: 10px; font-size: 0.88rem; }
+.kartu-dosen dt { font-size: 0.75rem; color: var(--muted); margin-bottom: 2px; }
+.kartu-dosen dd { margin: 0; font-weight: 600; line-height: 1.4; }
+.kartu-dosen-kode { font-weight: 400; color: var(--muted); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+/* ---------- Baris "Dokumen" di kartu → membuka halaman dokumen ---------- */
+.kartu-dok-entry {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 10px 12px;
+  background: var(--bg); color: var(--text); border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  font-family: var(--font-heading); text-align: left; cursor: pointer; transition: border-color 0.15s ease;
+}
+.kartu-dok-entry:hover { border-color: var(--accent); }
+.kartu-dok-entry:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.kartu-dok-ikon { display: inline-flex; color: var(--blue); flex: none; }
+.kartu-dok-teks { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.kartu-dok-judul { font-weight: 700; font-size: 0.95rem; }
+.kartu-dok-sub { font-size: 0.78rem; color: var(--muted); }
+.kartu-dok-entry > svg:last-child { color: var(--muted); flex: none; }
+
+/* ---------- Halaman dokumen (Portal mahasiswa) ---------- */
+.dok-page { max-width: 720px; margin: 0 auto; }
+.dok-page-head {
+  display: flex; align-items: center; gap: 14px; padding-bottom: 14px; border-bottom: 3px solid var(--text);
+}
+.dok-back {
+  display: inline-flex; align-items: center; justify-content: center; flex: none; width: 48px; height: 48px;
+  background: transparent; color: var(--blue); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); cursor: pointer;
+}
+.dok-back:hover { border-color: var(--blue); }
+.dok-page-title { margin: 0; font-size: 1.4rem; font-weight: 700; flex: 1; min-width: 0; }
+.dok-page-prog { font-size: 0.85rem; color: var(--muted); text-align: right; }
+.dok-tabs { display: flex; gap: 22px; overflow-x: auto; border-bottom: 1px solid var(--border-strong); margin: 4px 0 0; scrollbar-width: none; }
+.dok-tabs::-webkit-scrollbar { display: none; }
+.dok-tab {
+  flex: none; display: inline-flex; align-items: baseline; gap: 6px; min-height: 48px; padding: 12px 0 10px;
+  background: none; border: none; border-bottom: 3px solid transparent; margin-bottom: -1px;
+  font-family: var(--font-heading); font-size: 1rem; color: var(--muted); cursor: pointer; white-space: nowrap;
+}
+.dok-tab:hover { color: var(--text); }
+.dok-tab.active { color: var(--text); font-weight: 700; border-bottom-color: var(--accent); }
+.dok-tab-now { font-size: 0.68rem; font-weight: 600; color: var(--amber-text); }
+.dok-cycler { display: none; }
+@media (max-width: 640px) {
+  /* Di HP tab tahap diganti pemilih berpanah (lihat PemilihTahap). */
+  .dok-tabs { display: none; }
+  .dok-cycler {
+    display: flex; align-items: center; gap: 10px; margin-top: 12px; padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-strong);
+  }
+  .dok-cycler-btn {
+    display: inline-flex; align-items: center; justify-content: center; flex: none; width: 48px; height: 48px;
+    background: var(--bg); color: var(--text); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); cursor: pointer;
+  }
+  .dok-cycler-btn:disabled { color: var(--muted-2); border-color: var(--border); cursor: default; }
+  .dok-cycler-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .dok-cycler-label { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; }
+  .dok-cycler-nama {
+    display: inline-flex; align-items: baseline; flex-wrap: wrap; justify-content: center; gap: 0 6px;
+    font-size: 1.05rem; font-weight: 700; border-bottom: 3px solid var(--accent); padding-bottom: 2px;
+  }
+  .dok-cycler-pos { font-size: 0.78rem; color: var(--muted); }
+}
+.dok-seksi { margin-top: 26px; }
+.dok-eyebrow { margin: 0 0 6px; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.dok-seksi-hint { margin: 0 0 12px; }
+.dok-kosong { margin-top: 24px; }
+.dok-list { list-style: none; margin: 0; padding: 0; }
+.dok-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 16px 0; border-bottom: 1px solid var(--border-strong); }
+.dok-row-ikon { display: inline-flex; flex: none; color: var(--blue); align-self: flex-start; padding-top: 2px; }
+.dok-row-ikon.off { color: var(--muted-2); }
+.dok-row-teks { flex: 1 1 140px; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.dok-terunggah .dok-row-teks { flex: 1 1 0; }
+.dok-row-tautan { font-size: 0.85rem; color: var(--blue); overflow-wrap: anywhere; }
+.dok-row-nama { font-size: 1.02rem; line-height: 1.35; }
+.dok-row-off .dok-row-nama { color: var(--muted); }
+.dok-row-sub { font-size: 0.82rem; color: var(--muted); line-height: 1.45; }
+.dok-syarat { color: var(--amber-text); }
+.dok-btn {
+  /* Label tombol bisa diubah admin (Pengaturan → Konten): kalau terlalu
+     panjang, tombol turun ke baris sendiri dan teksnya membungkus, bukan
+     menekan kolom nama dokumen. */
+  flex: 0 1 auto; max-width: 100%; margin-left: auto; white-space: normal; text-align: center;
+  min-height: 48px; min-width: 84px; padding: 6px 16px; font-size: 0.95rem;
+  color: var(--green-text); border-color: var(--accent); display: inline-flex; align-items: center; justify-content: center;
+}
+.dok-btn:hover { background: var(--accent-weak); }
+.dok-slots { display: flex; flex-direction: column; gap: 18px; }
+.dok-slot { display: flex; flex-direction: column; gap: 8px; }
+.dok-slot-nama { font-size: 0.95rem; font-weight: 600; }
+.dok-terunggah {
+  display: flex; align-items: center; gap: 12px; padding: 14px 16px;
+  background: var(--green-bg); border: 1px solid var(--green-border); border-radius: var(--radius-sm); color: var(--green-text);
+}
+.dok-terunggah-ikon { display: inline-flex; flex: none; color: var(--green); }
+.dok-terunggah-file { color: var(--text); font-size: 0.95rem; overflow-wrap: anywhere; }
+.dok-terunggah-meta { font-size: 0.8rem; }
+.dok-terunggah-aksi { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex: none; }
+.dok-link { min-height: 40px; font-size: 0.88rem; }
+.dok-terunggah .dok-link:not(.danger) { color: var(--green-text); }
+.dok-slot-off {
+  display: flex; align-items: center; gap: 10px; padding: 12px 14px; font-size: 0.85rem; color: var(--muted);
+  border: 1px dashed var(--border-strong); border-radius: var(--radius-sm);
+}
+.dok-slot-off svg { flex: none; }
+.dok-drop {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 22px 16px;
+  border: 1.5px dashed var(--border-strong); border-radius: var(--radius-sm); background: var(--bg);
+  text-align: center; cursor: pointer; transition: border-color 0.15s ease, background 0.15s ease;
+}
+.dok-drop input[type="file"] { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+.dok-drop:hover, .dok-drop.over { border-color: var(--accent); background: var(--accent-weak); }
+.dok-drop:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.dok-drop.busy { cursor: progress; opacity: 0.75; }
+.dok-drop-ikon { display: inline-flex; color: var(--muted); }
+.dok-drop-hint { font-size: 0.8rem; color: var(--muted); }
+.dok-drop-btn { min-height: 44px; display: inline-flex; align-items: center; padding: 0 20px; font-size: 0.92rem; pointer-events: none; }
+.dok-batal { align-self: flex-start; min-height: 40px; }
+.dok-back:focus-visible, .dok-tab:focus-visible, .dok-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .callout { background: var(--blue-bg); border-left: 3px solid var(--blue); border-radius: 0; padding: 12px 16px; font-size: 0.85rem; color: var(--blue-text); }
 .callout a { color: var(--blue-text); text-decoration: underline; }
 .callout-red { background: var(--red-bg); border-left-color: var(--red); color: var(--red-text); }
@@ -883,6 +1062,10 @@ html[data-theme="dark"] .icon-btn-outline:hover { background: rgba(241, 241, 238
 .callout-amber a { color: var(--amber-text); }
 .portal-form { max-width: 760px; margin: 0 auto; background: var(--surface); padding: 32px; border-radius: 0; border-top: 3px solid var(--text); border-bottom: 1px solid var(--border); }
 .portal-form .page-title { margin-bottom: 20px; }
+.form-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+.portal-form .form-head .page-title { margin-bottom: 0; }
+.form-head-tutup { flex: none; width: 44px; height: 44px; margin: -4px -8px 0 0; border: 1px solid var(--border-strong); }
+.form-head-tutup:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* ---------- Kotak unggah berkas (drag & drop) ---------- */
 .file-drop {
@@ -990,7 +1173,6 @@ html[data-theme="dark"] .icon-btn-outline:hover { background: rgba(241, 241, 238
 .stage-mobile { display: none; }
 .mhs-mobile-rows { display: none; }
 .panduan-link-mobile { display: none; }
-.kp-dok-tabs-mobile { display: none; }
 /* Grid item ("kartu") sengaja dikasih min-width:0 — tanpa ini, konten yang
    tidak bisa menciut (mis. baris sub-tab dokumen KP yang belum digulir)
    bisa memaksa seluruh kartu (dan grid-nya) melebar melebihi layar, membuat
@@ -1023,6 +1205,13 @@ html[data-theme="dark"] .icon-btn-outline:hover { background: rgba(241, 241, 238
   animation: slideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .toolbar-extra select { width: 100%; }
+.toolbar-extra-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding-bottom: 10px; border-bottom: 3px solid var(--text);
+  font-family: var(--font-heading); font-weight: 700; font-size: 1.05rem;
+}
+.toolbar-extra-head .form-head-tutup { margin: 0; }
+.toolbar-extra-tutup { min-height: 44px; margin-top: 4px; }
 
 /* ---------- Daftar mahasiswa versi baris (pengganti tabel di layar sempit) ---------- */
 .mhs-mobile-group {
@@ -1045,15 +1234,22 @@ html[data-theme="dark"] .icon-btn-outline:hover { background: rgba(241, 241, 238
 .mhs-row-del { min-height: 32px; padding: 4px 8px; }
 
 /* ---------- Daftar tahapan vertikal ringkas (pengganti StageBar di layar sempit) ---------- */
-.stage-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
-.stage-list-item {
-  display: flex; align-items: center; gap: 11px; min-height: 27px; font-size: 0.85rem; color: var(--muted);
+.stepper { display: flex; flex-direction: column; gap: 8px; }
+.stepper-track { list-style: none; margin: 0; padding: 0; display: flex; align-items: center; }
+.stepper-step { display: flex; align-items: center; flex: 1; }
+.stepper-step:last-child { flex: none; }
+.stepper-step::after { content: ''; flex: 1; height: 2px; margin: 0 4px; background: var(--border-strong); }
+.stepper-step:last-child::after { display: none; }
+.stepper-done::after { background: var(--accent); }
+.stepper-node {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 28px; height: 28px; border-radius: var(--radius-sm);
+  font-size: 0.8rem; font-weight: 700; border: 1.5px solid var(--border-strong); color: var(--muted); background: var(--bg);
 }
-.stage-list-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--blue-bg); border: 1px solid var(--blue-border); }
-.stage-list-item.stage-done .stage-list-dot { background: var(--accent); border-color: var(--accent); }
-.stage-list-item.stage-done .stage-list-label { color: var(--muted); }
-.stage-list-item.stage-active { color: var(--text); font-weight: 600; }
-.stage-list-item.stage-active .stage-list-dot { background: var(--amber); border-color: var(--amber); }
+.stepper-done .stepper-node { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.stepper-active .stepper-node { background: var(--amber-bg); border: 2px solid var(--amber); color: var(--amber-text); }
+.stepper-caption { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 0.9rem; }
+.stepper-count { font-size: 0.78rem; color: var(--muted); }
 
 @media (max-width: 640px) {
   html, body { overflow-x: hidden; }
@@ -1143,12 +1339,13 @@ html[data-theme="dark"] .icon-btn-outline:hover { background: rgba(241, 241, 238
   .pagination { flex-direction: column; align-items: stretch; gap: 8px; }
   .pagination-controls { justify-content: center; }
 
-  /* ----- Kartu pengajuan mahasiswa: tahapan jadi daftar vertikal, aksi jadi tombol lebar ----- */
+  /* ----- Kartu pengajuan mahasiswa: tahapan jadi langkah bernomor, aksi jadi tombol lebar ----- */
   .stage-desktop { display: none; }
   .stage-mobile { display: block; }
   .kartu-aksi { flex-direction: column; align-items: stretch; }
   .kartu-aksi .btn { width: 100%; min-height: 44px; text-align: center; }
-  .kartu-aksi .btn-primary { order: -1; }
+  .kartu { padding: 16px; }
+  .kartu-status .btn { width: 100%; min-height: 44px; text-align: center; }
   .cards { gap: 14px; }
   /* Alur "Ajukan perpanjangan" (tombol pemicu + tombol unduh/unggah surat di
      dalam callout) — jadi lebar penuh & bertumpuk, sama seperti aksi lain di
@@ -1171,23 +1368,17 @@ html[data-theme="dark"] .icon-btn-outline:hover { background: rgba(241, 241, 238
      atas) di mana pun dipakai (panel dokumen KP, modal admin, dst). ----- */
   div.tabs { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
   div.tabs .tab { flex: none; }
-  /* Tahapan dokumen KP jadi dropdown di HP (bukan tab yang digulir ke
-     samping) — semua tahapan langsung terlihat sekali tap, tanpa geser.
-     Dikasih gaya menonjol (latar & pinggiran beda dari .kp-dok-body di
-     sekitarnya, bukan select polos) supaya jelas ini kontrol yang bisa
-     ditekan, bukan sekadar label. */
+  /* Tahapan dokumen jadi tombol yang membungkus ke baris berikutnya (bukan
+     tab yang digulir ke samping atau dropdown): semua tahap terlihat tanpa
+     geser dan tanpa membuka menu dulu. */
   .kp-dok-tabs-desktop { display: none; }
-  .kp-dok-tabs-mobile {
-    display: block; width: 100%; margin-bottom: 14px;
-    background: var(--bg); border: 1.5px solid var(--accent); border-radius: var(--radius-sm);
-    color: var(--text); font-family: var(--font-heading); font-weight: 700; font-size: 0.95rem;
-    padding: 11px 14px; box-shadow: var(--shadow-sm);
-  }
-  .kp-dok-tabs-mobile:focus { outline: none; box-shadow: 0 0 0 3px var(--accent-weak); }
+  .kp-dok-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+  .kp-dok-pill { min-height: 44px; }
 
-  /* ----- Panel dokumen KP: tombol berkas jadi lebar penuh ----- */
+  /* ----- Panel dokumen: tombol aksi berbagi satu baris, setinggi jempol ----- */
   .kp-dok-body { padding: 14px 12px; }
-  .kp-dok-item .btn { width: 100%; }
+  .kp-dok-aksi .btn { flex: 1 1 auto; min-height: 44px; text-align: center; }
+  .kp-dok-aksi .kp-dok-hapus { min-height: 44px; padding: 0 14px; }
 
   /* ----- Beban dosen (Portal dosen) & metrik lain: 1 kolom di layar sangat sempit ----- */
   .metrics { grid-template-columns: repeat(2, 1fr); }

@@ -36,11 +36,252 @@ service cloud.firestore {
     function ownedByMe(m) { return m.owner == studentNim(); }
 
     // ----- Data akademik mahasiswa (satu dokumen per program yang diikuti) -----
+    // Siapa pun yang punya token login bisa memanggil Firestore langsung (tanpa
+    // aplikasi), jadi aturan di bawah memeriksa ISI perubahan: mahasiswa & dosen
+    // hanya bisa membuat perubahan yang memang bisa dibuat lewat portal mereka.
+    // Field yang tidak tercantum di daftar mana pun (verifikasi → terverifikasi,
+    // pembimbing/penguji, tanggalLulus, nomorSurat, catatan admin, dst.) hanya
+    // bisa diubah admin. Menambah field yang ditulis portal mahasiswa = tambahkan
+    // juga di sini.
+    //
+    // Satu pengajuan per program per mahasiswa: ID dokumen buatan mahasiswa
+    // WAJIB "{nim}_{program}" (idPengajuan di helpers.js), dan dokumen lain yang
+    // memegang pasangan (nim, program) itu dengan ID berbeda (data lama, buatan
+    // admin, atau setelah ganti NIM) ditandai di slotPengajuan/{nim}_{program}.
+
+    // Field form pendaftaran; mengubahnya mengembalikan pengajuan ke antrean verifikasi.
+    function fieldForm() {
+      return ['nama', 'jenisMagang', 'periode', 'angkatan', 'judul', 'dosenWali',
+              'klasifikasi', 'bidang', 'tanggalMulai', 'batasAkhir', 'pendaftaran'];
+    }
+    // Isi m.pendaftaran yang ada di form (lihat META di utils/formPendaftaran.js).
+    function fieldPendaftaran() {
+      return ['syaratSKS', 'ipk', 'statusKP', 'terdaftarKRS', 'sudahUGB', 'namaPersetujuanDosen',
+              'berkasLink', 'nomorWA', 'semester', 'sksIpk', 'tempatKP', 'instansi', 'alamatWA'];
+    }
+    // Semua field yang boleh disentuh mahasiswa pada dokumen yang sudah ada.
+    // owner/nim/program sengaja tidak ada (tidak boleh berubah).
+    function fieldMahasiswa() {
+      return ['nama', 'jenisMagang', 'periode', 'angkatan', 'judul', 'dosenWali',
+              'klasifikasi', 'bidang', 'tanggalMulai', 'batasAkhir', 'pendaftaran',
+              'id', 'verifikasi', 'pernahTerverifikasi', 'aktivitas', 'tahap',
+              'jadwal', 'riwayatJadwal', 'perpanjangan', 'dokumenKP', 'dokumenMagang', 'dokumenTA',
+              'pembukuan'];
+    }
+    function semuaEvent() {
+      return ['Seminar Proposal', 'Seminar Hasil', 'Sidang', 'Expo'];
+    }
+    // Berkas yang hanya diunggah/dibuat admin (studentUpload: false di helpers.js).
+    // Daftar yang sama ada di storage.rules. baSeminar = BA Seminar KP lama (tahap
+    // sudah dihapus); tetap di sini supaya berkas lama tidak bisa ditimpa mahasiswa.
+    function dokumenAdmin() {
+      return ['stPembimbing', 'baSeminar', 'stPembimbingMagang', 'monevMagang', 'baExpo',
+              'stPembimbingMkt', 'monevMkt', 'baExpoMkt', 'baSemproTA', 'baSemhasTA', 'baSidangTA'];
+    }
+    function pernahVerif(m) {
+      return m.get('verifikasi', 'baru') == 'terverifikasi' || m.get('pernahTerverifikasi', false) == true;
+    }
+
+    // Pilihan di form hanya dari daftar yang dibuka admin: periode (config/global),
+    // angkatan aktif, dosen aktif. '' = tidak diisi.
+    function periodeBuka(p) {
+      return p in get(/databases/$(database)/documents/config/global).data.get('periodeBuka', []);
+    }
+    function angkatanAktif(x) {
+      return x == '' || get(/databases/$(database)/documents/angkatan/$(string(x))).data.get('isActive', true) != false;
+    }
+    function dosenAktif(kode) {
+      return kode == '' || get(/databases/$(database)/documents/dosen/$(kode)).data.get('isActive', true) != false;
+    }
+    // 'YYYY-MM-DD' → timestamp tengah malam UTC.
+    function tgl(s) {
+      let p = s.split('-');
+      return timestamp.date(int(p[0]), int(p[1]), int(p[2]));
+    }
+    // Selain KP/Magang, form tidak punya isian tanggal: mulai = hari ini, batas = +180 hari.
+    function tanggalOtomatis(d) {
+      return tgl(d.batasAkhir) == tgl(d.tanggalMulai) + duration.value(180, 'd')
+        && tgl(d.tanggalMulai) > request.time - duration.value(2, 'd')
+        && tgl(d.tanggalMulai) < request.time + duration.value(1, 'd');
+    }
+    // Log (aktivitas, riwayatJadwal) hanya bisa ditambah, tidak diubah/dihapus.
+    function hanyaTambah(a, b, field) {
+      let la = a.get(field, []);
+      let lb = b.get(field, []);
+      return !a.diff(b).affectedKeys().hasAny([field])
+        || (la.size() > lb.size() && la[0:lb.size()] == lb);
+    }
+
+    // Edit form pendaftaran: wajib kembali ke 'baru', tanggal hanya untuk KP/Magang.
+    function formMhsAman(a, b) {
+      let k = a.diff(b).affectedKeys();
+      let kp = a.get('pendaftaran', {}).diff(b.get('pendaftaran', {})).affectedKeys();
+      return (!k.hasAny(fieldForm()) || a.get('verifikasi', 'baru') == 'baru')
+        && (!k.hasAny(['tanggalMulai', 'batasAkhir']) || b.program in ['KP', 'MG'])
+        && (!k.hasAny(['jenisMagang']) || a.jenisMagang in ['Magang', 'MKT'])
+        && (!k.hasAny(['periode']) || periodeBuka(a.periode))
+        && (!k.hasAny(['angkatan']) || angkatanAktif(a.angkatan))
+        && (!k.hasAny(['dosenWali']) || dosenAktif(a.dosenWali))
+        && kp.hasOnly(fieldPendaftaran())
+        && (!kp.hasAny(['namaPersetujuanDosen']) || dosenAktif(a.pendaftaran.namaPersetujuanDosen));
+    }
+    // Verifikasi: mahasiswa hanya bisa mengembalikan ke 'baru' (edit pendaftaran),
+    // tidak bisa memverifikasi sendiri. pernahTerverifikasi (pengajuan tidak bisa
+    // dihapus mahasiswa lagi) hanya bisa dipasang, tidak dicabut, dan wajib
+    // dipasang saat pengajuan terverifikasi dikembalikan ke 'baru'.
+    function verifikasiMhsAman(a, b) {
+      let k = a.diff(b).affectedKeys();
+      return (!k.hasAny(['verifikasi']) || a.verifikasi == 'baru')
+        && (!k.hasAny(['pernahTerverifikasi'])
+            || (a.pernahTerverifikasi == true && b.get('verifikasi', 'baru') == 'terverifikasi'))
+        && (b.get('verifikasi', 'baru') != 'terverifikasi' || a.get('verifikasi', 'baru') == 'terverifikasi'
+            || a.get('pernahTerverifikasi', false) == true);
+    }
+    // Tahap hanya bisa digeser mahasiswa sekali: Pendaftaran → Bimbingan saat
+    // KP/Magang mengunggah surat balasan (lihat uploadDokumenKP di Portal.jsx).
+    function tahapMhsAman(a, b) {
+      let kKP = a.get('dokumenKP', {}).diff(b.get('dokumenKP', {})).affectedKeys();
+      let kMG = a.get('dokumenMagang', {}).diff(b.get('dokumenMagang', {})).affectedKeys();
+      return a.get('tahap', '') == b.get('tahap', '')
+        || (b.get('tahap', '') == 'Pendaftaran' && a.get('tahap', '') == 'Bimbingan'
+            && ((b.program == 'KP' && kKP.hasAny(['suratBalasan']))
+              || (b.program == 'MG' && kMG.hasAny(['suratBalasanMagang', 'suratBalasanMkt']))));
+    }
+    // Berkas: hanya ke field program ini, bukan berkas admin, dan menambah/mengganti
+    // hanya setelah pengajuan diverifikasi (syarat eligible di helpers.js).
+    // Menghapus berkas sendiri selalu boleh (tombol Hapus di panel dokumen).
+    function dokumenMhsAman(a, b, field, program) {
+      let d = a.get(field, {}).diff(b.get(field, {}));
+      return d.affectedKeys().size() == 0 || (
+        b.program == program
+        && !d.affectedKeys().hasAny(dokumenAdmin())
+        && (d.addedKeys().size() + d.changedKeys().size() == 0 || pernahVerif(b)));
+    }
+    // Kegiatan yang boleh diusulkan = tombol "Ajukan jadwal" di KartuPengajuan:
+    // sudah terverifikasi, punya pembimbing, dan kegiatan itu tahap saat ini
+    // (atau Magang yang sudah mengunggah dokumen Persetujuan — eventAktifAwal).
+    function bolehUsulJadwal(b, e) {
+      return b.get('verifikasi', 'baru') == 'terverifikasi'
+        && (b.get('pembimbing1', '') != '' || b.get('pembimbing2', '') != '')
+        && (b.get('tahap', '') == e
+          || (b.program == 'MG' && e == 'Expo'
+              && ('persetujuanSmMagang' in b.get('dokumenMagang', {}) || 'persetujuanSmkpMkt' in b.get('dokumenMagang', {}))));
+    }
+    // Sidang: mahasiswa hanya mengisi tautan berkas (jadwal ditetapkan admin).
+    // Kegiatan lain: usulan tanggal/jam/ruang/berkas; mengirim usulan selalu
+    // mengosongkan konfirmasi & nilai. Jadwal yang sudah dikunci admin tidak bisa diubah.
+    function evMhsAman(a, b, e) {
+      let ea = a.get('jadwal', {}).get(e, {});
+      let eb = b.get('jadwal', {}).get(e, {});
+      let k = ea.diff(eb).affectedKeys();
+      return k.size() == 0 || (bolehUsulJadwal(b, e) && (
+        (e == 'Sidang' && k.hasOnly(['berkasLink', 'turnitinLink', 'folderLink']))
+        || (e != 'Sidang'
+            && !(eb.get('dikonfirmasi', false) == true && eb.get('tanggal', '') != '')
+            && k.hasOnly(['tanggal', 'hari', 'jamMulai', 'jamSelesai', 'ruang', 'berkasLink', 'dikonfirmasi', 'hasil'])
+            && ea.get('dikonfirmasi', false) == false && ea.get('hasil', '') == '')));
+    }
+    function jadwalMhsAman(a, b) {
+      return a.get('jadwal', {}).diff(b.get('jadwal', {})).affectedKeys().hasOnly(semuaEvent())
+        && evMhsAman(a, b, 'Seminar Proposal') && evMhsAman(a, b, 'Seminar Hasil')
+        && evMhsAman(a, b, 'Sidang') && evMhsAman(a, b, 'Expo');
+    }
+    // Pembukuan KP (FormPembukuan): mahasiswa hanya mengisi tautan bukti saat
+    // tahapnya Pembukuan; centang "sudah diperiksa" milik admin.
+    function pembukuanMhsAman(a, b) {
+      let k = a.get('pembukuan', {}).diff(b.get('pembukuan', {})).affectedKeys();
+      return k.size() == 0 || (
+        b.program == 'KP' && b.get('verifikasi', 'baru') == 'terverifikasi'
+        && b.get('tahap', '') == 'Pembukuan'
+        && k.hasOnly(['berkasLink']) && a.pembukuan.berkasLink is string);
+    }
+    // Perpanjangan (tombol di KartuPengajuan): minta sekali sebelum surat admin
+    // tersedia; unggah/ganti surat final kapan saja setelah surat admin tersedia
+    // (admin memakai versi terbaru).
+    function perpanjanganMhsAman(a, b) {
+      let pa = a.get('perpanjangan', {});
+      let pb = b.get('perpanjangan', {});
+      let k = pa.diff(pb).affectedKeys();
+      let suratSiap = pb.get('suratAdminTersedia', false) == true;
+      return k.size() == 0 || (
+        b.get('verifikasi', 'baru') == 'terverifikasi' && b.get('tahap', '') != 'Lulus'
+        && b.program in ['TA', 'KP', 'MG']
+        && ((k.hasOnly(['diminta', 'alasan', 'tanggalDiminta']) && pa.diminta == true
+              && pb.get('diminta', false) != true && !suratSiap)
+          || (k.hasOnly(['suratFinal', 'suratFinalLink']) && suratSiap && 'suratFinal' in pa)));
+    }
+    function perubahanMhsAman(a, b, id) {
+      let k = a.diff(b).affectedKeys();
+      return k.hasOnly(fieldMahasiswa())
+        && (!k.hasAny(['id']) || a.id == id)
+        && formMhsAman(a, b)
+        && verifikasiMhsAman(a, b)
+        && tahapMhsAman(a, b)
+        && jadwalMhsAman(a, b)
+        && perpanjanganMhsAman(a, b)
+        && pembukuanMhsAman(a, b)
+        && dokumenMhsAman(a, b, 'dokumenKP', 'KP')
+        && dokumenMhsAman(a, b, 'dokumenMagang', 'MG')
+        && dokumenMhsAman(a, b, 'dokumenTA', 'TA')
+        && hanyaTambah(a, b, 'aktivitas')
+        && hanyaTambah(a, b, 'riwayatJadwal');
+    }
+
+    // Pengajuan baru dari mahasiswa: hanya isi form pendaftaran dengan pilihan
+    // yang dibuka admin, status awal, tanpa dosen/jadwal/berkas, dan belum ada
+    // pengajuan lain untuk program itu.
+    function pengajuanBaruAman(d, id) {
+      return d.owner == studentNim() && d.nim == studentNim()
+        && d.program in ['TA', 'KP', 'CAP', 'MG', 'S2']
+        && id == studentNim() + '_' + d.program
+        && d.get('id', id) == id
+        && !exists(/databases/$(database)/documents/slotPengajuan/$(id))
+        && d.keys().hasOnly(['id', 'program', 'nama', 'nim', 'owner', 'jenisMagang', 'judul', 'periode',
+              'angkatan', 'klasifikasi', 'bidang', 'dosenWali', 'pembimbing1', 'pembimbing2', 'penguji1',
+              'penguji2', 'tahap', 'tanggalMulai', 'batasAkhir', 'dibatalkan', 'catatan', 'jadwal',
+              'verifikasi', 'pendaftaran', 'aktivitas'])
+        && d.verifikasi == 'baru' && d.tahap == 'Pendaftaran'
+        && d.get('pembimbing1', '') == '' && d.get('pembimbing2', '') == ''
+        && d.get('penguji1', '') == '' && d.get('penguji2', '') == ''
+        && d.get('catatan', '') == '' && d.get('dibatalkan', false) == false
+        && d.get('jadwal', {}).size() == 0
+        && d.get('aktivitas', []).size() == 1
+        && d.get('pendaftaran', {}).keys().hasOnly(fieldPendaftaran())
+        && d.get('jenisMagang', 'Magang') in ['Magang', 'MKT']
+        && periodeBuka(d.periode)
+        && angkatanAktif(d.get('angkatan', ''))
+        && dosenAktif(d.get('dosenWali', ''))
+        && dosenAktif(d.get('pendaftaran', {}).get('namaPersetujuanDosen', ''))
+        && (d.program in ['KP', 'MG'] || tanggalOtomatis(d));
+    }
+
+    // Dosen hanya membaca (DosenPortal.jsx tidak menulis apa pun).
     match /mahasiswa/{id} {
-      allow read, update, delete: if isAdmin()
+      allow read: if isAdmin()
         || (isLecturer() && assignedTo(resource.data))
         || (isStudent() && ownedByMe(resource.data));
-      allow create: if isAdmin() || (isStudent() && ownedByMe(request.resource.data));
+      allow update: if isAdmin()
+        || (isStudent() && ownedByMe(resource.data) && perubahanMhsAman(request.resource.data, resource.data, id));
+      allow delete: if isAdmin()
+        || (isStudent() && ownedByMe(resource.data)
+            && resource.data.get('verifikasi', 'baru') != 'terverifikasi'
+            && resource.data.get('pernahTerverifikasi', false) != true);
+      allow create: if isAdmin()
+        || (isStudent() && pengajuanBaruAman(request.resource.data, id));
+    }
+
+    // ----- Penanda pengajuan per (nim, program) yang ID dokumennya bukan "{nim}_{program}" -----
+    // { mahasiswaId, owner, program }. Ditulis admin (simpanMahasiswa), Cloud
+    // Functions (ganti NIM) dan skrip functions/migrate-slot-pengajuan.js.
+    // Mahasiswa boleh menghapus penanda miliknya hanya bila dokumen yang
+    // ditandainya sudah tidak ada (dihapus lebih dulu, lihat hapusMahasiswa di App.jsx).
+    match /slotPengajuan/{id} {
+      allow read, create, update: if isAdmin();
+      allow delete: if isAdmin() || (isStudent() && (
+        (resource == null && id.matches(studentNim() + '_[A-Za-z0-9]+'))
+        || (resource != null && resource.data.owner == studentNim()
+            && !existsAfter(/databases/$(database)/documents/mahasiswa/$(resource.data.mahasiswaId)))
+      ));
     }
 
     // ----- Akun login mahasiswa -----

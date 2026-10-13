@@ -63,6 +63,38 @@ export function MessageIcon() {
   );
 }
 
+export function LampIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9 18h6" />
+      <path d="M10 22h4" />
+      <path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14" />
+    </svg>
+  );
+}
+
+// Tombol ✕ di ujung kanan kotak cari, muncul hanya bila ada isi. Pembungkusnya
+// harus position: relative (.search-wrap / .cari-wrap). mousedown dicegah supaya
+// fokus tetap di kotak cari (tidak memicu onBlur).
+export function TombolHapusCari({ q, onHapus }) {
+  if (!q) return null;
+  return (
+    <button type="button" className="icon-btn search-clear" onMouseDown={(e) => e.preventDefault()} onClick={onHapus} title="Hapus pencarian" aria-label="Hapus pencarian">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
+    </button>
+  );
+}
+
+// Kotak cari biasa (input + tombol ✕). `style` untuk pembungkus (mis. maxWidth).
+export function KotakCari({ q, setQ, placeholder, style }) {
+  return (
+    <div className="cari-wrap" style={style}>
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={placeholder} />
+      <TombolHapusCari q={q} onHapus={() => setQ('')} />
+    </div>
+  );
+}
+
 // Ikon logout (pintu + panah keluar) — dipakai tombol Logout di sidebar admin.
 // className diteruskan supaya bisa pakai kelas .tab-icon (ukuran/warna sama
 // dengan ikon nav sidebar lain).
@@ -152,8 +184,8 @@ export function ThemeToggle() {
 }
 
 // Status satu tahap relatif terhadap tahap saat ini — 'done' | 'active' | 'upcoming'.
-// Dipakai bersama oleh StageBar (bilah horizontal) dan StageListVertical (daftar
-// vertikal ringkas, tampilan layar sempit) supaya logikanya selalu konsisten.
+// Dipakai bersama oleh StageBar (bilah horizontal) dan StageStepper (langkah
+// bernomor, tampilan layar sempit) supaya logikanya selalu konsisten.
 export function stageStatus(stages, tahap, i) {
   const idx = stages.indexOf(tahap);
   if (tahap === 'Lulus' || i < idx) return 'done';
@@ -179,21 +211,31 @@ export function StageBar({ program, tahap }) {
   );
 }
 
-// Versi vertikal ringkas dari StageBar untuk layar sempit (mobile) — daftar
-// semua tahap dengan titik status per tahap. Sengaja TANPA tanggal per-tahap:
-// data itu tidak tersimpan per-tahap saat ini (hanya tahap aktif yang dilacak),
-// jadi ini murni tampilan ulang StageBar, bukan fitur baru.
-export function StageListVertical({ program, tahap }) {
+// Versi layar sempit dari StageBar: satu baris langkah bernomor (✓ untuk yang
+// sudah lewat) + keterangan "Tahap x dari n" di bawahnya. Nama tiap tahap
+// tidak ditulis di bawah nodenya karena program TA punya sampai 6 tahap dan
+// tidak muat di lebar HP; nama tahap aktif cukup di keterangan.
+export function StageStepper({ program, tahap }) {
   const stages = stagesFor(program);
+  const idx = Math.max(0, stages.indexOf(tahap));
   return (
-    <ul className="stage-list" aria-label={`Tahapan saat ini: ${tahap}`}>
-      {stages.map((s, i) => (
-        <li key={s} className={'stage-list-item stage-' + stageStatus(stages, tahap, i)}>
-          <span className="stage-list-dot" aria-hidden="true" />
-          <span className="stage-list-label">{s}</span>
-        </li>
-      ))}
-    </ul>
+    <div className="stepper">
+      <ol className="stepper-track" aria-label="Tahapan">
+        {stages.map((s, i) => {
+          const status = stageStatus(stages, tahap, i);
+          return (
+            <li key={s} className={'stepper-step stepper-' + status} title={s} aria-current={status === 'active' ? 'step' : undefined}>
+              <span className="stepper-node" aria-hidden="true">{status === 'done' ? '✓' : i + 1}</span>
+              <span className="sr-only">{s}{status === 'done' ? ' (selesai)' : status === 'active' ? ' (sekarang)' : ''}</span>
+            </li>
+          );
+        })}
+      </ol>
+      <div className="stepper-caption">
+        <span className="stepper-count">Tahap {idx + 1} dari {stages.length}</span>
+        <strong>{tahap}</strong>
+      </div>
+    </div>
   );
 }
 
@@ -248,6 +290,18 @@ export function Modal({ title, onClose, children, footer, wide, headExtra, opsi 
         <div className="modal-body">{children}</div>
         {footer && <div className="modal-foot">{footer}</div>}
       </div>
+    </div>
+  );
+}
+
+// Judul form "melayang" (portal-form) dengan ✕ di kanan atas, pasangan tombol
+// Batal di bawahnya: setiap jendela selalu bisa ditutup dari atas dan bawah,
+// sama seperti Modal. Tanpa onClose (mis. mode pratinjau) hanya judulnya.
+export function KepalaForm({ title, onClose }) {
+  return (
+    <div className="form-head">
+      <h2 className="page-title">{title}</h2>
+      {onClose && <button type="button" className="icon-btn form-head-tutup" onClick={onClose} aria-label="Tutup">✕</button>}
     </div>
   );
 }

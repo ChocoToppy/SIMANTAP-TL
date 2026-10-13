@@ -8,7 +8,7 @@ import { Portal } from './pages/Portal.jsx';
 import { DosenPortal } from './pages/DosenPortal.jsx';
 import { PanduanPage } from './pages/PanduanPage.jsx';
 import { PenggunaanRuangPortal } from './modules/ruang';
-import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, stagesFor, eventsFor, punyaKlasifikasi, punyaSyarat, rolesFor, syaratLabel, getJadwal, STAGES, KLASIFIKASI, BIDANG, KP_TEMA, HARI, bidangLabel, todayISO, parseISO, daysBetween, BULAN, formatTanggal, kondisi, isAktif, indexTahap, hitungBeban, hitungBebanProgram, hitungBebanRinci, SEMUA, filterByPeriode, daftarPeriode, PERIODE_AKTIF, TOPIK, VERIFIKASI, statusVerif, tambahHari, LABEL_PENDAFTARAN, ringkasPendaftaran, RUANG, menitJam, rentangJadwal, jamTampil, beririsan, dosenTerlibat, kumpulkanEvent, cariBentrok, pesanNotifikasi, waLink, mailtoLink, waMahasiswa, TEMPLATE_SURAT, tokenSurat, renderSurat, PEJABAT, KOP_SURAT, evKeyDok, dokTA, DURASI_EVENT, JAM_KERJA, durasiEvent, jamTambah, dalamJamKerja, tahapBerikut, eventAktif, BERKAS_SYARAT, berkasSyarat, bolehAjukanJadwal, orphanedUploadPaths } from './utils/helpers.js';
+import { arsipkanJadwal, idPengajuan, PROGRAMS, PROGRAM_KEYS, programOf, programLabel, stagesFor, eventsFor, punyaKlasifikasi, punyaSyarat, rolesFor, syaratLabel, getJadwal, STAGES, KLASIFIKASI, BIDANG, KP_TEMA, HARI, bidangLabel, todayISO, parseISO, daysBetween, BULAN, formatTanggal, kondisi, isAktif, indexTahap, hitungBeban, hitungBebanProgram, hitungBebanRinci, SEMUA, filterByPeriode, daftarPeriode, PERIODE_AKTIF, TOPIK, VERIFIKASI, statusVerif, tambahHari, LABEL_PENDAFTARAN, ringkasPendaftaran, RUANG, menitJam, rentangJadwal, jamTampil, beririsan, dosenTerlibat, kumpulkanEvent, cariBentrok, pesanNotifikasi, waLink, mailtoLink, waMahasiswa, TEMPLATE_SURAT, tokenSurat, renderSurat, PEJABAT, KOP_SURAT, evKeyDok, dokTA, DURASI_EVENT, JAM_KERJA, durasiEvent, jamTambah, dalamJamKerja, tahapBerikut, eventAktif, BERKAS_SYARAT, berkasSyarat, bolehAjukanJadwal, orphanedUploadPaths } from './utils/helpers.js';
 import { deleteUploadedFile, deleteUploadedFolder } from './utils/fileUpload.js';
 import { DOSEN_AWAL, plusHari, RAW_MAHASISWA, MAHASISWA_AWAL, AKUN_AWAL, PERIODE_BUKA_AWAL, PENGUMUMAN_AWAL, PERIODE_AKTIF_AWAL, PANDUAN_AWAL } from './data/seed.js';
 import { Badge, StageBar, ExportMenu, TextSizeToggle, ThemeToggle, RolePill, TabIcon, LogoutIcon, Dropdown, Muat, PasswordField, HamburgerIcon } from './components/ui.jsx';
@@ -21,7 +21,7 @@ import { readClaims, logout, changeOwnPassword, adminCreateUser, adminResetPassw
 import { bolehMasukDomainIni, KUNCI_DITOLAK } from './utils/domainAccess.js';
 import logoTl from './assets/logo-tl.png';
 import gearIcon from './assets/gear.png';
-import { FITUR_EKSPERIMENTAL } from './utils/config.js';
+import { FITUR_RUANG } from './utils/config.js';
 import { useJadwalRuang, useSinkronProgram } from './modules/ruang';
 
 // Dirender saat akun non-super-admin login di domain terbatas: tandai penolakan
@@ -68,6 +68,15 @@ function writeDoc(collectionName, id, value, label) {
     console.error('FB err:', e);
     alert('Gagal menyimpan perubahan ke server: ' + (e.message || e) + '\n\nPerubahan Anda BELUM tersimpan secara permanen. Coba lagi, atau hubungi admin.');
   });
+}
+
+// ID penanda slotPengajuan untuk dokumen yang memegang pasangan (owner, program)
+// dengan ID selain idPengajuan (data lama, buatan admin, atau setelah ganti NIM),
+// atau null bila tidak perlu penanda. Lihat firestore.rules.
+function slotPengajuanUntuk(m) {
+  if (!m || !m.owner) return null;
+  const slotId = idPengajuan(m.owner, programOf(m));
+  return slotId === m.id ? null : slotId;
 }
 
 function hapusDoc(collectionName, id) {
@@ -347,24 +356,54 @@ export default function App() {
 
   const mhsPeriode = useMemo(() => filterByPeriode(data.mahasiswa, periode), [data.mahasiswa, periode]);
 
-  function simpanMahasiswa(m) {
+  function simpanMahasiswa(rec) {
     // Berkas KP/perpanjangan yang ada di record lama tapi tidak lagi ada di
     // record baru (diganti atau dihapus) sudah tidak dirujuk siapa pun —
     // hapus dari Storage sekarang juga supaya tidak menumpuk jadi sampah.
-    const lama = mahasiswaList.find((x) => x.id === m.id);
+    const lama = mahasiswaList.find((x) => x.id === rec.id);
+    let m = arsipkanJadwal(lama, rec); // jadwal yang diganti masuk riwayat
+    // Pengajuan yang pernah terverifikasi tidak bisa dihapus mahasiswa lagi,
+    // meski kemudian kembali ke 'baru' lewat edit (firestore.rules mewajibkan ini).
+    if (m.verifikasi === 'terverifikasi' || (lama && (lama.verifikasi === 'terverifikasi' || lama.pernahTerverifikasi))) {
+      m = { ...m, pernahTerverifikasi: true };
+    }
     if (lama) orphanedUploadPaths(lama, m).forEach((p) => deleteUploadedFile(p));
     setMahasiswaList((prev) => {
       const ada = prev.some((x) => x.id === m.id);
       return ada ? prev.map((x) => (x.id === m.id ? m : x)) : [...prev, m];
     });
     writeDoc('mahasiswa', m.id, m, 'mahasiswa');
+    if (claims?.role === 'admin') {
+      const slotLama = slotPengajuanUntuk(lama);
+      const slotBaru = slotPengajuanUntuk(m);
+      if (slotLama && slotLama !== slotBaru) hapusDoc('slotPengajuan', slotLama);
+      if (slotBaru && (!lama || slotBaru !== slotLama)) {
+        writeDoc('slotPengajuan', slotBaru, { mahasiswaId: m.id, owner: m.owner, program: programOf(m) }, 'slotPengajuan');
+      }
+    }
   }
-  function hapusMahasiswa(id) {
+  async function hapusMahasiswa(id) {
+    const m = mahasiswaList.find((x) => x.id === id);
     setMahasiswaList((prev) => prev.filter((x) => x.id !== id));
-    hapusDoc('mahasiswa', id);
     // Semua berkas mahasiswa ini disimpan di bawah uploads/{id}/... — hapus
     // seluruh folder sekaligus supaya tidak ada sisa berkas yatim di Storage.
-    deleteUploadedFolder(`uploads/${id}`);
+    // Folder dihapus SEBELUM dokumennya: aturan Storage untuk mahasiswa
+    // membaca dokumen mahasiswa/{id} untuk mengecek kepemilikan.
+    await deleteUploadedFolder(`uploads/${id}`);
+    try {
+      await deleteDoc(doc(db, 'mahasiswa', id));
+    } catch (e) {
+      console.error('FB err:', e);
+      alert('Gagal menghapus data di server: ' + (e.message || e) + '\n\nPerubahan Anda BELUM tersimpan secara permanen. Coba lagi, atau hubungi admin.');
+      if (m) setMahasiswaList((prev) => (prev.some((x) => x.id === id) ? prev : [...prev, m]));
+      return;
+    }
+    // Penanda slotPengajuan dihapus SESUDAH dokumennya (aturannya hanya mengizinkan
+    // mahasiswa menghapus penanda yang dokumennya sudah tidak ada), supaya program
+    // itu bisa diajukan lagi. Bila penanda menunjuk pengajuan lain untuk program yang
+    // sama yang masih ada (duplikat lama), penghapusan ditolak — memang seharusnya.
+    const slot = slotPengajuanUntuk(m);
+    if (slot) deleteDoc(doc(db, 'slotPengajuan', slot)).catch(() => {});
   }
   // Hapus akun mahasiswa sepenuhnya: akun Auth, akun/{nim}, loginIndex/{nim},
   // dan semua data KP terkait — dipakai untuk membersihkan akun dummy/uji
@@ -373,15 +412,6 @@ export default function App() {
     const { deletedMahasiswaIds } = await adminDeleteStudent(nim);
     setMahasiswaList((prev) => prev.filter((x) => !deletedMahasiswaIds.includes(x.id)));
     deletedMahasiswaIds.forEach((id) => deleteUploadedFolder(`uploads/${id}`));
-  }
-  // Dosen hanya boleh mengubah nilai/hasil pada event yang mereka tangani sendiri —
-  // jangan pakai simpanMahasiswa (itu menimpa seluruh record, termasuk field admin).
-  function simpanNilaiKP(id, ev, hasil) {
-    const target = mahasiswaList.find((x) => x.id === id);
-    if (!target) return;
-    const next = { ...target, jadwal: { ...(target.jadwal || {}), [ev]: { ...((target.jadwal || {})[ev] || {}), hasil } } };
-    setMahasiswaList((prev) => prev.map((x) => (x.id === id ? next : x)));
-    writeDoc('mahasiswa', id, next, 'mahasiswa');
   }
   function simpanDosen(ds) {
     setDosenList((prev) => {
@@ -478,7 +508,6 @@ export default function App() {
         allDosen={data.dosen}
         mahasiswa={data.mahasiswa}
         periodeList={periodeList}
-        onGradeSave={simpanNilaiKP}
         onLogout={keluar}
       />
     );
@@ -516,6 +545,7 @@ export default function App() {
         konten={data.konten || {}}
         jadwalRuang={jadwalRuang}
         onSave={simpanMahasiswa}
+        onDelete={hapusMahasiswa}
         onSimpanAkun={async (profil) => {
           const { nimBerubah } = await studentUpdateProfile(profil);
           if (nimBerubah) await refreshClaims();
@@ -597,8 +627,7 @@ export default function App() {
     { key: 'dashboard', label: 'Dashboard' },
     { key: 'mahasiswa', label: 'Mahasiswa' },
     { key: 'dosen', label: 'Dosen' },
-    // Eksperimental: hanya di build `full` (lihat FITUR_EKSPERIMENTAL).
-    ...(FITUR_EKSPERIMENTAL ? [{ key: 'ruang', label: 'Penggunaan Ruang' }] : []),
+    ...(FITUR_RUANG ? [{ key: 'ruang', label: 'Penggunaan Ruang' }] : []),
   ];
 
   return (
@@ -701,7 +730,7 @@ export default function App() {
           {tab === 'mahasiswa' && (
             <Mahasiswa programTab={mhsProg} setProgramTab={setMhsProg} jadwalRuang={jadwalRuang} mahasiswa={mhsPeriode} allMahasiswa={data.mahasiswa} allDosen={data.dosen} periode={periode} periodeList={periodeList} daftarAngkatan={daftarAngkatan} konten={data.konten || {}} onSave={simpanMahasiswa} onDelete={hapusMahasiswa} />
           )}
-          {FITUR_EKSPERIMENTAL && tab === 'ruang' && <PenggunaanRuangPortal mahasiswa={mhsPeriode} semuaMahasiswa={data.mahasiswa || []} jadwalRuang={jadwalRuang} dosen={data.dosen || []} aksi={aksiJadwalRuang} catatanSinkron={sinkronTidakMasuk} />}
+          {FITUR_RUANG && tab === 'ruang' && <PenggunaanRuangPortal mahasiswa={mhsPeriode} semuaMahasiswa={data.mahasiswa || []} jadwalRuang={jadwalRuang} dosen={data.dosen || []} aksi={aksiJadwalRuang} catatanSinkron={sinkronTidakMasuk} />}
           {tab === 'dosen' && (
             <Dosen dosen={data.dosen} mahasiswa={mhsPeriode} periodeLabel={periode === SEMUA ? 'semua periode' : periode} onSave={simpanDosen} onDelete={hapusDosen} />
           )}

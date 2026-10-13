@@ -21,6 +21,10 @@
     ],
     "rewrites": [
       {
+        "source": "/api/ruang",
+        "function": "jadwalRuangPublik"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

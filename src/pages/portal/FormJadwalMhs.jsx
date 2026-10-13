@@ -1,34 +1,29 @@
 import React, { useState } from 'react';
-import { programOf, durasiEvent, jamTambah, dalamJamKerja, formatTanggal, berkasSyarat, JAM_KERJA, HARI, RUANG, catatAktivitas } from '../../utils/helpers.js';
-import { Field } from '../../components/ui.jsx';
+import { durasiEvent, jamTambah, dalamJamKerja, formatTanggal, berkasSyarat, JAM_KERJA, RUANG, catatAktivitas } from '../../utils/helpers.js';
+import { Field, KepalaForm } from '../../components/ui.jsx';
 import { periksaUsulanRuang, teksBentrokRuang, opsiRuang, milikProgram } from '../../modules/ruang';
-import { FITUR_EKSPERIMENTAL } from '../../utils/config.js';
+import { FITUR_RUANG } from '../../utils/config.js';
 import { BerkasCallout } from '../../components/BerkasCallout.jsx';
 
 export function FormJadwalMhs({ awal, ev, konten = {}, jadwalRuang = null, onCancel, onSave }) {
   const isSidang = ev.includes('Sidang');
-  const isKP = programOf(awal) === 'KP' || ev.includes('KP');
-  // Seminar KP tidak dibatasi rentang mulai/akhir KP: durasi KP terikat kerja
-  // lapangan mahasiswa, bukan jadwal seminar — begitu berkas siap, mahasiswa
-  // boleh mengajukan seminar meski tanggalnya melewati batasAkhir KP.
-  const bebasRentangKP = ev === 'Seminar KP';
   const durasi = durasiEvent(ev);
   const [j, setJ] = useState(() => ({ ...(awal.jadwal && awal.jadwal[ev] ? awal.jadwal[ev] : {}) }));
   const [err, setErr] = useState('');
   const set = (k, v) => setJ((p) => ({ ...p, [k]: v }));
   function setMulai(v) { setJ((p) => ({ ...p, jamMulai: v, jamSelesai: v ? jamTambah(v, durasi) : '' })); }
 
-  // Usulan tidak boleh diajukan bila ruang sudah terpakai (kuliah/kegiatan) pada
-  // tanggal & jam itu — mahasiswa hanya mengusulkan, admin yang memesan, tapi usulan
-  // harus relevan dengan ketersediaan. Hanya berlaku di build eksperimental.
+  // Jadwal yang sudah ditetapkan admin dianggap final: usulan tidak boleh diajukan bila ruang
+  // sudah terpakai (kuliah/kegiatan/jadwal lain) pada tanggal & jam itu — kecuali admin
+  // lebih dulu mengubah jadwal tersebut. Mahasiswa hanya mengusulkan; admin yang memesan.
   const daftarRuang = opsiRuang(jadwalRuang, RUANG);
-  const bentrokRuang = FITUR_EKSPERIMENTAL && jadwalRuang && j.tanggal && j.jamMulai && j.ruang
+  const bentrokRuang = FITUR_RUANG && jadwalRuang && j.tanggal && j.jamMulai && j.ruang
     ? periksaUsulanRuang(jadwalRuang, { tanggal: j.tanggal, jamMulai: j.jamMulai, jamSelesai: jamTambah(j.jamMulai, durasi), ruang: j.ruang }, { abaikan: milikProgram(awal.id, ev) }).bentrok
     : [];
 
   function submit() {
     if (!isSidang) {
-      if (j.tanggal && !bebasRentangKP) {
+      if (j.tanggal) {
         if (awal.tanggalMulai && j.tanggal < awal.tanggalMulai) { setErr(`Tanggal harus pada/setelah ${formatTanggal(awal.tanggalMulai)} (tanggal mulai).`); return; }
         if (awal.batasAkhir && j.tanggal > awal.batasAkhir) { setErr(`Tanggal harus pada/sebelum ${formatTanggal(awal.batasAkhir)} (batas akhir).`); return; }
       }
@@ -51,7 +46,7 @@ export function FormJadwalMhs({ awal, ev, konten = {}, jadwalRuang = null, onCan
 
   return (
     <div className="portal-form card">
-      <h2 className="page-title">{isSidang ? 'Unggah draft & berkas sidang' : `Ajukan jadwal ${ev}`}</h2>
+      <KepalaForm title={isSidang ? 'Unggah draft & berkas sidang' : `Ajukan jadwal ${ev}`} onClose={onCancel} />
       <p className="hint">
         {isSidang
           ? 'Jadwal sidang ditetapkan admin. Anda cukup mengunggah draft & berkas di sini.'
@@ -61,15 +56,7 @@ export function FormJadwalMhs({ awal, ev, konten = {}, jadwalRuang = null, onCan
       <div className="form-grid">
         {!isSidang && (
           <>
-            <Field label="Rencana tanggal"><input type="date" value={j.tanggal || ''} min={bebasRentangKP ? undefined : (awal.tanggalMulai || undefined)} max={bebasRentangKP ? undefined : (awal.batasAkhir || undefined)} onChange={(e) => set('tanggal', e.target.value)} /></Field>
-            {isKP && (
-              <Field label="Hari seminar">
-                <select value={j.hari || ''} onChange={(e) => set('hari', e.target.value)}>
-                  <option value="">—</option>
-                  {HARI.map((h) => <option key={h} value={h}>{h}</option>)}
-                </select>
-              </Field>
-            )}
+            <Field label="Rencana tanggal"><input type="date" value={j.tanggal || ''} min={awal.tanggalMulai || undefined} max={awal.batasAkhir || undefined} onChange={(e) => set('tanggal', e.target.value)} /></Field>
             <Field label="Jam mulai"><input type="time" min={JAM_KERJA.mulai} max={JAM_KERJA.selesai} value={j.jamMulai || ''} onChange={(e) => setMulai(e.target.value)} /></Field>
             <Field label={`Jam selesai (otomatis +${durasi} menit)`}><input type="time" value={j.jamMulai ? jamTambah(j.jamMulai, durasi) : (j.jamSelesai || '')} readOnly /></Field>
             <Field label="Ruang">

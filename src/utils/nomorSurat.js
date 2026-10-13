@@ -4,14 +4,13 @@ import { programOf, todayISO, parseISO, tambahHari } from './helpers.js';
 // Logika murni (tanpa Firestore) untuk nomor surat: format, aturan perpanjangan,
 // dan status "perlu ditinjau". Penulisan ke Firestore ada di nomorSuratDb.js.
 //
-// Bentuk nomor:  013/UN7.F3.6.8.TL/DL/XII/2025
+// Bentuk nomor:  013/UN7.F3.6.8/DL/XII/2025
 //   013         nomor urut, reset tiap tahun (satu urutan untuk semua program)
 //   UN7.F3      kode fakultas
 //   6.8         kode penandatangan (Ketua Prodi S1)
-//   TL          kode departemen
 //   DL          kode hal (Pendidikan dan Pelatihan)
 //   XII / 2025  bulan (romawi) & tahun saat nomor diterbitkan
-export const KODE_NOMOR = { fakultas: 'UN7.F3', penandatangan: '6.8', departemen: 'TL', hal: 'DL' };
+export const KODE_NOMOR = { fakultas: 'UN7.F3', penandatangan: '6.8', hal: 'DL' };
 
 // Satu nomor berlaku untuk satu siklus (mahasiswa + program) sampai diakhiri
 // admin. Perpanjangan: KP/Magang 1× 1 bulan, TA 2× 1 bulan. Program lain
@@ -29,8 +28,19 @@ export function romawiBulan(bulan) { return ROMAWI[bulan - 1] || ''; }
 export function idNomor(tahun, urut) { return `${tahun}-${String(urut).padStart(3, '0')}`; }
 
 export function formatNomor(urut, bulan, tahun) {
-  const { fakultas, penandatangan, departemen, hal } = KODE_NOMOR;
-  return `${String(urut).padStart(3, '0')}/${fakultas}.${penandatangan}.${departemen}/${hal}/${romawiBulan(bulan)}/${tahun}`;
+  const { fakultas, penandatangan, hal } = KODE_NOMOR;
+  return `${String(urut).padStart(3, '0')}/${fakultas}.${penandatangan}/${hal}/${romawiBulan(bulan)}/${tahun}`;
+}
+
+// Kunci sortir: tahun dulu, baru nomor urut (urutan reset tiap tahun, jadi 001/2026
+// harus setelah 120/2025). Nomor ketikan manual yang tidak sesuai format dibandingkan
+// apa adanya, setelah semua nomor yang sesuai format.
+export function kunciUrutNomor(nomor) {
+  const s = String(nomor || '').trim();
+  const urut = s.match(/^(\d+)\//);
+  const tahun = s.match(/\/(\d{4})\s*$/);
+  if (!urut || !tahun) return `2 ${s}`;
+  return `1 ${tahun[1]}-${urut[1].padStart(6, '0')}`;
 }
 
 export function tambahBulan(iso, n) {

@@ -45,10 +45,52 @@ npm run deploy:experimental          # deploy to cPanel (full build)
 
 ## Dist Files
 
-...bash
-npm run build:production - KP & Magang (for simantaptlundip.com; vite --mode prod
-  — see src/utils/config.js for which programs each mode allows)
-npm run build:experimental - all (for simantap-tl.web.app)
+```bash
+npm run build:production     # KP & Magang (for simantaptlundip.com; vite build --mode prod)
+npm run build:experimental   # all programs (for simantap-tl.web.app; vite build --mode full)
+```
+
+See `src/utils/config.js` for which programs each mode allows.
+
+## Running localhost as a specific build
+
+`npm run dev` on its own loads no `.env.*` file, so it falls back to the
+**experimental** build (`VITE_PROGRAM_SCOPE` defaults to `full`). Pass `--mode`
+to choose:
+
+```bash
+npm run dev -- --mode prod   # production build: KP & Magang only, manual Nomor Surat, no Registri tab
+npm run dev -- --mode full   # experimental build: all programs + experimental features
+```
+
+- The mode is read when the dev server starts. To switch builds, stop the server
+  and start it again with the other mode.
+- Both modes use the **same Firebase project**. Only the UI changes, so anything
+  you save on localhost goes to the live database.
+- What each mode turns on is in `src/utils/config.js` (`PROGRAM_SCOPE`,
+  `FITUR_EKSPERIMENTAL`).
+
+## Public room schedule embed (WordPress / other sites)
+
+Not reachable from inside the app — there is no menu or link to it. It is a separate page
+plus a public data endpoint, and it only exists on the Firebase (experimental) site.
+
+- Page: `https://simantap-tl.web.app/embed/ruang.html` (options: `?view=hari|minggu|bulan`, `&ruang=E.301,D.202`)
+- Data: `https://simantap-tl.web.app/api/ruang` — Cloud Function `jadwalRuangPublik` (published semesters/bookings
+  only, no student names or PJ). Source in `functions/index.js`; `firebase.json` rewrites `/api/ruang` to it.
+- Shown on lingkungan.undip.ac.id/fasilitas-3/ through a "Custom HTML" block containing an `<iframe>`.
+  The exact snippet is in `src/modules/ruang/README.md` (section "Sematan publik").
+
+Deploy (the cPanel `npm run deploy` does NOT include this):
+
+~~~bash
+npm run build:experimental
+npx firebase deploy --only functions:jadwalRuangPublik,hosting
+~~~
+
+Nothing appears until a semester is published (Pengaturan → Jadwal Ruang → Terbitkan). The data refreshes
+within 5 minutes of a change. If the grid is blank: open `/api/ruang` directly — 404 means the function was not
+deployed; empty lists mean no published semester.
 
 ## cPanel deployment
 

@@ -3,7 +3,7 @@ import { Field } from '../host.js';
 import { PROGRAMS, PROGRAM_KEYS, programOf, eventsFor } from '../host.js';
 
 // Jumlah mahasiswa maksimum per kegiatan menurut program (TA bisa berkelompok 3, Capstone 4).
-export const MAKS_MAHASISWA = { TA: 3, CAP: 4, KP: 1, MG: 1, S2: 1 };
+export const MAKS_MAHASISWA = { TA: 3, CAP: 4, MG: 1, S2: 1 };
 export const maksMahasiswa = (program) => MAKS_MAHASISWA[program] || 1;
 
 // Isian khusus booking seminar/sidang: program -> kegiatan (daftar mengikuti program) ->
@@ -24,12 +24,14 @@ export function BookingSeminarFields({ f, set, mahasiswa = [] }) {
     <>
       <Field label="Program">
         <select value={f.program} onChange={(e) => ubahProgram(e.target.value)}>
-          {PROGRAM_KEYS.map((k) => <option key={k} value={k}>{PROGRAMS[k].label}</option>)}
+          {/* Program tanpa kegiatan terjadwal (KP) disembunyikan, kecuali booking lama yang sudah memakainya. */}
+          {PROGRAM_KEYS.filter((k) => eventsFor(k).length > 0 || k === f.program).map((k) => <option key={k} value={k}>{PROGRAMS[k].label}</option>)}
         </select>
       </Field>
       <Field label="Kegiatan">
         <select value={f.kegiatan} onChange={(e) => set('kegiatan', e.target.value)}>
           {eventsFor(f.program).map((ev) => <option key={ev} value={ev}>{ev}</option>)}
+          {f.kegiatan && !eventsFor(f.program).includes(f.kegiatan) && <option value={f.kegiatan}>{f.kegiatan}</option>}
         </select>
       </Field>
       <Field label={`Mahasiswa (maks. ${maks})`} full>

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { collection, doc, onSnapshot, query, where, writeBatch } from 'firebase/firestore';
 import { db } from '../host.js';
-import { FITUR_EKSPERIMENTAL } from '../host.js';
+import { FITUR_RUANG } from '../host.js';
 import { rancangImpor } from '../logic/ruangBooking.js';
 import { rancangSinkronProgram } from '../logic/sinkronRuang.js';
 
@@ -29,7 +29,7 @@ export function useJadwalRuang(authUser, claims) {
   const isAdmin = claims?.role === 'admin';
 
   useEffect(() => {
-    if (!FITUR_EKSPERIMENTAL || !authUser) { setRuang([]); setSemesters([]); setBookings([]); return; }
+    if (!FITUR_RUANG || !authUser) { setRuang([]); setSemesters([]); setBookings([]); return; }
     const baca = (ref, set, nama) => onSnapshot(ref, (snap) => set(snap.docs.map((d) => ({ ...d.data(), id: d.id }))), (e) => { console.error(`jadwal ruang: gagal membaca ${nama}:`, e); set([]); });
     const unsubs = [
       baca(collection(db, 'ruang'), setRuang, 'ruang'),
@@ -39,12 +39,13 @@ export function useJadwalRuang(authUser, claims) {
     return () => unsubs.forEach((u) => u());
   }, [authUser, isAdmin]);
 
-  const data = useMemo(() => (FITUR_EKSPERIMENTAL ? { ruang, semesters, bookings } : null), [ruang, semesters, bookings]);
+  const data = useMemo(() => (FITUR_RUANG ? { ruang, semesters, bookings } : null), [ruang, semesters, bookings]);
 
   // ----- Aksi admin (melempar error ke pemanggil supaya UI bisa menampilkannya) -----
   const aksi = useMemo(() => ({
     simpanRuang: (r) => jalankanBatch([(b) => b.set(doc(db, 'ruang', r.id), r)]),
     hapusRuang: (id) => jalankanBatch([(b) => b.delete(doc(db, 'ruang', id))]),
+    hapusBanyakRuang: (ids) => jalankanBatch(ids.map((id) => (b) => b.delete(doc(db, 'ruang', id)))),
     simpanSemester: (s) => jalankanBatch([(b) => b.set(doc(db, 'semesterRuang', s.id), s)]),
 
     // Tulis/hapus booking dalam satu batch; flag terbit mengikuti status semester.
@@ -99,7 +100,7 @@ export function useJadwalRuang(authUser, claims) {
 export function useSinkronProgram({ aktif, mahasiswa, data, aksi }) {
   const [tidakMasuk, setTidakMasuk] = useState([]);
   useEffect(() => {
-    if (!FITUR_EKSPERIMENTAL || !aktif || !data || !data.ruang.length || !data.semesters.length) { setTidakMasuk([]); return undefined; }
+    if (!FITUR_RUANG || !aktif || !data || !data.ruang.length || !data.semesters.length) { setTidakMasuk([]); return undefined; }
     const t = setTimeout(() => {
       const r = rancangSinkronProgram(mahasiswa, data);
       setTidakMasuk(r.tidakMasuk);

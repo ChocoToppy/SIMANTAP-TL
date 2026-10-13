@@ -30,6 +30,10 @@ export function ruangSama(a, b) {
   return !!x && !!y && (x === y || x.includes(y) || y.includes(x));
 }
 
+// Satu ruang bisa punya "nama lain" (alias), mis. "Ruang Seminar KP" untuk C.302 — nama lama
+// yang tersimpan di data mahasiswa sebelum daftar ruang resmi ada.
+export const cocokRuang = (r, nama) => [r.nama, ...(r.alias || [])].some((n) => ruangSama(n, nama));
+
 export function slugRuang(nama) {
   return 'r-' + (String(nama).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'ruang');
 }
@@ -92,8 +96,9 @@ export function cariBentrokBooking(data, semester, { tanggal, jamMulai, jamSeles
   if (!data || !semester || !tanggal || !ruang) return [];
   const a = menitJam(jamMulai), b = menitJam(jamSelesai);
   if (a == null || b == null) return [];
+  const target = (data.ruang || []).find((r) => cocokRuang(r, ruang));
   return slotPadaTanggal(data, semester, tanggal)
-    .filter((s) => ruangSama(s.ruang, ruang) && beririsan([a, b], [menitJam(s.mulai), menitJam(s.selesai)]));
+    .filter((s) => (target ? s.ruangId === target.id : ruangSama(s.ruang, ruang)) && beririsan([a, b], [menitJam(s.mulai), menitJam(s.selesai)]));
 }
 
 // Pemeriksa tunggal untuk semua form (usulan mahasiswa, penjadwalan admin, dst.):
@@ -154,7 +159,7 @@ export function rancangImpor(hasil, ruangAda, semester) {
   let urut = Math.max(0, ...ruangAda.map((r) => r.urut || 0));
   const terpakai = new Set(ruangAda.map((r) => r.id));
   hasil.ruang.forEach((nama) => {
-    const ada = ruangAda.find((r) => ruangPersis(r.nama, nama));
+    const ada = ruangAda.find((r) => ruangPersis(r.nama, nama)) || ruangBaru.find((r) => ruangPersis(r.nama, nama));
     if (ada) { peta.set(nama, ada.id); return; }
     let id = slugRuang(nama);
     while (terpakai.has(id)) id += '-2';

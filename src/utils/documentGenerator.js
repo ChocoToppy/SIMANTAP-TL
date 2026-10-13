@@ -1,7 +1,8 @@
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import { saveAs } from 'file-saver';
-import { formatTanggal, todayISO, tambahHari, bidangLabel, jenisMagangOf } from './helpers.js';
+import { formatTanggal, todayISO, bidangLabel, jenisMagangOf } from './helpers.js';
+import { periodePerpanjangan, periodeSuratPerpanjangan } from './perpanjangan.js';
 
 /**
  * Generates and downloads a .docx file based on a template and JSON data.
@@ -138,6 +139,7 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
           nim: m.nim,
           nama_dosen_wali: wali.nama_dosen_wali,
           nip_dosen_wali: wali.nip_dosen_wali,
+          tgl_cetak,
         }
       };
 
@@ -227,6 +229,7 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
 
     case 'Perpanjangan Magang': {
       const sfx = mktMhs ? 'mkt' : 'magang';
+      const pp = periodeSuratPerpanjangan(m);
       return {
         template: magangTemplate('Magang/perpanjangan-magang.docx', 'Magang/perpanjangan-mkt.docx'),
         filename: `Perpanjangan_${jenisLabel}_${m.nama}.docx`,
@@ -236,9 +239,9 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
           nim: m.nim,
           [`judul_${sfx}`]: m.judul,
           [`mulai_${sfx}`]: formatTanggal(m.tanggalMulai) || "-",
-          [`akhir_${sfx}`]: formatTanggal(m.batasAkhir) || "-",
-          [`mulai_pp${sfx}`]: formatTanggal(m.batasAkhir) || "-",
-          [`akhir_pp${sfx}`]: formatTanggal(tambahHari(m.batasAkhir, 30)) || "-",
+          [`akhir_${sfx}`]: formatTanggal(pp.dari) || "-",
+          [`mulai_pp${sfx}`]: formatTanggal(pp.dari) || "-",
+          [`akhir_pp${sfx}`]: formatTanggal(pp.sampai) || "-",
           tgl_cetak,
           nama_dosen1: d1.nama || m.pembimbing1,
           nip1: d1.nip || "-",
@@ -278,28 +281,8 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
         }
       };
 
-    case 'BA Seminar KP':
-      return {
-        template: 'KP/seminar-kp-ba.docx',
-        filename: `BA_Seminar_KP_${m.nama}.docx`,
-        data: {
-          no_surat: m.nomorSurat || jEv.nomorST || "___/UN7.../2026",
-          nama_mhs: m.nama,
-          nim: m.nim,
-          judul_kp: m.judul,
-          hari_smkp: jEv.hari || "-",
-          tanggal_smkp: formatTanggal(jEv.tanggal) || "-",
-          tgl_smkp: formatTanggal(jEv.tanggal) || "-",
-          waktu_smkp: `${jEv.jamMulai || '-'} s.d ${jEv.jamSelesai || '-'}`,
-          tempat_smkp: jEv.ruang || "-",
-          tgl_cetak,
-          nama_dosen1: d1.nama || m.pembimbing1,
-          nip1: d1.nip || "-",
-          ...wali,
-        }
-      };
-
     case 'Perpanjangan KP': {
+      const pp = periodeSuratPerpanjangan(m);
       return {
         template: 'KP/perpanjangan-kp.docx',
         filename: `Perpanjangan_KP_${m.nama}.docx`,
@@ -309,9 +292,9 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
           nim: m.nim,
           judul_kp: m.judul,
           mulai_kp: formatTanggal(m.tanggalMulai) || "-",
-          akhir_kp: formatTanggal(m.batasAkhir) || "-",
-          mulai_ppkp: formatTanggal(m.batasAkhir) || "-",
-          akhir_ppkp: formatTanggal(tambahHari(m.batasAkhir, 30)) || "-",
+          akhir_kp: formatTanggal(pp.dari) || "-",
+          mulai_ppkp: formatTanggal(pp.dari) || "-",
+          akhir_ppkp: formatTanggal(pp.sampai) || "-",
           tgl_cetak,
           nama_dosen1: d1.nama || m.pembimbing1,
           nip1: d1.nip || "-",
@@ -319,21 +302,6 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
         }
       };
     }
-
-    case 'Persetujuan SMKP':
-      return {
-        template: 'KP/persetujuan-smkp.docx',
-        filename: `Persetujuan_SMKP_${m.nama}.docx`,
-        data: {
-          nama_mhs: m.nama,
-          nim: m.nim,
-          judul_kp: m.judul,
-          tgl_cetak,
-          nama_dosen1: d1.nama || m.pembimbing1,
-          nip1: d1.nip || "-",
-          ...wali,
-        }
-      };
 
     // Tugas Akhir — tata letak dulu; tag mengikuti "List of Tags.txt", isinya
     // belum dicocokkan ke tiap template.
@@ -345,6 +313,9 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
           nama_mhs: m.nama,
           nim: m.nim,
           judul_ta: m.judul,
+          tema_ta: bidangLabel(m.bidang),
+          // persetujuan-ugb.docx memakai {topik_ta} (bukan {tema_ta}) — kirim keduanya.
+          topik_ta: bidangLabel(m.bidang),
           tgl_cetak,
           nama_dosen1: d1.nama || m.pembimbing1,
           nip1: d1.nip || "-",
@@ -353,7 +324,6 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
       };
 
     case 'Persetujuan Dosbing TA': {
-      const d2 = dosenByKode[m.pembimbing2] || {};
       return {
         template: 'TA/persetujuan-dosbing.docx',
         filename: `Persetujuan_Dosbing_${m.nama}.docx`,
@@ -361,18 +331,18 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
           nama_mhs: m.nama,
           nim: m.nim,
           judul_ta: m.judul,
+          tema_ta: bidangLabel(m.bidang),
           tgl_cetak,
           nama_dosen1: d1.nama || m.pembimbing1,
           nip1: d1.nip || "-",
-          nama_dosen2: d2.nama || m.pembimbing2 || "-",
-          nip2: d2.nip || "-",
           ...wali,
         }
       };
     }
 
+    // Sempro & Semhas: dosen 1 = pembimbing, dosen 2 = penguji (penguji 1).
     case 'BA Sempro TA': {
-      const d2 = dosenByKode[m.pembimbing2] || {};
+      const d2 = dosenByKode[m.penguji1] || {};
       return {
         template: 'TA/ba-sempro-ta.docx',
         filename: `BA_Sempro_${m.nama}.docx`,
@@ -381,6 +351,7 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
           nama_mhs: m.nama,
           nim: m.nim,
           judul_ta: m.judul,
+          tema_ta: bidangLabel(m.bidang),
           tgl_sempro: formatTanggal(jEv.tanggal) || "-",
           waktu_sempro: `${jEv.jamMulai || '-'} s.d ${jEv.jamSelesai || '-'}`,
           tempat_sempro: jEv.ruang || "-",
@@ -388,15 +359,45 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
           tgl_cetak,
           nama_dosen1: d1.nama || m.pembimbing1,
           nip1: d1.nip || "-",
-          nama_dosen2: d2.nama || m.pembimbing2 || "-",
+          nama_dosen2: d2.nama || m.penguji1 || "-",
           nip2: d2.nip || "-",
           ...wali,
         }
       };
     }
 
+    case 'Perpanjangan TA': {
+      // Maks. 2x perpanjangan @1 bulan: pp1 menyambung batas akhir, pp2 menyambung pp1
+      // (periode yang sudah disetujui diambil dari riwayat — lihat perpanjangan.js).
+      const pp1 = periodePerpanjangan(m, 0);
+      const pp2 = periodePerpanjangan(m, 1);
+      return {
+        template: 'TA/perpanjangan-ta.docx',
+        filename: `Perpanjangan_TA_${m.nama}.docx`,
+        data: {
+          no_surat: m.nomorSurat || jEv.nomorST || "___/UN7.../2026",
+          nama_mhs: m.nama,
+          nim: m.nim,
+          judul_ta: m.judul,
+          tema_ta: bidangLabel(m.bidang),
+          judul_TA: m.judul,
+          mulai_ta: formatTanggal(m.tanggalMulai) || "-",
+          akhir_ta: formatTanggal(pp1.dari) || "-",
+          mulai_ta_pp1: formatTanggal(pp1.dari) || "-",
+          akhir_ta_pp1: formatTanggal(pp1.sampai) || "-",
+          mulai_ta_pp2: formatTanggal(pp2.dari) || "-",
+          akhir_ta_pp2: formatTanggal(pp2.sampai) || "-",
+          tgl_surat_ppta: tgl_cetak,
+          tgl_cetak,
+          nama_dosen1: d1.nama || m.pembimbing1,
+          nip1: d1.nip || "-",
+          ...wali,
+        }
+      };
+    }
+
     case 'BA Semhas TA': {
-      const d2 = dosenByKode[m.pembimbing2] || {};
+      const d2 = dosenByKode[m.penguji1] || {};
       return {
         template: 'TA/ba-expo-ta.docx',
         filename: `BA_Semhas_${m.nama}.docx`,
@@ -405,13 +406,14 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
           nama_mhs: m.nama,
           nim: m.nim,
           judul_ta: m.judul,
+          tema_ta: bidangLabel(m.bidang),
           tgl_expo: formatTanggal(jEv.tanggal) || "-",
           waktu_expo: `${jEv.jamMulai || '-'} s.d ${jEv.jamSelesai || '-'}`,
           tempat_expo: jEv.ruang || "-",
           tgl_cetak,
           nama_dosen1: d1.nama || m.pembimbing1,
           nip1: d1.nip || "-",
-          nama_dosen2: d2.nama || m.pembimbing2 || "-",
+          nama_dosen2: d2.nama || m.penguji1 || "-",
           nip2: d2.nip || "-",
           ...wali,
         }
@@ -419,10 +421,9 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
     }
 
     case 'BA Sidang TA': {
-      // Dosen 1-2 = pembimbing, 3 = ketua penguji, 4 = anggota penguji.
-      const d2 = dosenByKode[m.pembimbing2] || {};
-      const d3 = dosenByKode[m.penguji1] || {};
-      const d4 = dosenByKode[m.penguji2] || {};
+      // Dosen 1 = pembimbing, 2 = penguji 1, 3 = penguji 2.
+      const d2 = dosenByKode[m.penguji1] || {};
+      const d3 = dosenByKode[m.penguji2] || {};
       return {
         template: 'TA/ba-sidang-ta.docx',
         filename: `BA_Sidang_${m.nama}.docx`,
@@ -431,6 +432,7 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
           nama_mhs: m.nama,
           nim: m.nim,
           judul_ta: m.judul,
+          tema_ta: bidangLabel(m.bidang),
           hari_sidang: jEv.hari || "-",
           tgl_sidang: formatTanggal(jEv.tanggal) || "-",
           waktu_sidang: `${jEv.jamMulai || '-'} s.d ${jEv.jamSelesai || '-'}`,
@@ -438,12 +440,10 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
           tgl_cetak,
           nama_dosen1: d1.nama || m.pembimbing1,
           nip1: d1.nip || "-",
-          nama_dosen2: d2.nama || m.pembimbing2 || "-",
+          nama_dosen2: d2.nama || m.penguji1 || "-",
           nip2: d2.nip || "-",
-          nama_dosen3: d3.nama || m.penguji1 || "-",
+          nama_dosen3: d3.nama || m.penguji2 || "-",
           nip3: d3.nip || "-",
-          nama_dosen4: d4.nama || m.penguji2 || "-",
-          nip4: d4.nip || "-",
           ...wali,
         }
       };

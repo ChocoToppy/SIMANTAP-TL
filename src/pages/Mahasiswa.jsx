@@ -1,9 +1,9 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, punyaKlasifikasi, formatTanggal, formatTanggalSingkat, kondisi, SEMUA, statusVerif, cariBentrok, eventAktif, bidangLabel, tanggalDibuat, hitungNomorUrut, jenisMagangOf } from '../utils/helpers.js';
 import { semuaKpTema, semuaBidang } from '../utils/pilihan.js';
-import { Badge, StageBar, ExportMenu, ColumnMenu, ColResizeHandle, Empty } from '../components/ui.jsx';
+import { Badge, StageBar, ExportMenu, ColumnMenu, ColResizeHandle, Empty, TombolHapusCari } from '../components/ui.jsx';
 import { useColumnWidths } from '../utils/useColumnWidths.js';
-import { perluDitinjau } from '../utils/nomorSurat.js';
+import { perluDitinjau, kunciUrutNomor } from '../utils/nomorSurat.js';
 import { AktivitasMini, JadwalMini } from './mahasiswa/AktivitasCells.jsx';
 import { FormMahasiswa } from './mahasiswa/FormMahasiswa.jsx';
 import { eksporMahasiswa } from './mahasiswa/exportMahasiswa.js';
@@ -24,7 +24,7 @@ const STATUS_FILTER = [
 ];
 
 // Kolom "peran dosen" beda tiap program (lihat PROGRAMS di helpers.js) — KP/Magang
-// cuma satu pembimbing rangkap penguji, TA/Tesis S2 punya 2 pembimbing + 2 penguji, dst.
+// cuma satu pembimbing, TA 1 pembimbing + 2 penguji, Tesis S2 2 pembimbing + 2 penguji, dst.
 function kolomDosenProgram(programKey) {
   const p = PROGRAMS[programKey] || PROGRAMS.TA;
   const cols = [{ key: 'pembimbing1', label: p.pembimbingLabel || 'Pembimbing 1' }];
@@ -74,10 +74,9 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
   const [editing, setEditing] = useState(null);
   const [open, setOpen] = useState(false);
   const [sudahPindah, setSudahPindah] = useState(false); // true = modal edit dibuka lewat ‹ › (tanpa animasi buka)
-  // Filter tambahan (di luar pencarian & status) diciutkan di layar sempit —
-  // supaya toolbar tidak jadi tumpukan dropdown yang berdesakan/terpotong.
-  // Di layar lebar, CSS selalu menampilkannya (lihat .toolbar-extra), jadi
-  // state ini cuma berpengaruh di mobile.
+  // Filter tambahan (di luar pencarian & status) ada di panel melayang di
+  // balik tombol "Filter" di semua ukuran layar (lihat .toolbar-extra).
+  // Panel ditutup lewat ✕ di atas, "Tutup" di bawah, atau klik di luar.
   const [filtersOpen, setFiltersOpen] = useState(false);
   // Kolom cari diciutkan jadi ikon di layar sempit; melebar saat ditekan.
   const [searchOpen, setSearchOpen] = useState(false);
@@ -158,6 +157,13 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
         if (sortBy === 'no') {
           const noOf = (m) => (groupMode === 'angkatan' ? (nomorUrut[m.id] || {}).angkatan : (nomorUrut[m.id] || {}).periode) ?? 0;
           return (noOf(a.m) - noOf(b.m)) * arah;
+        }
+        if (sortBy === 'nomorSurat') {
+          // Yang belum punya nomor selalu di bawah, ke arah mana pun disortir.
+          const ka = a.m.nomorSurat ? kunciUrutNomor(a.m.nomorSurat) : '';
+          const kb = b.m.nomorSurat ? kunciUrutNomor(b.m.nomorSurat) : '';
+          if (!ka || !kb) return (ka ? 0 : 1) - (kb ? 0 : 1);
+          return ka.localeCompare(kb, 'id') * arah;
         }
         const val = (m) => sortBy === 'judul' ? (m.judul || '')
           : sortBy === 'tahap' ? m.tahap
@@ -276,6 +282,7 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
             onChange={(e) => setQ(e.target.value)}
             onBlur={() => { if (!q) setSearchOpen(false); }}
           />
+          <TombolHapusCari q={q} onHapus={() => setQ('')} />
         </div>
         <div className="toolbar-filter">
           <button
@@ -302,7 +309,11 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
           {filtersOpen && (
             <>
               <div className="toolbar-filter-backdrop" onClick={() => setFiltersOpen(false)} />
-              <div className="toolbar-extra">
+              <div className="toolbar-extra" role="dialog" aria-label="Filter">
+                <div className="toolbar-extra-head">
+                  <span>Filter</span>
+                  <button type="button" className="icon-btn form-head-tutup" onClick={() => setFiltersOpen(false)} aria-label="Tutup">✕</button>
+                </div>
                 <select value={fStatus} onChange={(e) => setFStatus(e.target.value)}>
                   {STATUS_FILTER.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
                 </select>
@@ -329,6 +340,7 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
                   <option value="periode">Kelompokkan per Periode</option>
                   <option value="angkatan">Kelompokkan per Angkatan</option>
                 </select>
+                <button type="button" className="btn btn-primary toolbar-extra-tutup" onClick={() => setFiltersOpen(false)}>Tutup</button>
               </div>
             </>
           )}
@@ -367,7 +379,7 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
               ))}
               {!hiddenCols.has('deadline') && <th className="th-sort" onClick={() => ubahSort('deadline')}>Deadline{panah('deadline')}<ColResizeHandle onMouseDown={(e) => startResize(4 + dosenCols.length, e)} /></th>}
               {!hiddenCols.has('aktivitas') && <th className="th-sort" onClick={() => ubahSort('dibuat')}>Aktivitas{panah('dibuat')}<ColResizeHandle onMouseDown={(e) => startResize(5 + dosenCols.length, e)} /></th>}
-              {!hiddenCols.has('nomorSurat') && <th>No. Surat<ColResizeHandle onMouseDown={(e) => startResize(6 + dosenCols.length, e)} /></th>}
+              {!hiddenCols.has('nomorSurat') && <th className="th-sort" onClick={() => ubahSort('nomorSurat')}>No. Surat{panah('nomorSurat')}<ColResizeHandle onMouseDown={(e) => startResize(6 + dosenCols.length, e)} /></th>}
               <th></th>
             </tr>
           </thead>

@@ -30,7 +30,7 @@ Saat ini tetap berjalan di dalam SIMANTAP.
 
 - UI: `Modal`, `Field`, `Badge`, `Empty`
 - Domain: `formatTanggal`, `todayISO`, `buatId`, `BULAN`, `menitJam`, `beririsan`, `PROGRAMS`, `PROGRAM_KEYS`, `programOf`, `programLabel`, `programDisplayLabel`, `eventsFor`, `durasiEvent`, `jamTambah`, `kumpulkanEvent`
-- Infrastruktur: `loadXLSX`, `db` (Firestore), `FITUR_EKSPERIMENTAL`
+- Infrastruktur: `loadXLSX`, `db` (Firestore), `FITUR_RUANG`
 - Variabel CSS tema: `--border`, `--border-strong`, `--surface`, `--surface-2`, `--text`, `--muted`, `--accent`, `--accent-weak`, `--blue-bg/-text`, `--green-bg/-text`, `--radius-sm`, `--font-heading`; kelas bersama `btn`, `card`, `callout`, `tbl`, `toolbar`, `form-grid`, `field`, `modal*`, `badge*`, `check`, `seg-*`, `hint`, `login-err`.
 
 ## Data & keamanan
@@ -57,3 +57,28 @@ Bentuk dokumen: lihat komentar kepala `logic/ruangBooking.js`. Tambahan: `pj: [{
 3. Di induk, ganti `useSinkronProgram` dan pemeriksaan bentrok dengan panggilan ke modul/API.
 4. Hapus `modules/ruang` dari induk dan perbarui impor di `App.jsx`, `Portal.jsx`, `Pengaturan.jsx`,
    `FormMahasiswa.jsx`, `FormJadwalMhs.jsx` (lima titik itu satu-satunya yang mengimpor modul).
+
+## Sematan publik (iframe, mis. WordPress)
+
+Halaman hanya-baca tanpa login: `embed/ruang.html` (entri Vite kedua) memanggil endpoint
+publik `jadwalRuangPublik` (Cloud Function di `functions/index.js`, diakses lewat rewrite
+Hosting `/api/ruang`). Endpoint hanya memberi semester terbit & booking terbit, **tanpa nama
+mahasiswa/PJ** (judul seminar/sidang diganti nama kegiatan). Aturan Firestore tidak dilonggarkan.
+
+Opsi URL: `?view=hari|minggu|bulan` dan `&ruang=E.301,D.202` (filter ruang).
+Variabel build `VITE_RUANG_API` mengubah alamat endpoint bila halaman disajikan dari domain lain.
+
+Tempel di blok "HTML Kustom" WordPress (ganti alamat dengan domain Hosting):
+
+```html
+<iframe id="jadwal-ruang" src="https://simantap-tl.web.app/embed/ruang.html?view=minggu"
+        style="width:100%;border:0;min-height:600px" loading="lazy" title="Jadwal ruang"></iframe>
+<script>
+  window.addEventListener('message', function (e) {
+    if (e.data && e.data.ruangEmbedTinggi) document.getElementById('jadwal-ruang').style.height = e.data.ruangEmbedTinggi + 'px';
+  });
+</script>
+```
+
+Prasyarat: `firebase deploy --only functions,hosting` (build `full`/eksperimental). Build produksi
+cPanel ikut memuat halaman sematan, tetapi tanpa endpoint di domainnya ia hanya menampilkan pesan galat.

@@ -7,6 +7,7 @@ import { formatTanggal } from '../host.js';
 import { JadwalRuangEditor } from '../components/JadwalRuangEditor.jsx';
 import { Badge } from '../host.js';
 import { SemesterForm } from './SemesterForm.jsx';
+import { SematkanBox } from './SematkanBox.jsx';
 import { RuangDaftar } from './RuangDaftar.jsx';
 
 // Jadwal ruang (eksperimental) — kelola semester, ruang master, dan impor Excel
@@ -56,7 +57,7 @@ export function SeksiJadwalRuang({ data, dosen = [], mahasiswa = [], aksi }) {
       setPesan({ tone: 'ok', teks: `Impor selesai: ${r.booking} pemakaian ruang, ${r.ruangBaru} ruang baru. Masih draft — terbitkan bila sudah sesuai.` });
     } catch (ex) { galat(ex); } finally { setSibuk(false); }
   }
-  async function imporRekap({ baru }) {
+  async function imporRekap({ baru, hasil: dipilih }) {
     setSibuk(true); setGalatRekap('');
     try {
       let sem = semester;
@@ -65,8 +66,8 @@ export function SeksiJadwalRuang({ data, dosen = [], mahasiswa = [], aksi }) {
         await aksi.simpanSemester(sem);
       }
       // Dua pengampu pertama jadi penanggung jawab; yang tidak ada di daftar dosen = dosen luar.
-      const slots = rekap.slots.map((s) => ({ ...s, pj: s.pengampu.slice(0, 2).map((n) => cocokkanDosen(n, dosen)) }));
-      const r = await aksi.imporKeSemester(sem, { ...rekap, slots });
+      const slots = dipilih.slots.map((s) => ({ ...s, pj: s.pengampu.slice(0, 2).map((n) => cocokkanDosen(n, dosen)) }));
+      const r = await aksi.imporKeSemester(sem, { ...dipilih, slots });
       setSemId(sem.id); setRekap(null); setHasil(null);
       setPesan({ tone: 'ok', teks: `Impor selesai di ${sem.label}: ${r.booking} pemakaian ruang, ${r.ruangBaru} ruang baru. Masih draft — cek grid, tambahkan blackout (libur/UTS/UAS) bila perlu, lalu terbitkan.` });
     } catch (ex) { setGalatRekap(ex.message || String(ex)); } finally { setSibuk(false); }
@@ -105,6 +106,7 @@ export function SeksiJadwalRuang({ data, dosen = [], mahasiswa = [], aksi }) {
       {pesan && <div className={pesan.tone === 'err' ? 'login-err' : 'callout'} style={{ marginBottom: 12 }}>{pesan.teks}</div>}
 
       {sub === 'ruang' && <RuangDaftar data={data} aksi={aksi} onGalat={galat} />}
+      {sub === 'jadwal' && <SematkanBox ruang={data.ruang || []} />}
 
       {sub === 'jadwal' && !semester && (
         <div className="toolbar">
@@ -112,28 +114,27 @@ export function SeksiJadwalRuang({ data, dosen = [], mahasiswa = [], aksi }) {
             {sibuk ? 'Memproses…' : 'Impor jadwal kuliah (Excel)'}
             <input type="file" accept=".xlsx,.xls" hidden onChange={pilihFile} disabled={sibuk} />
           </label>
-          <span className="hint" style={{ margin: 0 }}>Pilih rekap jadwal kuliah dari sistem pusat — semester dibuat otomatis setelah Anda mengisi periodenya.</span>
         </div>
       )}
       {rekap && <ImporRekapModal hasil={rekap} ruang={data.ruang || []} semesterAda={semester} sibuk={sibuk} galat={galatRekap} onImpor={imporRekap} onBatal={() => { setRekap(null); setGalatRekap(''); }} />}
       {sub === 'jadwal' && semester && (
         <>
-          <div className="callout" style={{ marginBottom: 12 }}>
-            <strong>{semester.label}</strong> · {formatTanggal(semester.mulai)} – {formatTanggal(semester.selesai)} ·{' '}
-            <Badge tone={terbit ? 'green' : 'amber'}>{terbit ? 'Terbit' : 'Draft'}</Badge> · {jumlahBooking} pemakaian ruang
-            {semester.imporTerakhir && <> · impor terakhir: {semester.imporTerakhir.sumber}</>}
-            <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button className="btn btn-sm btn-primary" onClick={toggleTerbit} disabled={!terbit && jumlahBooking === 0}>{terbit ? 'Tarik ke draft' : 'Terbitkan'}</button>
-              {!terbit && <button className="btn btn-sm" onClick={hapusSemester}>Hapus semester</button>}
+          <div className="callout" style={{ marginBottom: 12, display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div>
+              <div style={{ fontSize: '1.05rem' }}><strong>{semester.label}</strong> <Badge tone={terbit ? 'green' : 'amber'}>{terbit ? 'Terbit' : 'Draft'}</Badge></div>
+              <div className="cell-sub">
+                {formatTanggal(semester.mulai)} – {formatTanggal(semester.selesai)} · {jumlahBooking} pemakaian ruang
+                {semester.imporTerakhir && <> · impor terakhir: {semester.imporTerakhir.sumber}</>}
+              </div>
             </div>
-          </div>
-
-          <div className="toolbar">
-            <label className="btn btn-primary" style={{ cursor: 'pointer' }}>
-              {sibuk ? 'Memproses…' : 'Impor dari Excel'}
-              <input type="file" accept=".xlsx,.xls" hidden onChange={pilihFile} disabled={sibuk} />
-            </label>
-            <span className="hint" style={{ margin: 0 }}>Rekap jadwal kuliah sistem pusat: periode ditanyakan lalu semester dibuat otomatis. Impor ulang ke semester draft mengganti hasil impor sebelumnya; booking manual tidak tersentuh.</span>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <label className="btn btn-sm" style={{ cursor: 'pointer' }}>
+                {sibuk ? 'Memproses…' : 'Impor dari Excel'}
+                <input type="file" accept=".xlsx,.xls" hidden onChange={pilihFile} disabled={sibuk} />
+              </label>
+              {!terbit && <button className="btn btn-sm" onClick={hapusSemester}>Hapus semester</button>}
+              <button className="btn btn-sm btn-primary" onClick={toggleTerbit} disabled={!terbit && jumlahBooking === 0}>{terbit ? 'Tarik ke draft' : 'Terbitkan'}</button>
+            </div>
           </div>
 
           {hasil && rencana && (

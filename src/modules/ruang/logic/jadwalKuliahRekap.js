@@ -109,3 +109,11 @@ export async function parseRekapKuliah(file) {
     dilewati: rows.length - diimpor.length,
   };
 }
+
+// Terapkan suntingan admin pada ruang hasil parse: peta = { namaDiBerkas: { nama, lewati } }.
+// Nama baru yang sama (atau setara) otomatis tergabung; yang dilewati tidak ikut diimpor.
+export function terapkanSuntinganRuang(hasil, peta) {
+  const tujuan = (n) => { const p = peta[n]; return p && !p.lewati ? (rapikan(p.nama) || n) : null; };
+  const slots = hasil.slots.map((x) => ({ ...x, ruang: tujuan(x.ruang) })).filter((x) => x.ruang);
+  return { ...hasil, slots, ruang: Array.from(new Set(slots.map((x) => x.ruang))) };
+}

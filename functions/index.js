@@ -320,12 +320,14 @@ exports.adminDeleteStudent = functions.https.onCall(async (data, context) => {
   const uid = akunSnap.data().uid;
 
   const mahasiswaSnap = await db.collection('mahasiswa').where('owner', '==', nim).get();
+  const slotSnap = await db.collection('slotPengajuan').where('owner', '==', nim).get();
   const deletedMahasiswaIds = mahasiswaSnap.docs.map((d) => d.id);
 
   const batch = db.batch();
   batch.delete(akunRef);
   batch.delete(db.collection('loginIndex').doc(nim));
   mahasiswaSnap.docs.forEach((d) => batch.delete(d.ref));
+  slotSnap.docs.forEach((d) => batch.delete(d.ref));
   await batch.commit();
 
   if (uid) {
@@ -394,6 +396,9 @@ exports.studentUpdateProfile = functions.https.onCall(async (data, context) => {
   const mahasiswaSnap = nimBerubah
     ? await db.collection('mahasiswa').where('owner', '==', currentNim).get()
     : null;
+  const slotSnap = nimBerubah
+    ? await db.collection('slotPengajuan').where('owner', '==', currentNim).get()
+    : null;
 
   const batch = db.batch();
   if (nimBerubah) {
@@ -402,6 +407,15 @@ exports.studentUpdateProfile = functions.https.onCall(async (data, context) => {
     batch.delete(db.collection('loginIndex').doc(currentNim));
     batch.set(db.collection('loginIndex').doc(newNim), { email: newEmail });
     mahasiswaSnap.docs.forEach((d) => batch.update(d.ref, { owner: newNim, nim: newNim }));
+    // Dokumen pengajuan tidak di-rename (berkas Storage-nya ada di uploads/{id}),
+    // jadi ID-nya tidak lagi "{nim}_{program}" — tandai di slotPengajuan supaya
+    // batas satu pengajuan per program tetap berlaku (lihat firestore.rules).
+    slotSnap.docs.forEach((d) => batch.delete(d.ref));
+    mahasiswaSnap.docs.forEach((d) => {
+      const program = d.data().program || 'TA';
+      const slotId = `${newNim}_${program}`;
+      if (d.id !== slotId) batch.set(db.collection('slotPengajuan').doc(slotId), { mahasiswaId: d.id, owner: newNim, program });
+    });
   } else {
     batch.update(akunRef, { nama, email: newEmail });
     if (emailBerubah) batch.set(db.collection('loginIndex').doc(currentNim), { email: newEmail }, { merge: true });
@@ -418,4 +432,38 @@ exports.studentUpdateProfile = functions.https.onCall(async (data, context) => {
   });
 
   return { ok: true, nim: newNim, nimBerubah };
+});
+
+// ----- Jadwal ruang publik (untuk disematkan di situs lain, mis. WordPress) -----
+// Tanpa login: hanya semester TERBIT + booking ber-flag terbit, dan field yang aman
+// ditampilkan ke publik. Nama mahasiswa, penanggung jawab, dan referensi internal TIDAK
+// ikut; judul seminar/sidang diganti nama kegiatannya saja. Diakses lewat rewrite
+// Hosting `/api/ruang` (lihat firebase.json). Di-cache 5 menit.
+const FIELD_BOOKING_PUBLIK = ['id', 'semesterId', 'ruangId', 'jenis', 'pola', 'hari', 'tanggal', 'dari', 'sampai', 'kecuali', 'mulai', 'selesai'];
+const ambilField = (obj, daftar) => Object.fromEntries(daftar.filter((k) => obj[k] !== undefined).map((k) => [k, obj[k]]));
+
+exports.jadwalRuangPublik = functions.https.onRequest(async (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Cache-Control', 'public, max-age=300, s-maxage=300');
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  try {
+    const [ruang, semesters, bookings] = await Promise.all([
+      db.collection('ruang').get(),
+      db.collection('semesterRuang').where('status', '==', 'terbit').get(),
+      db.collection('booking').where('terbit', '==', true).get(),
+    ]);
+    res.json({
+      diperbarui: new Date().toISOString(),
+      ruang: ruang.docs.map((d) => ({ id: d.id, ...ambilField(d.data(), ['nama', 'gedung', 'aktif', 'urut']) })),
+      semesters: semesters.docs.map((d) => ({ id: d.id, ...ambilField(d.data(), ['label', 'mulai', 'selesai', 'blackout', 'status']) })),
+      bookings: bookings.docs.map((d) => {
+        const b = d.data();
+        const judul = b.jenis === 'seminar' ? (b.kegiatan || (b.ref && b.ref.ev) || 'Seminar/Sidang') : b.judul;
+        return { ...ambilField({ ...b, id: d.id }, FIELD_BOOKING_PUBLIK), judul };
+      }),
+    });
+  } catch (e) {
+    console.error('jadwalRuangPublik:', e);
+    res.status(500).json({ error: 'Gagal memuat jadwal ruang.' });
+  }
 });

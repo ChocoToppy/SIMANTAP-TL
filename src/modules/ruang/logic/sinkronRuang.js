@@ -1,5 +1,5 @@
 import { programOf, programDisplayLabel, durasiEvent, jamTambah } from '../host.js';
-import { ruangSama } from './ruangBooking.js';
+import { cocokRuang } from './ruangBooking.js';
 
 // ===================== sinkronRuang.js =====================
 // Menyambungkan jadwal program ke jadwal ruang: tiap jadwal yang SUDAH DIKONFIRMASI
@@ -10,7 +10,6 @@ import { ruangSama } from './ruangBooking.js';
 // Hanya program yang sudah rilis. Program lain (TA, Capstone, Tesis S2) menyusul:
 // cukup tambahkan barisnya di sini.
 export const EVENT_SINKRON = {
-  KP: ['Seminar KP'],
   MG: ['Expo'], // Magang & MKT (Mata Kuliah Terapan) sama-sama Expo
 };
 
@@ -35,7 +34,7 @@ export function rancangSinkronProgram(mahasiswa, data) {
       const j = (m.jadwal || {})[ev];
       if (!j || !j.dikonfirmasi || !j.tanggal || !j.jamMulai || !j.ruang) return;
       const selesai = j.jamSelesai || jamTambah(j.jamMulai, durasiEvent(ev));
-      const r = ruang.find((x) => ruangSama(x.nama, j.ruang));
+      const r = ruang.find((x) => cocokRuang(x, j.ruang));
       const semester = semesters.find((s) => s.mulai <= j.tanggal && j.tanggal <= s.selesai);
       if (!r || !semester) {
         tidakMasuk.push({ nama: m.nama, ev, alasan: !r ? `ruang "${j.ruang}" tidak ada di daftar ruang` : 'tanggal di luar semua semester jadwal ruang' });

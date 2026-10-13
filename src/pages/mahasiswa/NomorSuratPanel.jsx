@@ -1,15 +1,79 @@
 import React, { useState } from 'react';
-import { Badge } from '../../components/ui.jsx';
+import { Badge, LampIcon } from '../../components/ui.jsx';
 import { formatTanggal, orphanedUploadPaths } from '../../utils/helpers.js';
 import { deleteUploadedFile } from '../../utils/fileUpload.js';
-import { aturanPerpanjangan, bolehPerpanjang, perpanjanganDisetujui, perluDitinjau, tambahBulan, patchDaftarUlang } from '../../utils/nomorSurat.js';
+import { aturanPerpanjangan, perpanjanganDisetujui, perluDitinjau, patchDaftarUlang, formatNomor, KODE_NOMOR } from '../../utils/nomorSurat.js';
+import { FITUR_EKSPERIMENTAL } from '../../utils/config.js';
 import { pratinjauNomor, terbitkanNomor, akhiriNomor } from '../../utils/nomorSuratDb.js';
 
 // Blok "Nomor Surat" di modal edit admin. Nomor tidak diketik tangan: admin
 // meminta ("Ambil nomor"), sistem menyarankan nomor berikutnya, admin
 // mengonfirmasi, lalu nomor itu tercatat di registri (nomorSurat/) dan
 // terpasang ke mahasiswa. Aturan & format: utils/nomorSurat.js.
-export function NomorSuratPanel({ m, setM, baru }) {
+export function NomorSuratPanel(props) {
+  // Fitur eksperimental: di build produksi nomor surat tetap diisi manual seperti sebelumnya.
+  if (!FITUR_EKSPERIMENTAL) {
+    return <NomorSuratManual {...props} />;
+  }
+  return <NomorSuratOtomatis {...props} />;
+}
+
+// Panduan format dibuka lewat tombol lampu di kanan isian.
+// div, bukan <Field> (label): klik tombol di dalam label ikut memfokuskan input.
+function NomorSuratManual({ m, setM }) {
+  const [panduan, setPanduan] = useState(false);
+  return (
+    <div className="field field-full">
+      <span className="field-label">Nomor Surat</span>
+      <div className="nomor-surat-row">
+        <input value={m.nomorSurat || ''} onChange={(e) => setM((prev) => ({ ...prev, nomorSurat: e.target.value }))} placeholder={`mis. ${CONTOH_NOMOR}`} />
+        <button
+          type="button"
+          className={'icon-btn-outline lampu-btn' + (panduan ? ' aktif' : '')}
+          onClick={() => setPanduan((v) => !v)}
+          aria-expanded={panduan}
+          aria-label="Panduan format nomor surat"
+          title="Panduan format nomor surat"
+        ><LampIcon /></button>
+      </div>
+      {panduan && <PanduanFormatNomor />}
+    </div>
+  );
+}
+
+const CONTOH_NOMOR = formatNomor(13, 12, 2025);
+
+// Panduan untuk admin yang mengetik nomor manual. Kode diambil dari KODE_NOMOR
+// supaya panduan ikut berubah kalau kodenya diganti.
+function PanduanFormatNomor() {
+  const { fakultas, penandatangan, hal } = KODE_NOMOR;
+  const bagian = [
+    ['013', 'Nomor urut, selalu tiga digit (001, 002, dst.). Satu urutan dipakai bersama untuk semua program, dan dimulai lagi dari 001 setiap tahun.'],
+    [fakultas, 'Kode fakultas.'],
+    [penandatangan, 'Kode penandatangan, yaitu Ketua Program Studi S1.'],
+    [hal, 'Kode hal surat: Pendidikan dan Pelatihan.'],
+    ['XII', 'Bulan surat diterbitkan, ditulis dengan angka Romawi (I untuk Januari sampai XII untuk Desember).'],
+    ['2025', 'Tahun surat diterbitkan.'],
+  ];
+  return (
+    <div className="callout" style={{ marginTop: 8 }}>
+      <div>Contoh: <strong>{CONTOH_NOMOR}</strong></div>
+      <table className="tbl" style={{ marginTop: 8 }}>
+        <thead><tr><th>Bagian</th><th>Arti</th></tr></thead>
+        <tbody>
+          {bagian.map(([kode, arti]) => (
+            <tr key={kode}><td><strong>{kode}</strong></td><td>{arti}</td></tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="hint" style={{ marginBottom: 0 }}>
+        Bagian {fakultas}.{penandatangan}/{hal} selalu sama. Yang berubah hanya nomor urut, bulan, dan tahun.
+      </div>
+    </div>
+  );
+}
+
+function NomorSuratOtomatis({ m, setM, baru }) {
   const [usulan, setUsulan] = useState(null); // { nomor } saat menunggu konfirmasi
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -42,14 +106,6 @@ export function NomorSuratPanel({ m, setM, baru }) {
       orphanedUploadPaths(m, { ...m, ...patch }).forEach((p) => deleteUploadedFile(p));
       setM((prev) => ({ ...prev, ...patch }));
     });
-  }
-
-  function setujuiPerpanjangan() {
-    setM((prev) => ({
-      ...prev,
-      batasAkhir: tambahBulan(prev.batasAkhir, aturan.bulan),
-      perpanjangan: { ...(prev.perpanjangan || {}), disetujui: perpanjanganDisetujui(prev) + 1 },
-    }));
   }
 
   return (
@@ -90,8 +146,7 @@ export function NomorSuratPanel({ m, setM, baru }) {
 
       {aturan && !baru && (
         <div className="hint" style={{ marginTop: 8 }}>
-          Perpanjangan disetujui: {perpanjanganDisetujui(m)} / {aturan.maks} (+{aturan.bulan} bulan tiap kali).{' '}
-          {bolehPerpanjang(m) && <button type="button" className="btn btn-sm" onClick={setujuiPerpanjangan}>Setujui perpanjangan</button>}
+          Perpanjangan disetujui: {perpanjanganDisetujui(m)} / {aturan.maks} (+{aturan.bulan} bulan tiap kali, disetujui di bagian Perpanjangan).{' '}
           {perluDitinjau(m) && <Badge tone="amber">Perlu ditinjau</Badge>}
         </div>
       )}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../../utils/firebase.js';
-import { Empty } from '../../components/ui.jsx';
+import { Empty, KotakCari } from '../../components/ui.jsx';
 import { PROGRAM_KEYS, programLabel, formatWaktu } from '../../utils/helpers.js';
 
 // ----- Registri nomor surat -----
@@ -41,7 +41,7 @@ export function SeksiNomorSurat() {
         tetap tercatat di sini dan tidak akan dipakai lagi.
       </p>
       <div className="toolbar" style={{ marginBottom: 12 }}>
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cari nomor, nama, atau NIM…" style={{ maxWidth: 280 }} />
+        <KotakCari q={q} setQ={setQ} placeholder="Cari nomor, nama, atau NIM…" style={{ maxWidth: 280 }} />
         <select value={fTahun} onChange={(e) => setFTahun(e.target.value)} title="Tahun">
           <option value="">Semua tahun</option>
           {tahunList.map((t) => <option key={t} value={t}>{t}</option>)}

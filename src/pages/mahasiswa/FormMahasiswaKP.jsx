@@ -3,25 +3,28 @@ import { PROGRAM_KEYS, programLabel, programDisplayLabel, ringkasPendaftaran, no
 import { kpTemaUntukPilihan } from '../../utils/pilihan.js';
 import { Field, Modal, MessageIcon, Badge } from '../../components/ui.jsx';
 import { KpDocumentPanel } from '../../components/kpDocuments.jsx';
+import { LinkBerkasRow } from './LinkBerkasRow.jsx';
 import { RiwayatAktivitas } from './AktivitasCells.jsx';
-import { PerpanjanganTA } from './PerpanjanganTA.jsx';
 import { NomorSuratPanel } from './NomorSuratPanel.jsx';
+import { PersetujuanPerpanjangan } from './PersetujuanPerpanjangan.jsx';
+import { PengingatPesan } from './PengingatPesan.jsx';
 
 // Tata letak tab-per-tahap di dalam modal FormMahasiswa (lihat
-// FormMahasiswa.jsx) — dipakai untuk KP, Magang (Pendaftaran → Bimbingan →
-// [seminar/expo] → Lulus) dan Tugas Akhir (Pendaftaran → Sempro → Semhas →
-// Sidang → Lulus, dengan 2 pembimbing + 2 penguji), sengaja terpisah dari
+// FormMahasiswa.jsx) — dipakai untuk KP (Pendaftaran → Bimbingan → Pembukuan →
+// Lulus), Magang (Pendaftaran → Bimbingan → Expo → Lulus) dan Tugas Akhir
+// (Pendaftaran → Sempro → Semhas → Sidang → Lulus, dengan 1 pembimbing +
+// 2 penguji), sengaja terpisah dari
 // FormMahasiswaGeneric karena tampilannya jauh berbeda (tab per tahap + panel
 // Dokumen di samping). Semua state/handler dikelola di FormMahasiswa.jsx,
 // komponen ini murni presentasional (props saja).
 export function FormMahasiswaKP({
   m, setM, set, gantiProgram, setTahap, periodeList, daftarAngkatan = [],
-  roles, pembimbing1Label, penguji1Label, penguji2Label, dosenOpts, stages,
+  roles, pembimbing1Label, penguji1Label, penguji2Label, dosenOpts, bebanBlok, stages,
   alurTahapBlok, notifikasiBlok, peringatanBlok,
   tahapTab, setTahapTab, p, events, jadwalBlok,
   dosenByKode, konten, uploadAdminDokumenKP, hapusAdminDokumenKP,
-  setPP, unduhPerpanjanganKP, dlBusyKP, ppBusy, ppErr, berikanSuratPerpanjangan,
-  baru, onCancel, submit, navEntri, modalOpsi,
+  unduhPerpanjanganKP, dlBusyKP,
+  verifAwal, baru, onCancel, submit, navEntri, modalOpsi,
 }) {
   // "Halaman" di dalam modal — 'utama' (tab tahap, dokumen, dst) atau 'data'
   // (form identitas/penugasan Program..Batas akhir, dibuka lewat tombol "Edit
@@ -117,6 +120,10 @@ export function FormMahasiswaKP({
             <Field label={penguji2Label}><select value={m.penguji2} onChange={(e) => set('penguji2', e.target.value)}>{dosenOpts}</select></Field>
           )}
           <Field label="Dosen Wali"><select value={m.dosenWali || ''} onChange={(e) => set('dosenWali', e.target.value)}>{dosenOpts}</select></Field>
+          <div className="field-full beban-mini-grid">
+            {bebanBlok('bimbingan')}
+            {roles.penguji >= 1 && bebanBlok('penguji')}
+          </div>
 
           <Field label="Tahap saat ini">
             <select value={m.tahap} onChange={(e) => setTahap(e.target.value)}>
@@ -136,22 +143,32 @@ export function FormMahasiswaKP({
       </div>
 
       <div className="mhs-edit-identity">
-        {!baru && (
-          <div className="mhs-edit-identity-info">
-            <div>
-              <span className="field-label">Nama</span>
-              <div className="cell-name">{m.nama}</div>
-            </div>
-            <div>
-              <span className="field-label">NIM</span>
-              <div>{m.nim}</div>
-            </div>
-            <div className="mhs-edit-identity-judul">
-              <span className="field-label">{judulLabelFor(m)}</span>
-              <div>{m.judul || <span className="muted">—</span>}</div>
-            </div>
+        <div className="mhs-edit-identity-info">
+          {!baru && (
+            <>
+              <div>
+                <span className="field-label">Nama</span>
+                <div className="cell-name">{m.nama}</div>
+              </div>
+              <div>
+                <span className="field-label">NIM</span>
+                <div>{m.nim}</div>
+              </div>
+              <div className="mhs-edit-identity-judul">
+                <span className="field-label">{judulLabelFor(m)}</span>
+                <div>{m.judul || <span className="muted">—</span>}</div>
+              </div>
+            </>
+          )}
+          <div>
+            <span className="field-label">Status verifikasi</span>
+            <select value={m.verifikasi || 'terverifikasi'} onChange={(e) => set('verifikasi', e.target.value)}>
+              <option value="baru">Menunggu verifikasi</option>
+              <option value="terverifikasi">Terverifikasi</option>
+              <option value="perbaikan">Perlu perbaikan</option>
+            </select>
           </div>
-        )}
+        </div>
         <button
           type="button"
           className="icon-btn"
@@ -161,9 +178,18 @@ export function FormMahasiswaKP({
         ><MessageIcon /></button>
       </div>
 
+      <PengingatPesan m={m} set={set} verifAwal={verifAwal} />
+
       {catatanOpen && (
         <div className="form-grid" style={{ marginTop: 12 }}>
-          <Field label="Catatan / pesan untuk mahasiswa" full><textarea rows={2} value={m.catatan} onChange={(e) => set('catatan', e.target.value)} /></Field>
+          <Field label="Catatan / pesan untuk mahasiswa" full>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+              <textarea rows={2} value={m.catatan} onChange={(e) => set('catatan', e.target.value)} style={{ flex: 1 }} />
+              {m.catatan && (
+                <button type="button" className="icon-btn" onClick={() => set('catatan', '')} aria-label="Hapus pesan" title="Hapus pesan">✕</button>
+              )}
+            </div>
+          </Field>
         </div>
       )}
 
@@ -185,31 +211,21 @@ export function FormMahasiswaKP({
           {tahapTab === 'Pendaftaran' && (
             <div className="sched">
               <div className="sched-title">Verifikasi pendaftaran</div>
-              {(ringkasPendaftaran(p).length > 0 || p.berkasLink) ? (
+              {ringkasPendaftaran(p).length > 0 ? (
                 <div className="verif-info">
                   {ringkasPendaftaran(p).map((r) => (
                     <div key={r.label}>{r.label}: <strong>{r.nilai}</strong></div>
                   ))}
-                  {p.berkasLink
-                    ? <div>Berkas: <a href={normalizeUrl(p.berkasLink)} target="_blank" rel="noreferrer">buka link</a></div>
-                    : <div className="muted">Berkas belum dilampirkan.</div>}
                 </div>
               ) : <div className="hint">Data dibuat manual oleh admin (tanpa pengajuan mahasiswa).</div>}
-              <div className="sched-grid" style={{ marginTop: 10 }}>
-                <Field label="Status verifikasi">
-                  <select value={m.verifikasi || 'terverifikasi'} onChange={(e) => set('verifikasi', e.target.value)}>
-                    <option value="baru">Menunggu verifikasi</option>
-                    <option value="terverifikasi">Terverifikasi</option>
-                    <option value="perbaikan">Perlu perbaikan</option>
-                  </select>
-                </Field>
-                {!baru && (
-                  <div className="field">
-                    <span className="field-label" style={{ visibility: 'hidden' }}>_</span>
-                    <button type="button" className="btn" onClick={() => setPage('data')}>Edit data pendaftaran</button>
-                  </div>
-                )}
+              <div style={{ marginTop: 10 }}>
+                <LinkBerkasRow label="Link berkas pendaftaran" url={p.berkasLink} onUbah={(v) => setM((prev) => ({ ...prev, pendaftaran: { ...(prev.pendaftaran || {}), berkasLink: v } }))} diperiksa={p.berkasDiperiksa} onDiperiksa={(v) => setM((prev) => ({ ...prev, pendaftaran: { ...(prev.pendaftaran || {}), berkasDiperiksa: v } }))} />
               </div>
+              {!baru && (
+                <div style={{ marginTop: 10 }}>
+                  <button type="button" className="btn" onClick={() => setPage('data')}>Edit data pendaftaran</button>
+                </div>
+              )}
             </div>
           )}
 
@@ -217,11 +233,22 @@ export function FormMahasiswaKP({
             <div className="sched">
               <div className="sched-title">Dosen pembimbing</div>
               <div className="sched-grid">
-                <Field label={pembimbing1Label}><select value={m.pembimbing1} onChange={(e) => set('pembimbing1', e.target.value)}>{dosenOpts}</select></Field>
-                <Field label="Pembimbing 2"><select value={m.pembimbing2} onChange={(e) => set('pembimbing2', e.target.value)}>{dosenOpts}</select></Field>
+                <Field label={pembimbing1Label} full><select value={m.pembimbing1} onChange={(e) => set('pembimbing1', e.target.value)}>{dosenOpts}</select></Field>
                 <NomorSuratPanel m={m} setM={setM} baru={baru} />
               </div>
+              {bebanBlok('bimbingan')}
               <div className="hint" style={{ marginTop: 6 }}>Pembimbing yang sama dipakai di Seminar Proposal, Seminar Hasil, dan Sidang. Nomor surat dipakai untuk semua dokumen TA.</div>
+            </div>
+          )}
+
+          {tahapTab === 'Seminar Proposal' && m.program === 'TA' && (
+            <div className="sched">
+              <div className="sched-title">Dosen penguji</div>
+              <div className="sched-grid">
+                <Field label={penguji1Label} full><select value={m.penguji1} onChange={(e) => set('penguji1', e.target.value)}>{dosenOpts}</select></Field>
+              </div>
+              {bebanBlok('penguji')}
+              <div className="hint" style={{ marginTop: 6 }}>Penguji ini juga menguji di Seminar Hasil dan Sidang.</div>
             </div>
           )}
 
@@ -229,13 +256,13 @@ export function FormMahasiswaKP({
             <div className="sched">
               <div className="sched-title">Bimbingan</div>
               <div className="sched-grid">
-                <Field label={pembimbing1Label}><select value={m.pembimbing1} onChange={(e) => set('pembimbing1', e.target.value)}>{dosenOpts}</select></Field>
+                <Field label={pembimbing1Label} full><select value={m.pembimbing1} onChange={(e) => set('pembimbing1', e.target.value)}>{dosenOpts}</select></Field>
                 {roles.pembimbing >= 2 && (
-                  <Field label="Pembimbing 2"><select value={m.pembimbing2} onChange={(e) => set('pembimbing2', e.target.value)}>{dosenOpts}</select></Field>
+                  <Field label="Pembimbing 2" full><select value={m.pembimbing2} onChange={(e) => set('pembimbing2', e.target.value)}>{dosenOpts}</select></Field>
                 )}
                 <NomorSuratPanel m={m} setM={setM} baru={baru} />
               </div>
-              <div className="hint" style={{ marginTop: 6 }}>Nomor surat ini dipakai untuk semua surat program ini (termasuk ST Pembimbing {programDisplayLabel(m)}) — isi setelah dosen pembimbing ditetapkan.</div>
+              {bebanBlok('bimbingan')}
             </div>
           )}
 
@@ -243,12 +270,27 @@ export function FormMahasiswaKP({
             <div className="sched">
               <div className="sched-title">Dosen penguji</div>
               <div className="sched-grid">
-                <Field label={penguji1Label}><select value={m.penguji1} onChange={(e) => set('penguji1', e.target.value)}>{dosenOpts}</select></Field>
+                <Field label={penguji1Label} full><select value={m.penguji1} onChange={(e) => set('penguji1', e.target.value)}>{dosenOpts}</select></Field>
                 {roles.penguji >= 2 && (
-                  <Field label={penguji2Label}><select value={m.penguji2} onChange={(e) => set('penguji2', e.target.value)}>{dosenOpts}</select></Field>
+                  <Field label={penguji2Label} full><select value={m.penguji2} onChange={(e) => set('penguji2', e.target.value)}>{dosenOpts}</select></Field>
                 )}
               </div>
-              <div className="hint" style={{ marginTop: 6 }}>Pembimbing 1 dan 2 sama seperti tahap sebelumnya; ubah di tab Pendaftaran.</div>
+              {bebanBlok('penguji')}
+              <div className="hint" style={{ marginTop: 6 }}>Penguji 1 sama dengan penguji Seminar Proposal. Pembimbing diubah di tab Pendaftaran.</div>
+            </div>
+          )}
+
+          {tahapTab === 'Pembukuan' && (
+            <div className="sched">
+              <div className="sched-title">Pembukuan</div>
+              <LinkBerkasRow
+                label="Link bukti pembukuan"
+                url={(m.pembukuan || {}).berkasLink}
+                onUbah={(v) => setM((prev) => ({ ...prev, pembukuan: { ...(prev.pembukuan || {}), berkasLink: v } }))}
+                diperiksa={(m.pembukuan || {}).berkasDiperiksa}
+                onDiperiksa={(v) => setM((prev) => ({ ...prev, pembukuan: { ...(prev.pembukuan || {}), berkasDiperiksa: v } }))}
+              />
+              <div className="hint" style={{ marginTop: 6 }}>Bukti bahwa laporan KP sudah diarsipkan dan ditandatangani. Setelah diperiksa, lanjutkan mahasiswa ke tahap Lulus.</div>
             </div>
           )}
 
@@ -280,28 +322,22 @@ export function FormMahasiswaKP({
 
         <div className="modal-kp-side">
           <KpDocumentPanel m={m} program={m.program} dosenByKode={dosenByKode} konten={konten} canUpload role="admin" onUpload={uploadAdminDokumenKP} onDeleteUpload={hapusAdminDokumenKP} collapsible={false} title={`Dokumen ${programDisplayLabel(m)}`} activeStage={tahapTab} />
-          {m.program === 'TA' ? (
-            <PerpanjanganTA m={m} dosenByKode={dosenByKode} ppBusy={ppBusy} ppErr={ppErr} berikanSuratPerpanjangan={berikanSuratPerpanjangan} />
-          ) : (
-            <div className="sched">
-              <div className="sched-title">Perpanjangan {programDisplayLabel(m)}</div>
-              {(m.perpanjangan && m.perpanjangan.diminta)
-                ? <div className="verif-info"><div>Alasan mahasiswa: <strong>{m.perpanjangan.alasan || '—'}</strong>{m.perpanjangan.tanggalDiminta ? ` · ${formatTanggal(m.perpanjangan.tanggalDiminta)}` : ''}</div></div>
-                : <div className="hint">Belum ada pengajuan perpanjangan dari mahasiswa.</div>}
-              {(m.perpanjangan || {}).suratAdminTersedia
-                ? <div className="callout callout-green">Surat perpanjangan sudah terlihat di Portal mahasiswa.</div>
-                : <div className="hint">Surat perpanjangan belum ditampilkan ke mahasiswa.</div>}
-              {((m.perpanjangan || {}).suratFinal || (m.perpanjangan || {}).suratFinalLink)
-                ? <div className="callout callout-green">Surat final (ditandatangani) dari mahasiswa: <a href={m.perpanjangan.suratFinal ? (m.perpanjangan.suratFinal.url || m.perpanjangan.suratFinal.dataUrl) : normalizeUrl(m.perpanjangan.suratFinalLink)} target="_blank" rel="noreferrer">{m.perpanjangan.suratFinal ? m.perpanjangan.suratFinal.fileName : 'buka'}</a></div>
-                : <div className="hint">Surat final dari mahasiswa belum diunggah.</div>}
-              <div className="notif-actions" style={{ marginTop: 8 }}>
-                <button type="button" className="btn" onClick={unduhPerpanjanganKP} disabled={dlBusyKP}>{dlBusyKP ? 'Menyiapkan PDF…' : `Cetak surat perpanjangan ${programDisplayLabel(m)} (PDF)`}</button>
-                {!(m.perpanjangan || {}).suratAdminTersedia && (
-                  <button type="button" className="btn btn-primary" onClick={() => setPP('suratAdminTersedia', true)}>Kirim ke mahasiswa</button>
-                )}
-              </div>
+          <div className="sched">
+            <div className="sched-title">Perpanjangan {programDisplayLabel(m)}</div>
+            {(m.perpanjangan && m.perpanjangan.diminta)
+              ? <div className="verif-info"><div>Alasan mahasiswa: <strong>{m.perpanjangan.alasan || '—'}</strong>{m.perpanjangan.tanggalDiminta ? ` · ${formatTanggal(m.perpanjangan.tanggalDiminta)}` : ''}</div></div>
+              : <div className="hint">Belum ada pengajuan perpanjangan dari mahasiswa.</div>}
+            {(m.perpanjangan || {}).suratAdminTersedia
+              ? <div className="callout callout-green">Surat perpanjangan sudah terlihat di Portal mahasiswa.</div>
+              : <div className="hint">Surat perpanjangan belum ditampilkan ke mahasiswa.</div>}
+            {((m.perpanjangan || {}).suratFinal || (m.perpanjangan || {}).suratFinalLink)
+              ? <div className="callout callout-green">Surat final (ditandatangani) dari mahasiswa: <a href={m.perpanjangan.suratFinal ? (m.perpanjangan.suratFinal.url || m.perpanjangan.suratFinal.dataUrl) : normalizeUrl(m.perpanjangan.suratFinalLink)} target="_blank" rel="noreferrer">{m.perpanjangan.suratFinal ? m.perpanjangan.suratFinal.fileName : 'buka'}</a></div>
+              : <div className="hint">Surat final dari mahasiswa belum diunggah.</div>}
+            <PersetujuanPerpanjangan m={m} setM={setM} />
+            <div className="notif-actions" style={{ marginTop: 8 }}>
+              <button type="button" className="btn" onClick={unduhPerpanjanganKP} disabled={dlBusyKP}>{dlBusyKP ? 'Menyiapkan PDF…' : `Cetak surat perpanjangan ${programDisplayLabel(m)} (PDF)`}</button>
             </div>
-          )}
+          </div>
         </div>
       </div>
 

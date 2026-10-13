@@ -23,11 +23,18 @@ export function Dashboard({ mahasiswa, dosen, prog, setProg }) {
   const mendekati = withK.filter((x) => x.k.key === 'mendekati');
 
   // Beban dosen (otomatis) — per periode aktif (lihat selektor periode di atas).
-  const beban = dosen
-    .map((d) => ({ ...d, ...hitungBeban(scoped, d.kode, { semua: bebanMode === 'semua' }) }))
-    .filter((d) => d.total > 0)
-    .sort((a, b) => b.total - a.total);
-  const maxBeban = beban.length ? beban[0].total : 1;
+  // Dipisah jadi dua grafik: sebagai pembimbing dan sebagai penguji. Beban
+  // pembimbing tidak dijumlah lintas program (pembimbing KP ≠ pembimbing TA),
+  // jadi dipecah per program; beban penguji tetap lintas program.
+  const opsBeban = { semua: bebanMode === 'semua' };
+  const urutPeran = (list, peran) => list.filter((d) => d[peran] > 0).sort((a, b) => b[peran] - a[peran]);
+  const bebanPenguji = urutPeran(dosen.map((d) => ({ ...d, ...hitungBeban(scoped, d.kode, opsBeban) })), 'penguji');
+  const grupBimbingan = (prog === 'ALL' ? PROGRAM_KEYS : [prog])
+    .map((p) => ({
+      program: p,
+      data: urutPeran(dosen.map((d) => ({ ...d, ...hitungBebanProgram(scoped, d.kode, p, opsBeban) })), 'bimbingan'),
+    }))
+    .filter((g) => g.data.length > 0);
 
   const perhatian = [...lewat, ...mendekati].sort((a, b) => a.k.daysLeft - b.k.daysLeft);
 
@@ -87,32 +94,31 @@ export function Dashboard({ mahasiswa, dosen, prog, setProg }) {
         <Metric label="Lewat batas" value={lewat.length} tone="red" />
       </div>
 
-      <div className="dash-grid">
-        <section className="card">
-          <div className="card-head">
-            <h3 className="card-title">Beban dosen (per periode)</h3>
-            <div className="seg seg-sm">
-              <button className={'seg-btn' + (bebanMode === 'semua' ? ' active' : '')} onClick={() => setBebanMode('semua')}>Semua</button>
-              <button className={'seg-btn' + (bebanMode === 'aktif' ? ' active' : '')} onClick={() => setBebanMode('aktif')}>Aktif</button>
-            </div>
+      <section className="card">
+        <div className="card-head">
+          <h3 className="card-title">Beban dosen (per periode)</h3>
+          <div className="seg seg-sm">
+            <button className={'seg-btn' + (bebanMode === 'semua' ? ' active' : '')} onClick={() => setBebanMode('semua')}>Semua</button>
+            <button className={'seg-btn' + (bebanMode === 'aktif' ? ' active' : '')} onClick={() => setBebanMode('aktif')}>Aktif</button>
           </div>
-          {beban.length === 0 ? (
-            <Empty>Belum ada dosen yang dibebani pada filter ini.</Empty>
-          ) : (
-            <div className="bars">
-              {beban.map((d) => (
-                <div className="bar-row" key={d.kode} title={`${d.bimbingan} bimbingan + ${d.penguji} penguji`}>
-                  <span className="bar-key">{d.kode}</span>
-                  <div className="bar-track">
-                    <div className={`bar-fill fill-${bebanTone(d.total)}`} style={{ width: `${Math.max(8, (d.total / maxBeban) * 100)}%` }} />
-                  </div>
-                  <span className="bar-val">{d.total}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
+        </div>
+        <div className="dash-grid">
+          <div>
+            <div className="sebaran-group-title">Pembimbing</div>
+            {grupBimbingan.length === 0 ? (
+              <Empty>Belum ada dosen pembimbing pada filter ini.</Empty>
+            ) : grupBimbingan.map((g) => (
+              <div className="beban-grup" key={g.program}>
+                {prog === 'ALL' && <div className="beban-grup-title">{programLabel(g.program)}</div>}
+                <BebanBars data={g.data} peran="bimbingan" label="pembimbing" tone={bebanTone} />
+              </div>
+            ))}
+          </div>
+          <BebanChart judul="Penguji" data={bebanPenguji} peran="penguji" tone={bebanTone} />
+        </div>
+      </section>
 
+      <div className="dash-grid">
         <section className="card">
           <h3 className="card-title">Perlu perhatian</h3>
           {perhatian.length === 0 ? (
@@ -209,6 +215,37 @@ export function Dashboard({ mahasiswa, dosen, prog, setProg }) {
           </div>
         )}
       </section>
+    </div>
+  );
+}
+
+function BebanChart({ judul, data, peran, tone }) {
+  return (
+    <div>
+      <div className="sebaran-group-title">{judul}</div>
+      {data.length === 0 ? (
+        <Empty>Belum ada dosen {judul.toLowerCase()} pada filter ini.</Empty>
+      ) : (
+        <BebanBars data={data} peran={peran} label={judul.toLowerCase()} tone={tone} />
+      )}
+    </div>
+  );
+}
+
+// `data` sudah terurut menurun, jadi data[0] adalah nilai terbesar.
+function BebanBars({ data, peran, label, tone }) {
+  const max = data[0][peran];
+  return (
+    <div className="bars">
+      {data.map((d) => (
+        <div className="bar-row" key={d.kode} title={`${d[peran]} sebagai ${label}`}>
+          <span className="bar-key">{d.kode}</span>
+          <div className="bar-track">
+            <div className={`bar-fill fill-${tone(d[peran])}`} style={{ width: `${Math.max(8, (d[peran] / max) * 100)}%` }} />
+          </div>
+          <span className="bar-val">{d[peran]}</span>
+        </div>
+      ))}
     </div>
   );
 }

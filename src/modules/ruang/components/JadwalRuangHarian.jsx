@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { slotPadaTanggal, teksSlot } from '../logic/ruangBooking.js';
 import { menitJam, formatTanggal } from '../host.js';
 
@@ -17,18 +17,15 @@ const fmt = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 
 // benar-benar berlaku pada tanggal itu (rentang berlaku & blackout dihormati).
 // onKosong({ruangId, tanggal, mulai}) / onBlok(slot, tanggal): opsional — bila diberikan,
 // sel kosong & blok bisa diklik (mode admin).
-export function JadwalRuangHarian({ data, semester, tanggal, onKosong, onBlok }) {
-  const [semuaRuang, setSemuaRuang] = useState(false); // false = sembunyikan ruang yang kosong seharian
-
-  const { ruang, baris, sel, adaData, kosongSeharian = [], jendela = [] } = useMemo(() => {
-    if (!data || !semester) return { ruang: [], baris: [], sel: {}, adaData: false };
+export function JadwalRuangHarian({ data, semester, tanggal, onKosong, onBlok, semuaRuang = false }) {
+  const { ruang, baris, sel } = useMemo(() => {
+    if (!data || !semester) return { ruang: [], baris: [], sel: {} };
     const dari = slotPadaTanggal(data, semester, tanggal);
     const ruangAktif = (data.ruang || []).filter((r) => r.aktif !== false).sort((a, b) => (a.urut || 0) - (b.urut || 0));
     // Ruang nonaktif tetap tampil bila pada tanggal ini masih punya booking.
     const idPakai = new Set(dari.map((s) => s.ruangId));
     const semuaKolom = [...ruangAktif, ...(data.ruang || []).filter((r) => r.aktif === false && idPakai.has(r.id))];
     const kolom = semuaRuang ? semuaKolom : semuaKolom.filter((r) => idPakai.has(r.id));
-    const kosongSeharian = semuaKolom.filter((r) => !idPakai.has(r.id));
     // Rentang jam mengikuti data (bukan dipatok 07–17) supaya tidak ada baris kosong sia-sia.
     let min = DEFAULT_RENTANG[0], max = DEFAULT_RENTANG[1];
     if (dari.length) {
@@ -48,23 +45,13 @@ export function JadwalRuangHarian({ data, semester, tanggal, onKosong, onBlok })
         for (let k = i + 1; k < j; k++) peta[`${k}|${r.id}`] = 'skip';
       });
     });
-    // Jendela kosong >= 60 menit per ruang dalam rentang tampilan (untuk ringkasan di bawah grid).
-    const jendela = semuaKolom.map((r) => {
-      const pakai = dari.filter((s) => s.ruangId === r.id).map((s) => [menitJam(s.mulai), menitJam(s.selesai)]).sort((a, b) => a[0] - b[0]);
-      const out = []; let kursor = min;
-      pakai.forEach(([a, b]) => { if (a - kursor >= 60) out.push([kursor, a]); kursor = Math.max(kursor, b); });
-      if (max - kursor >= 60) out.push([kursor, max]);
-      return { ruang: r, jendela: out };
-    }).filter((x) => x.jendela.length && idPakai.has(x.ruang.id));
-    return { ruang: kolom, baris: barisJam, sel: peta, adaData: dari.length > 0, kosongSeharian, jendela };
+    return { ruang: kolom, baris: barisJam, sel: peta };
   }, [data, semester, tanggal, semuaRuang]);
 
   const luar = tanggal < semester.mulai || tanggal > semester.selesai;
   return (
     <>
       {luar &&<div className="callout" style={{ marginBottom: 10 }}>Tanggal ini di luar {semester.label} ({formatTanggal(semester.mulai)} – {formatTanggal(semester.selesai)}).</div>}
-      {!adaData && !luar && <div className="hint" style={{ marginBottom: 8 }}>Tidak ada pemakaian ruang pada tanggal ini (mungkin hari libur/blackout).</div>}
-      {ruang.length === 0 && <div className="hint" style={{ marginBottom: 8 }}>Semua ruang kosong pada tanggal ini.</div>}
       <div className="jr-scroll">
         <table className="jr-tbl" style={{ minWidth: LEBAR_JAM + ruang.length * LEBAR_MIN_RUANG }}>
           <colgroup>
@@ -97,23 +84,6 @@ export function JadwalRuangHarian({ data, semester, tanggal, onKosong, onBlok })
             ))}
           </tbody>
         </table>
-      </div>
-      <div className="jr-ringkas">
-        {kosongSeharian.length > 0 && (
-          <div>
-            <strong>{semuaRuang ? 'Kosong seharian' : `${kosongSeharian.length} ruang kosong seharian`}:</strong> {kosongSeharian.map((r) => r.nama).join(', ')}{' '}
-            <button type="button" className="btn btn-sm" onClick={() => setSemuaRuang((v) => !v)}>{semuaRuang ? 'Sembunyikan ruang kosong' : 'Tampilkan sebagai kolom'}</button>
-          </div>
-        )}
-        {kosongSeharian.length === 0 && !semuaRuang && null}
-        {jendela.length > 0 && (
-          <details>
-            <summary>Jendela kosong ≥ 1 jam pada ruang yang terpakai</summary>
-            <div className="jr-jendela">
-              {jendela.map((x) => <span key={x.ruang.id} className="jr-chip"><b>{x.ruang.nama}</b> {x.jendela.map(([a, b]) => `${fmt(a)}–${fmt(b)}`).join(', ')}</span>)}
-            </div>
-          </details>
-        )}
       </div>
     </>
   );

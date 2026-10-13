@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { NAMA_HARI } from '../logic/jadwalRuang.js';
 import { susunRuang, pekanDari } from '../logic/jadwalRuangView.js';
 import { formatTanggal } from '../host.js';
@@ -8,15 +8,13 @@ const tglPendek = (iso) => formatTanggal(iso).split(' ').slice(0, 2).join(' ');
 
 // Tampilan mingguan: baris = ruang, kolom = Senin–Minggu. Tiap sel memuat daftar booking
 // hari itu. Klik sel kosong menambah, klik item mengubah, klik judul hari membuka harian.
-export function JadwalRuangPekan({ data, semester, tanggal, onKosong, onBlok, onBukaHari }) {
-  const [semuaRuang, setSemuaRuang] = useState(false);
+export function JadwalRuangPekan({ data, semester, tanggal, onKosong, onBlok, onBukaHari, semuaRuang = false }) {
   const hari = useMemo(() => pekanDari(tanggal), [tanggal]);
-  const { perTanggal, ruang, kosong } = useMemo(() => susunRuang(data, semester, hari, semuaRuang), [data, semester, hari, semuaRuang]);
+  const { perTanggal, ruang } = useMemo(() => susunRuang(data, semester, hari, semuaRuang), [data, semester, hari, semuaRuang]);
   const luar = (t) => t < semester.mulai || t > semester.selesai;
 
   return (
     <>
-      {ruang.length === 0 && <div className="hint" style={{ marginBottom: 8 }}>Tidak ada pemakaian ruang pada pekan ini.</div>}
       {ruang.length > 0 && (
         <div className="jr-scroll">
           <table className="jr-tbl jr-pekan" style={{ minWidth: 90 + 7 * 110 }}>
@@ -52,14 +50,6 @@ export function JadwalRuangPekan({ data, semester, tanggal, onKosong, onBlok, on
               ))}
             </tbody>
           </table>
-        </div>
-      )}
-      {kosong.length > 0 && (
-        <div className="jr-ringkas">
-          <div>
-            <strong>{semuaRuang ? 'Kosong sepekan' : `${kosong.length} ruang kosong sepekan`}:</strong> {kosong.map((r) => r.nama).join(', ')}{' '}
-            <button type="button" className="btn btn-sm" onClick={() => setSemuaRuang((v) => !v)}>{semuaRuang ? 'Sembunyikan ruang kosong' : 'Tampilkan sebagai baris'}</button>
-          </div>
         </div>
       )}
     </>

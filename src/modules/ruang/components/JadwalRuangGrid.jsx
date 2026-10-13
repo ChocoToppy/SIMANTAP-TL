@@ -21,14 +21,15 @@ function judulRentang(mode, tanggal) {
 // berlaku pada tanggal itu (rentang berlaku & blackout dihormati).
 // onKosong({ruangId, tanggal, mulai?}) / onBlok(slot, tanggal): opsional — bila diberikan,
 // sel kosong & blok bisa diklik (mode admin).
-export function JadwalRuangGrid({ data, semester, onKosong, onBlok }) {
+export function JadwalRuangGrid({ data, semester, onKosong, onBlok, modeAwal = 'hari', aksiKanan = null }) {
   const awal = useMemo(() => {
     const t = todayISO();
     if (!semester) return t;
     return t < semester.mulai ? semester.mulai : t > semester.selesai ? semester.selesai : t;
   }, [semester]);
   const [tanggal, setTanggal] = useState(awal);
-  const [mode, setMode] = useState('hari');
+  const [mode, setMode] = useState(modeAwal);
+  const [semuaRuang, setSemuaRuang] = useState(false); // false = hanya ruang yang punya booking pada rentang tampilan
 
   if (!semester) return <Empty>Belum ada jadwal ruang yang diterbitkan.</Empty>;
   if (!(data.ruang || []).length) return <Empty>Belum ada ruang terdaftar.</Empty>;
@@ -46,14 +47,17 @@ export function JadwalRuangGrid({ data, semester, onKosong, onBlok }) {
         <button type="button" className="btn btn-sm" onClick={() => setTanggal(geserMode(mode, tanggal, 1))} aria-label={`${satuan} berikutnya`}>›</button>
         <button type="button" className="btn btn-sm" onClick={() => setTanggal(awal)}>Hari ini</button>
         <span className="jr-tgl">{judulRentang(mode, tanggal)}</span>
+        <span style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <label className="btn btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' }} title="Tampilkan juga ruang yang tidak punya booking">
+            <input type="checkbox" checked={semuaRuang} onChange={(e) => setSemuaRuang(e.target.checked)} style={{ width: 'auto', margin: 0 }} />
+            Semua ruang
+          </label>
+          {aksiKanan}
+        </span>
       </div>
-      {mode === 'hari' && <JadwalRuangHarian data={data} semester={semester} tanggal={tanggal} onKosong={onKosong} onBlok={onBlok} />}
-      {mode === 'minggu' && <JadwalRuangPekan data={data} semester={semester} tanggal={tanggal} onKosong={onKosong} onBlok={onBlok} onBukaHari={bukaHari} />}
-      {mode === 'bulan' && <JadwalRuangBulan data={data} semester={semester} tanggal={tanggal} onBukaHari={bukaHari} />}
-      <div className="jr-legenda">
-        <span className="jr-chip"><i className="jr-sw jr-kuliah" /> Kuliah / kegiatan</span>
-        <span className="jr-chip"><i className="jr-sw jr-seminar" /> Seminar / sidang</span>
-      </div>
+      {mode === 'hari' && <JadwalRuangHarian data={data} semester={semester} tanggal={tanggal} onKosong={onKosong} onBlok={onBlok} semuaRuang={semuaRuang} />}
+      {mode === 'minggu' && <JadwalRuangPekan data={data} semester={semester} tanggal={tanggal} onKosong={onKosong} onBlok={onBlok} onBukaHari={bukaHari} semuaRuang={semuaRuang} />}
+      {mode === 'bulan' && <JadwalRuangBulan data={data} semester={semester} tanggal={tanggal} onBukaHari={bukaHari} semuaRuang={semuaRuang} />}
     </div>
   );
 }

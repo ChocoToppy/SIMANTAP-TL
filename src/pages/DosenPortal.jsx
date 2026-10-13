@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { SEMUA, filterByPeriode, hitungBebanRinci, aktivitasTerakhir, tanggalDibuat, kondisi, bidangLabel, programOf, programLabel, getJadwal, AKTIVITAS_LABEL, formatWaktu, jenisMagangOf } from '../utils/helpers.js';
+import { SEMUA, filterByPeriode, hitungBebanRinci, aktivitasTerakhir, tanggalDibuat, kondisi, bidangLabel, programOf, programLabel, AKTIVITAS_LABEL, formatWaktu, jenisMagangOf } from '../utils/helpers.js';
 import { Badge, StageBar, Empty, ColResizeHandle, TextSizeToggle, ThemeToggle, RolePill } from '../components/ui.jsx';
 import { generateDocument, getTemplateConfig } from '../utils/documentGenerator.js';
 import { useColumnWidths } from '../utils/useColumnWidths.js';
+import { FITUR_EKSPERIMENTAL } from '../utils/config.js';
 import logoTl from '../assets/logo-tl.png';
 
 // ===================== DosenPortal.jsx =====================
@@ -15,7 +16,7 @@ function peranDosen(m, kode) {
   return r.join(' & ');
 }
 
-export function DosenPortal({ dosen, allDosen, mahasiswa, periodeList = [], onGradeSave, onLogout }) {
+export function DosenPortal({ dosen, allDosen, mahasiswa, periodeList = [], onLogout }) {
   const [periode, setPeriode] = useState(SEMUA);
   const [semua, setSemua] = useState(true); // termasuk lulus
   const dosenByKode = useMemo(
@@ -129,7 +130,7 @@ export function DosenPortal({ dosen, allDosen, mahasiswa, periodeList = [], onGr
                     <th className="th-sort" onClick={() => ubahSort('tahap')}>Tahap{panah('tahap')}<ColResizeHandle onMouseDown={(e) => startResize(3, e)} /></th>
                     <th>Status<ColResizeHandle onMouseDown={(e) => startResize(4, e)} /></th>
                     <th className="th-sort" onClick={() => ubahSort('aktivitas')}>Aktivitas{panah('aktivitas')}<ColResizeHandle onMouseDown={(e) => startResize(5, e)} /></th>
-                    <th>Surat Tugas &amp; Nilai KP</th>
+                    <th>Surat Tugas KP</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -158,7 +159,7 @@ export function DosenPortal({ dosen, allDosen, mahasiswa, periodeList = [], onGr
                         </td>
                         <td>
                           {programOf(m) === 'KP' ? (
-                            <KpDosenActions m={m} dosenByKode={dosenByKode} onGradeSave={onGradeSave} />
+                            <KpDosenActions m={m} dosenByKode={dosenByKode} />
                           ) : (
                             <span className="hint">—</span>
                           )}
@@ -178,15 +179,12 @@ export function DosenPortal({ dosen, allDosen, mahasiswa, periodeList = [], onGr
   );
 }
 
-// Tampilan terbatas dosen untuk KP: unduh Surat Tugas pembimbingan + isi nilai
-// hasil Seminar KP. Dosen tidak bisa mengubah field lain milik mahasiswa.
-function KpDosenActions({ m, dosenByKode, onGradeSave }) {
-  const j = getJadwal(m, 'Seminar KP');
-  const bisaNilai = !!(j.dikonfirmasi && j.tanggal);
+// Tampilan terbatas dosen untuk KP: unduh Surat Tugas pembimbingan.
+function KpDosenActions({ m, dosenByKode }) {
   const [dlBusy, setDlBusy] = useState(false);
 
   async function unduhSuratTugas() {
-    const config = getTemplateConfig('ST Pembimbing KP', m, dosenByKode, getJadwal(m, 'Seminar KP'));
+    const config = getTemplateConfig('ST Pembimbing KP', m, dosenByKode, {});
     if (!config) return;
     setDlBusy(true);
     try {
@@ -198,20 +196,7 @@ function KpDosenActions({ m, dosenByKode, onGradeSave }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
-      <button type="button" className="btn" onClick={unduhSuratTugas} disabled={dlBusy || !m.nomorSurat} title={m.nomorSurat ? undefined : 'Menunggu admin menetapkan nomor surat'}>{dlBusy ? 'Menyiapkan PDF…' : 'Unduh Surat Tugas (PDF)'}</button>
-      <label className="field" style={{ margin: 0 }}>
-        <span className="field-label">Nilai Seminar KP</span>
-        <select
-          value={j.hasil || ''}
-          disabled={!bisaNilai}
-          onChange={(e) => onGradeSave && onGradeSave(m.id, 'Seminar KP', e.target.value)}
-        >
-          <option value="">— belum dinilai —</option>
-          <option value="lulus">Lulus</option>
-          <option value="tidak">Tidak lulus</option>
-        </select>
-      </label>
-      {!bisaNilai && <span className="hint">Menunggu jadwal Seminar KP dikonfirmasi admin.</span>}
+      <button type="button" className="btn" onClick={unduhSuratTugas} disabled={dlBusy || (FITUR_EKSPERIMENTAL && !m.nomorSurat)} title={(!FITUR_EKSPERIMENTAL || m.nomorSurat) ? undefined : 'Menunggu admin menetapkan nomor surat'}>{dlBusy ? 'Menyiapkan PDF…' : 'Unduh Surat Tugas (PDF)'}</button>
     </div>
   );
 }

@@ -1,12 +1,14 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { PROGRAMS, programOf, stagesFor, eventsFor, rolesFor, syaratLabel, SEMUA, buatId, todayISO, RUANG, jamTampil, cariBentrok, waMahasiswa, tahapBerikut, tahapSebelumnya, eventAktif, HARI, berkasSyarat, catatAktivitas, formatTanggal, normalizeUrl, dokumenFieldFor, dosenAktifUntuk } from '../../utils/helpers.js';
+import { perpanjanganDocType, PROGRAMS, programOf, stagesFor, eventsFor, rolesFor, syaratLabel, SEMUA, buatId, todayISO, RUANG, jamTampil, cariBentrok, waMahasiswa, tahapBerikut, tahapSebelumnya, eventAktif, berkasSyarat, catatAktivitas, formatTanggal, normalizeUrl, dokumenFieldFor, dosenAktifUntuk } from '../../utils/helpers.js';
 import { opsiRuang, periksaUsulanRuang, teksBentrokRuang, milikProgram } from '../../modules/ruang';
-import { FITUR_EKSPERIMENTAL } from '../../utils/config.js';
+import { FITUR_RUANG } from '../../utils/config.js';
 import { Field } from '../../components/ui.jsx';
 import { generateDocument, getTemplateConfig } from '../../utils/documentGenerator.js';
 import { readFileForUpload } from '../../utils/fileUpload.js';
+import { LinkBerkasRow } from './LinkBerkasRow.jsx';
 import { FormMahasiswaKP } from './FormMahasiswaKP.jsx';
 import { FormMahasiswaGeneric } from './FormMahasiswaGeneric.jsx';
+import { BebanDosenMini } from './BebanDosenMini.jsx';
 
 // ===================== mahasiswa/FormMahasiswa.jsx =====================
 // Modal tambah/edit mahasiswa (semua program) — file ini memegang SELURUH
@@ -56,12 +58,7 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
 
   const set = (k, v) => setM((prev) => ({ ...prev, [k]: v }));
   const setPP = (k, v) => setM((prev) => ({ ...prev, perpanjangan: { ...(prev.perpanjangan || {}), [k]: v } }));
-  const setTahap = (v) => setM((prev) => {
-    if (programOf(prev) === 'KP' && v === 'Seminar KP' && !(prev.dokumenKP || {}).persetujuanSmkp) {
-      if (!window.confirm('Mahasiswa belum mengunggah Persetujuan SMKP yang ditandatangani. Tetap pindahkan ke Seminar KP?')) return prev;
-    }
-    return { ...prev, tahap: v };
-  });
+  const setTahap = (v) => set('tahap', v);
   // Tab tahap yang sedang dilihat admin di modal KP — navigasi tampilan saja,
   // TIDAK mengubah m.tahap (yang sebenarnya) sampai admin memakai tombol "Alur tahap".
   const [tahapTab, setTahapTab] = useState(() => {
@@ -72,7 +69,7 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
   const bentrokLive = useMemo(() => cariBentrok(allMahasiswa, m), [allMahasiswa, m]);
   // Bentrok dengan jadwal ruang (kuliah/kegiatan) — peringatan untuk admin, boleh tetap disimpan.
   const bentrokRuangLive = useMemo(() => {
-    if (!FITUR_EKSPERIMENTAL || !jadwalRuang) return [];
+    if (!FITUR_RUANG || !jadwalRuang) return [];
     return Object.entries(m.jadwal || {}).flatMap(([ev, j]) => {
       if (!j || !j.tanggal || !j.jamMulai || !j.jamSelesai || !j.ruang) return [];
       const { bentrok } = periksaUsulanRuang(jadwalRuang, { tanggal: j.tanggal, jamMulai: j.jamMulai, jamSelesai: j.jamSelesai, ruang: j.ruang }, { abaikan: milikProgram(m.id, ev) });
@@ -86,7 +83,7 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
       jadwal: { ...(prev.jadwal || {}), [ev]: { ...((prev.jadwal || {})[ev] || {}), [key]: val } },
     }));
 
-  // Admin mengunggah berkas KP yang ditandatangani (mis. BA Seminar KP) atas nama
+  // Admin mengunggah berkas yang ditandatangani (mis. BA Expo) atas nama
   // mahasiswa — disimpan ke state lokal, ikut tersimpan saat admin klik "Simpan".
   async function uploadAdminDokumenKP(key, file) {
     const hasil = await readFileForUpload(file, `${m.id}/${key}`);
@@ -113,7 +110,7 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
   const [ppErr, setPpErr] = useState('');
   const [dlBusyKP, setDlBusyKP] = useState(false);
   async function unduhPerpanjanganKP() {
-    const docType = programOf(m) === 'KP' ? 'Perpanjangan KP' : 'Perpanjangan Magang';
+    const docType = perpanjanganDocType(m);
     const config = getTemplateConfig(docType, m, dosenByKode, {});
     if (!config) return;
     setDlBusyKP(true);
@@ -161,12 +158,8 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
     evs.forEach((ev) => {
       const t = ((calon.jadwal || {})[ev] || {}).tanggal;
       if (!t) return;
-      // Seminar KP tidak terikat rentang tanggalMulai/batasAkhir KP — durasi KP
-      // mengikuti kerja lapangan mahasiswa, bukan jadwal seminarnya.
-      if (ev !== 'Seminar KP') {
-        if (calon.tanggalMulai && t < calon.tanggalMulai) masalah.push(`Tanggal ${ev} mendahului tanggal mulai (${formatTanggal(calon.tanggalMulai)}).`);
-        if (calon.batasAkhir && t > calon.batasAkhir) masalah.push(`Tanggal ${ev} melewati batas akhir (${formatTanggal(calon.batasAkhir)}).`);
-      }
+      if (calon.tanggalMulai && t < calon.tanggalMulai) masalah.push(`Tanggal ${ev} mendahului tanggal mulai (${formatTanggal(calon.tanggalMulai)}).`);
+      if (calon.batasAkhir && t > calon.batasAkhir) masalah.push(`Tanggal ${ev} melewati batas akhir (${formatTanggal(calon.batasAkhir)}).`);
       if (prevEv && t < ((calon.jadwal || {})[prevEv] || {}).tanggal) masalah.push(`Tanggal ${ev} mendahului ${prevEv} — urutan harus ${evs.join(' → ')}.`);
       prevEv = ev;
     });
@@ -186,14 +179,16 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
       {dosenPilihan.map((d) => <option key={d.kode} value={d.kode}>{d.kode} — {d.nama}</option>)}
     </>
   );
+  // Grafik beban ringkas di samping dropdown pembimbing/penguji.
+  const bebanBlok = (peran) => <BebanDosenMini m={m} allMahasiswa={allMahasiswa} dosen={dosenPilihan} peran={peran} />;
 
   const stages = stagesFor(m.program);
   const events = eventsFor(m.program);
   const roles = rolesFor(m.program);
   const pembimbing1Label = roles.pembimbing === 1 ? (roles.pembimbingLabel || 'Pembimbing') : 'Pembimbing 1';
-  // TA: penguji 1 = ketua, penguji 2 = anggota (ditetapkan admin saat tahap Sidang).
-  const penguji1Label = m.program === 'TA' ? 'Ketua Penguji' : (roles.penguji === 1 ? 'Penguji' : 'Penguji 1');
-  const penguji2Label = m.program === 'TA' ? 'Anggota Penguji' : 'Penguji 2';
+  // TA: penguji 1 sejak Seminar Proposal, penguji 2 bergabung saat Sidang.
+  const penguji1Label = roles.penguji === 1 ? 'Penguji' : 'Penguji 1';
+  const penguji2Label = 'Penguji 2';
   const p = m.pendaftaran || {};
 
   // ----- Blok kontak mahasiswa (dipakai di kedua tata letak) -----
@@ -250,9 +245,6 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
     const jA = evA ? ((m.jadwal || {})[evA] || {}) : {};
     const luluskan = () => setM((prev) => {
       const nx = tahapBerikut(programOf(prev), prev.tahap);
-      if (programOf(prev) === 'KP' && nx === 'Seminar KP' && !(prev.dokumenKP || {}).persetujuanSmkp) {
-        if (!window.confirm('Mahasiswa belum mengunggah Persetujuan SMKP yang ditandatangani. Tetap lanjutkan ke Seminar KP?')) return prev;
-      }
       const upd = { ...prev, tahap: nx };
       if (evA) upd.jadwal = { ...(prev.jadwal || {}), [evA]: { ...((prev.jadwal || {})[evA] || {}), hasil: 'lulus' } };
       if (nx === 'Lulus') upd.tanggalLulus = prev.tanggalLulus || todayISO();
@@ -273,7 +265,9 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
         {evA && (
           <div className="verif-info" style={{ marginTop: 8 }}>
             <div>Jadwal {evA}: {jA.tanggal ? formatTanggal(jA.tanggal) : '—'} {jamTampil(jA)} {jA.ruang || ''}</div>
-            {jA.berkasLink ? <div>Berkas: <a href={normalizeUrl(jA.berkasLink)} target="_blank" rel="noreferrer">buka link</a></div> : <div className="muted">Berkas belum dilampirkan mahasiswa.</div>}
+            <div style={{ margin: '8px 0' }}>
+              <LinkBerkasRow label="Link berkas persyaratan" url={jA.berkasLink} onUbah={(v) => setJadwal(evA, 'berkasLink', v)} diperiksa={jA.berkasDiperiksa} onDiperiksa={(v) => setJadwal(evA, 'berkasDiperiksa', v)} />
+            </div>
             <div>Status: {jA.dikonfirmasi ? 'jadwal final' : (jA.tanggal ? 'perkiraan / menunggu verifikasi' : 'belum ada jadwal')}{jA.hasil ? ` · hasil terakhir: ${jA.hasil}` : ''}</div>
           </div>
         )}
@@ -302,14 +296,6 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
         <div className="sched-grid">
           <Field label="Nomor Surat"><input value={m.nomorSurat || j.nomorST || ''} disabled title="Nomor surat sekarang satu untuk seluruh program — isi di panel Verifikasi pendaftaran" /></Field>
           <Field label="Tanggal"><input type="date" value={j.tanggal || ''} onChange={(e) => setJadwal(ev, 'tanggal', e.target.value)} /></Field>
-          {(m.program === 'KP' || ev.includes('KP')) && (
-            <Field label="Hari">
-              <select value={j.hari || ''} onChange={(e) => setJadwal(ev, 'hari', e.target.value)}>
-                <option value="">—</option>
-                {HARI.map((h) => <option key={h} value={h}>{h}</option>)}
-              </select>
-            </Field>
-          )}
           <Field label="Jam mulai"><input type="time" value={j.jamMulai || ''} onChange={(e) => setJadwal(ev, 'jamMulai', e.target.value)} /></Field>
           <Field label="Jam selesai"><input type="time" value={j.jamSelesai || ''} onChange={(e) => setJadwal(ev, 'jamSelesai', e.target.value)} /></Field>
           <Field label="Ruang">
@@ -326,26 +312,11 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
           <label className="check"><input type="checkbox" checked={!!j.dikonfirmasi} onChange={(e) => setJadwal(ev, 'dikonfirmasi', e.target.checked)} /><span>Jadwal final (dikonfirmasi)</span></label>
         </div>
         <div className="sched-grid" style={{ marginTop: 8 }}>
-          <Field label="Link berkas persyaratan" full>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <input style={{ flex: 1 }} value={j.berkasLink || ''} onChange={(e) => setJadwal(ev, 'berkasLink', e.target.value)} placeholder="https://drive.google.com/..." />
-              {j.berkasLink && <a className="btn" href={normalizeUrl(j.berkasLink)} target="_blank" rel="noreferrer">Buka</a>}
-            </div>
-          </Field>
+          <LinkBerkasRow label="Link berkas persyaratan" url={j.berkasLink} onUbah={(v) => setJadwal(ev, 'berkasLink', v)} diperiksa={j.berkasDiperiksa} onDiperiksa={(v) => setJadwal(ev, 'berkasDiperiksa', v)} />
           {ev.includes('Sidang') && (
             <>
-              <Field label="Link Turnitin" full>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <input style={{ flex: 1 }} value={j.turnitinLink || ''} onChange={(e) => setJadwal(ev, 'turnitinLink', e.target.value)} placeholder="https://drive.google.com/..." />
-                  {j.turnitinLink && <a className="btn" href={normalizeUrl(j.turnitinLink)} target="_blank" rel="noreferrer">Buka</a>}
-                </div>
-              </Field>
-              <Field label="Link folder sidang" full>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <input style={{ flex: 1 }} value={j.folderLink || ''} onChange={(e) => setJadwal(ev, 'folderLink', e.target.value)} placeholder="https://drive.google.com/..." />
-                  {j.folderLink && <a className="btn" href={normalizeUrl(j.folderLink)} target="_blank" rel="noreferrer">Buka</a>}
-                </div>
-              </Field>
+              <LinkBerkasRow label="Link Turnitin" url={j.turnitinLink} onUbah={(v) => setJadwal(ev, 'turnitinLink', v)} diperiksa={j.turnitinDiperiksa} onDiperiksa={(v) => setJadwal(ev, 'turnitinDiperiksa', v)} />
+              <LinkBerkasRow label="Link folder sidang" url={j.folderLink} onUbah={(v) => setJadwal(ev, 'folderLink', v)} diperiksa={j.folderDiperiksa} onDiperiksa={(v) => setJadwal(ev, 'folderDiperiksa', v)} />
             </>
           )}
         </div>
@@ -363,11 +334,12 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
     return (
       <FormMahasiswaKP
         m={m} setM={setM} set={set} gantiProgram={gantiProgram} setTahap={setTahap} periodeList={periodeList} daftarAngkatan={daftarAngkatan}
-        roles={roles} pembimbing1Label={pembimbing1Label} penguji1Label={penguji1Label} penguji2Label={penguji2Label} dosenOpts={dosenOpts} stages={stages}
+        roles={roles} pembimbing1Label={pembimbing1Label} penguji1Label={penguji1Label} penguji2Label={penguji2Label} dosenOpts={dosenOpts} bebanBlok={bebanBlok} stages={stages}
         alurTahapBlok={alurTahapBlok} notifikasiBlok={notifikasiBlok} peringatanBlok={peringatanBlok}
         tahapTab={tahapTab} setTahapTab={setTahapTab} p={p} events={events} jadwalBlok={jadwalBlok}
         dosenByKode={dosenByKode} konten={konten} uploadAdminDokumenKP={uploadAdminDokumenKP} hapusAdminDokumenKP={hapusAdminDokumenKP}
-        setPP={setPP} unduhPerpanjanganKP={unduhPerpanjanganKP} dlBusyKP={dlBusyKP} ppBusy={ppBusy} ppErr={ppErr} berikanSuratPerpanjangan={berikanSuratPerpanjangan}
+        unduhPerpanjanganKP={unduhPerpanjanganKP} dlBusyKP={dlBusyKP}
+        verifAwal={awal ? awal.verifikasi : null}
         baru={baru} onCancel={onCancel} submit={submit} navEntri={navEntri} modalOpsi={modalOpsi}
       />
     );
@@ -376,9 +348,10 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
   return (
     <FormMahasiswaGeneric
       m={m} setM={setM} set={set} gantiProgram={gantiProgram} periodeList={periodeList} daftarAngkatan={daftarAngkatan}
-      roles={roles} pembimbing1Label={pembimbing1Label} penguji1Label={penguji1Label} dosenOpts={dosenOpts} stages={stages} events={events} jadwalBlok={jadwalBlok}
+      roles={roles} pembimbing1Label={pembimbing1Label} penguji1Label={penguji1Label} dosenOpts={dosenOpts} bebanBlok={bebanBlok} stages={stages} events={events} jadwalBlok={jadwalBlok}
       alurTahapBlok={alurTahapBlok} notifikasiBlok={notifikasiBlok} peringatanBlok={peringatanBlok} p={p}
-      dosenByKode={dosenByKode} ppBusy={ppBusy} ppErr={ppErr} berikanSuratPerpanjangan={berikanSuratPerpanjangan}
+      dosenByKode={dosenByKode}
+      verifAwal={awal ? awal.verifikasi : null}
       baru={baru} onCancel={onCancel} submit={submit} navEntri={navEntri} modalOpsi={modalOpsi}
     />
   );

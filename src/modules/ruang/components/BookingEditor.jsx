@@ -107,7 +107,7 @@ export function BookingEditor({ data, dosen = [], mahasiswa = [], semester, awal
       <div className="form-grid">
         <Field label="Jenis">
           <select value={f.jenis} onChange={(e) => set('jenis', e.target.value)}>
-            {Object.entries(JENIS_BOOKING).map(([k, v]) => <option key={k} value={k}>{v}{k === 'kuliah' ? ' (berulang tiap pekan)' : ' (sekali, bertanggal)'}</option>)}
+            {Object.entries(JENIS_BOOKING).map(([k, v]) => <option key={k} value={k}>{v}{k === 'kuliah' ? ' (Berulang)' : ''}</option>)}
           </select>
         </Field>
         {seminar && <BookingSeminarFields f={f} set={set} mahasiswa={mahasiswa} />}

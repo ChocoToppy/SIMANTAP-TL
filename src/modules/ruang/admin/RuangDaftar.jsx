@@ -15,13 +15,22 @@ export function RuangDaftar({ data, aksi, onGalat }) {
 
   async function simpan(r) {
     try {
-      await aksi.simpanRuang({ ...r, ...draft[r.id] });
+      const gabung = { ...r, ...draft[r.id] };
+      if (typeof gabung.alias === 'string') gabung.alias = gabung.alias.split(',').map((x) => x.trim()).filter(Boolean);
+      await aksi.simpanRuang(gabung);
       setDraft((d) => { const sisa = { ...d }; delete sisa[r.id]; return sisa; });
     } catch (e) { onGalat(e); }
   }
   async function hapus(r) {
     if (!window.confirm(`Hapus ruang ${r.nama}?`)) return;
     try { await aksi.hapusRuang(r.id); } catch (e) { onGalat(e); }
+  }
+  const kosong = daftar.filter((r) => !dipakai.has(r.id));
+  async function hapusKosong() {
+    if (!window.confirm(`Hapus ${kosong.length} ruang yang tidak punya booking?
+
+${kosong.map((r) => r.nama).join(', ')}`)) return;
+    try { await aksi.hapusBanyakRuang(kosong.map((r) => r.id)); } catch (e) { onGalat(e); }
   }
   async function tambah() {
     const nama = baru.nama.trim();
@@ -36,14 +45,16 @@ export function RuangDaftar({ data, aksi, onGalat }) {
 
   return (
     <div>
+      {kosong.length > 0 && <div className="toolbar"><button className="btn btn-sm" onClick={hapusKosong}>Hapus {kosong.length} ruang tanpa booking</button><span className="hint" style={{ margin: 0 }}>Ruang yang sudah punya booking tidak ikut terhapus.</span></div>}
       <p className="hint">Daftar ruang ini dipakai di seluruh aplikasi. Impor Excel mencocokkan ruang berdasarkan nama persis, dan menambah ruang baru bila belum ada.</p>
       <div className="table-wrap card">
         <table className="tbl">
-          <thead><tr><th>Nama ruang</th><th>Gedung</th><th>Kapasitas</th><th>Jenis</th><th>Aktif</th><th /></tr></thead>
+          <thead><tr><th>Nama ruang</th><th>Nama lain</th><th>Gedung</th><th>Kapasitas</th><th>Jenis</th><th>Aktif</th><th /></tr></thead>
           <tbody>
             {daftar.map((r) => (
               <tr key={r.id}>
                 <td><input value={nilai(r, 'nama')} onChange={(e) => ubah(r, 'nama', e.target.value)} /></td>
+                <td><input value={typeof nilai(r, 'alias') === 'string' ? nilai(r, 'alias') : (r.alias || []).join(', ')} onChange={(e) => ubah(r, 'alias', e.target.value)} placeholder="mis. Ruang Seminar KP" title="Nama lain untuk ruang ini, pisahkan dengan koma. Dipakai mencocokkan jadwal lama." /></td>
                 <td><input value={nilai(r, 'gedung') || ''} onChange={(e) => ubah(r, 'gedung', e.target.value)} style={{ width: 70 }} /></td>
                 <td><input type="number" min="0" value={nilai(r, 'kapasitas') || ''} onChange={(e) => ubah(r, 'kapasitas', e.target.value)} style={{ width: 90 }} /></td>
                 <td>
@@ -58,7 +69,7 @@ export function RuangDaftar({ data, aksi, onGalat }) {
                 </td>
               </tr>
             ))}
-            {daftar.length === 0 && <tr><td colSpan={6} className="muted">Belum ada ruang. Impor Excel akan membuatnya otomatis, atau tambah manual di bawah.</td></tr>}
+            {daftar.length === 0 && <tr><td colSpan={7} className="muted">Belum ada ruang. Impor Excel akan membuatnya otomatis, atau tambah manual di bawah.</td></tr>}
           </tbody>
         </table>
       </div>

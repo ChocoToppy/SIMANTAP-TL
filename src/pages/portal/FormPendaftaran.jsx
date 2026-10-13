@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { buatId, todayISO, tambahHari, catatAktivitas, ringkasPerubahanPendaftaran, KLASIFIKASI, programLabel, dosenAktifUntuk } from '../../utils/helpers.js';
+import { buatId, idPengajuan, todayISO, tambahHari, catatAktivitas, ringkasPerubahanPendaftaran, KLASIFIKASI, programLabel, dosenAktifUntuk } from '../../utils/helpers.js';
 import { kpTemaUntukPilihan, bidangUntukPilihan, kodeKpTemaPertama, kodeBidangPertama, adalahKodeKpTema } from '../../utils/pilihan.js';
-import { Field } from '../../components/ui.jsx';
+import { Field, KepalaForm } from '../../components/ui.jsx';
 import { META, BUTIR_SYARAT, kunciProgram, gayaKP, urutanForm, medanForm, galatWajib } from '../../utils/formPendaftaran.js';
 import { PROGRAM_KEYS_PENDAFTARAN } from './shared.js';
 
@@ -9,11 +9,14 @@ import { PROGRAM_KEYS_PENDAFTARAN } from './shared.js';
 // dirender apa adanya (kontrol dinonaktifkan, tanpa tombol), tiap field dibungkus
 // tombol pilih supaya admin mengeditnya langsung di tampilan yang dilihat mahasiswa.
 // { program, jenisMagang, terpilih, onPilih(id) }
-export function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], angkatanAktif = [], konten = {}, pratinjau, onCancel, onSave }) {
+export function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], angkatanAktif = [], konten = {}, programTerpakai = [], pratinjau, onCancel, onSave }) {
   const baru = pratinjau ? true : !awal;
+  // Satu pengajuan per program: program yang sudah punya pengajuan tetap tampil di
+  // pilihan tapi tidak bisa dipilih (hapus dulu pengajuan lamanya).
+  const programBebas = PROGRAM_KEYS_PENDAFTARAN.find((k) => !programTerpakai.includes(k));
   const [m, setM] = useState(() =>
     awal || {
-      id: buatId(), program: pratinjau ? pratinjau.program : (PROGRAM_KEYS_PENDAFTARAN[0] || 'TA'), nama, nim, owner: nim,
+      id: buatId(), program: pratinjau ? pratinjau.program : (programBebas || PROGRAM_KEYS_PENDAFTARAN[0] || 'TA'), nama, nim, owner: nim,
       ...(pratinjau && pratinjau.jenisMagang ? { jenisMagang: pratinjau.jenisMagang } : {}),
       judul: '', periode: periodeBuka[0] || '', angkatan: '', klasifikasi: 'Penelitian',
       bidang: pratinjau && (pratinjau.program === 'KP' || pratinjau.program === 'MG') ? kodeKpTemaPertama() : 'U',
@@ -63,8 +66,9 @@ export function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], a
     if (!m.periode) { setErr('Pilih periode pendaftaran terlebih dahulu.'); return; }
     const galat = galatWajib(kunci, m, konten);
     if (galat) { setErr(galat); return; }
+    if (baru && programTerpakai.includes(m.program)) { setErr(`Kamu sudah punya pengajuan ${programLabel(m.program)}. Hapus pengajuan lama dulu untuk membuat yang baru.`); return; }
     setErr('');
-    const rec = { ...m, angkatan: Number(m.angkatan) || m.angkatan, verifikasi: 'baru' };
+    const rec = { ...m, angkatan: Number(m.angkatan) || m.angkatan, verifikasi: 'baru', ...(baru ? { id: idPengajuan(nim, m.program) } : {}) };
     const catatan = baru ? '' : ringkasPerubahanPendaftaran(awal, rec).join(', ');
     onSave(catatAktivitas(rec, baru ? 'daftar' : 'perbaikan', catatan));
   }
@@ -105,7 +109,10 @@ export function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], a
       case 'program':
         return bungkus(id, () => (
           <select value={m.program} onChange={(e) => gantiProgram(e.target.value)} disabled={!baru}>
-            {programOpsi.map((k) => <option key={k} value={k}>{programLabel(k)}</option>)}
+            {programOpsi.map((k) => {
+              const terpakai = baru && programTerpakai.includes(k);
+              return <option key={k} value={k} disabled={terpakai}>{programLabel(k)}{terpakai ? ' (sudah ada pengajuan)' : ''}</option>;
+            })}
           </select>
         ));
       case 'jenis':
@@ -198,7 +205,7 @@ export function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], a
 
   return (
     <div className="portal-form card">
-      <h2 className="page-title">{baru ? 'Ajukan pendaftaran' : 'Edit pendaftaran'}</h2>
+      <KepalaForm title={baru ? 'Ajukan pendaftaran' : 'Edit pendaftaran'} onClose={pratinjau ? undefined : onCancel} />
       {pratinjau ? (
         <fieldset disabled className="ff-fieldset"><div className="form-grid">{urutan.map((id) => slot(id))}</div></fieldset>
       ) : (
