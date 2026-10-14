@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { catatAktivitas, dokumenConfigFor, dokumenFieldFor, eventAktif, programOf, programLabel } from '../utils/helpers.js';
+import { catatAktivitas, tandaiMenungguVerifikasi, dokumenConfigFor, dokumenFieldFor, eventAktif, programOf, programLabel } from '../utils/helpers.js';
 import { PROGRAM_KEYS_PENDAFTARAN } from './portal/shared.js';
 import { Empty, TextSizeToggle, ThemeToggle, TabIcon } from '../components/ui.jsx';
 import { readFileForUpload } from '../utils/fileUpload.js';
@@ -34,6 +34,9 @@ export function Portal({ nim, nama, email, mahasiswa, allDosen, periodeBuka = []
   const [view, setView] = useState({ mode: 'list' });
 
   function simpan(rec) { onSave(rec); setView({ mode: 'list' }); }
+  // Kiriman yang perlu diperiksa admin (usulan jadwal, berkas sidang,
+  // perpanjangan) → status kembali "Menunggu verifikasi".
+  function simpanAjuan(rec) { simpan(tandaiMenungguVerifikasi(rec)); }
 
   async function uploadDokumenKP(m, key, file) {
     const hasil = await readFileForUpload(file, `${m.id}/${key}`);
@@ -41,9 +44,16 @@ export function Portal({ nim, nama, email, mahasiswa, allDosen, periodeBuka = []
     const label = ((dokumenConfigFor(programOf(m), m) || []).find((d) => d.key === key) || {}).label || key;
     let rec = { ...m, [field]: { ...(m[field] || {}), [key]: hasil } };
     rec = catatAktivitas(rec, 'unggah', label);
+    // Surat balasan → Bimbingan dan menunggu admin menetapkan pembimbing.
     if (['suratBalasan', 'suratBalasanMagang', 'suratBalasanMkt'].includes(key) && m.tahap === 'Pendaftaran') {
       rec = { ...rec, tahap: 'Bimbingan' };
       rec = catatAktivitas(rec, 'tahapBimbingan');
+      rec = tandaiMenungguVerifikasi(rec);
+    }
+    // Lembar pengesahan → Pembukuan langsung, tanpa verifikasi admin.
+    if (key === 'lembarPengesahanKP' && m.tahap === 'Bimbingan') {
+      rec = { ...rec, tahap: 'Pembukuan' };
+      rec = catatAktivitas(rec, 'tahapPembukuan');
     }
     onSave(rec);
   }
@@ -62,11 +72,12 @@ export function Portal({ nim, nama, email, mahasiswa, allDosen, periodeBuka = []
     onSave(rec);
   }
 
-  // Tautan yang dikirim dari halaman dokumen (saat ini hanya bukti Pembukuan KP
-  // → m.pembukuan.berkasLink). Tetap di halaman dokumen setelah tersimpan.
+  // Tautan yang dikirim dari halaman dokumen (saat ini hanya folder berkas final
+  // KP → m.pembukuan.berkasLink). Mencabut centang "Sudah diperiksa" supaya admin
+  // memeriksa ulang sebelum surat selesai pembukuan terbuka (pembukuanDisetujui).
   function kirimTautan(m, field, url) {
-    const rec = { ...m, [field]: { ...(m[field] || {}), berkasLink: url } };
-    onSave(catatAktivitas(rec, field));
+    const rec = { ...m, [field]: { ...(m[field] || {}), berkasLink: url, berkasDiperiksa: false } };
+    onSave(tandaiMenungguVerifikasi(catatAktivitas(rec, field)));
   }
 
   const editing = view.id ? mine.find((m) => m.id === view.id) : null;
@@ -149,11 +160,11 @@ export function Portal({ nim, nama, email, mahasiswa, allDosen, periodeBuka = []
             )}
 
             {view.mode === 'jadwal' && editing && (
-              <FormJadwalMhs awal={editing} ev={view.ev || eventAktif(editing)} konten={konten} jadwalRuang={jadwalRuang} onCancel={() => setView({ mode: 'list' })} onSave={simpan} />
+              <FormJadwalMhs awal={editing} ev={view.ev || eventAktif(editing)} konten={konten} jadwalRuang={jadwalRuang} onCancel={() => setView({ mode: 'list' })} onSave={simpanAjuan} />
             )}
 
             {(view.mode === 'pp-minta' || view.mode === 'pp-final') && editing && (
-              <FormPerpanjangan awal={editing} allDosen={allDosen} mode={view.mode === 'pp-final' ? 'final' : 'minta'} onCancel={() => setView({ mode: 'list' })} onSave={simpan} />
+              <FormPerpanjangan awal={editing} allDosen={allDosen} mode={view.mode === 'pp-final' ? 'final' : 'minta'} onCancel={() => setView({ mode: 'list' })} onSave={simpanAjuan} />
             )}
           </>
         )}

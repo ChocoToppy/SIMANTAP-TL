@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { dokumenStatus, perpanjanganDocType, statusVerif, kondisi, programOf, eventAktifAwal, bolehAjukanJadwal, formatTanggal, jamTampil, bidangLabel, programLabel, programDisplayLabel, jenisMagangOf, normalizeUrl, judulLabelFor } from '../../utils/helpers.js';
+import { dokumenStatus, perpanjanganDocType, statusVerif, pernahDiverifikasi, bolehAksesBerkas, pembukuanDisetujui, kondisi, programOf, eventAktifAwal, bolehAjukanJadwal, formatTanggal, jamTampil, bidangLabel, programLabel, programDisplayLabel, jenisMagangOf, normalizeUrl, judulLabelFor } from '../../utils/helpers.js';
 import { Badge, StageBar, StageStepper } from '../../components/ui.jsx';
 import { IkonLanjut, IkonMap } from '../../components/DokIkon.jsx';
 import { generateDocument, getTemplateConfig } from '../../utils/documentGenerator.js';
@@ -12,7 +12,9 @@ import { panduanUntukProgram } from './shared.js';
 export function KartuPengajuan({ m, allDosen = [], konten = {}, panduan = [], onEdit, onHapus, onJadwal, onPerpanjangan, onDokumen }) {
   const v = statusVerif(m);
   const k = kondisi(m);
-  const terverifikasi = v.key === 'terverifikasi';
+  // Akses tombol/aksi mengikuti "pernah terverifikasi"; badge tetap status saat
+  // ini (kembali "Menunggu verifikasi" tiap ada kiriman baru, lihat helpers.js).
+  const aktif = pernahDiverifikasi(m);
   const program = programOf(m);
   const isMG = program === 'MG';
   // Magang/MKT: begitu dokumen Persetujuan tahap Bimbingan diunggah,
@@ -32,7 +34,11 @@ export function KartuPengajuan({ m, allDosen = [], konten = {}, panduan = [], on
   const jadwalTeks = [jEv.tanggal ? formatTanggal(jEv.tanggal) : null, jamTampil(jEv), jEv.ruang].filter(Boolean).join(' · ');
   const panduanRelevan = panduanUntukProgram(panduan, program);
   const lulus = k.key === 'lulus';
-  const pembukuan = program === 'KP' && m.tahap === 'Pembukuan' ? (m.pembukuan || {}) : null;
+  // Langkah KP tanpa jadwal: Bimbingan → unggah lembar pengesahan (membuka
+  // Pembukuan), Pembukuan → kirim tautan folder → disetujui admin.
+  const langkahKP = program === 'KP' && (m.tahap === 'Bimbingan' || m.tahap === 'Pembukuan')
+    ? { tahap: m.tahap, linkTerkirim: !!(m.pembukuan || {}).berkasLink, disetujui: pembukuanDisetujui(m) }
+    : null;
   const adaDokumen = ['KP', 'MG', 'TA'].includes(program);
 
   return (
@@ -61,15 +67,15 @@ export function KartuPengajuan({ m, allDosen = [], konten = {}, panduan = [], on
 
       <div className="stage-desktop"><StageBar program={program} tahap={m.tahap} /></div>
       <div className="stage-mobile"><StageStepper program={program} tahap={m.tahap} /></div>
-      {!terverifikasi && !lulus && (
+      {!aktif && !lulus && (
         <div className="cell-sub">Batas: {formatTanggal(m.batasAkhir)} · <Badge tone={k.tone}>{k.label}</Badge></div>
       )}
 
       <StatusTahap
-        v={v} terverifikasi={terverifikasi} lulus={lulus} tanggalLulus={m.tanggalLulus}
+        v={v} aktif={aktif} lulus={lulus} tanggalLulus={m.tanggalLulus}
         evA={evA} jEv={jEv} sidang={sidang} disetujui={disetujui} adaUsulan={adaUsulan}
-        bolehAjukan={bolehAjukan} jadwalTeks={jadwalTeks} onJadwal={onJadwal}
-        pembukuan={pembukuan} onPembukuan={onDokumen}
+        bolehAjukan={bolehAjukan} jadwalTeks={jadwalTeks} onJadwal={onJadwal} terkunci={!bolehAksesBerkas(m)}
+        langkahKP={langkahKP} onDokumen={onDokumen}
       />
 
       {m.catatan && (
@@ -89,13 +95,13 @@ export function KartuPengajuan({ m, allDosen = [], konten = {}, panduan = [], on
         <BarisDokumen m={m} program={program} konten={konten} onClick={onDokumen} />
       )}
 
-      {adaDokumen && terverifikasi && !lulus && (
+      {adaDokumen && aktif && !lulus && (
         <Perpanjangan m={m} dosenByKode={dosenByKode} onPerpanjangan={onPerpanjangan} />
       )}
 
       <div className="kartu-aksi">
         <button className="btn" onClick={onEdit}>Edit pendaftaran</button>
-        {!terverifikasi && !m.pernahTerverifikasi && onHapus && <button className="btn btn-red" onClick={onHapus}>Hapus pengajuan</button>}
+        {!aktif && onHapus && <button className="btn btn-red" onClick={onHapus}>Hapus pengajuan</button>}
       </div>
     </div>
   );
@@ -104,31 +110,45 @@ export function KartuPengajuan({ m, allDosen = [], konten = {}, panduan = [], on
 // Status tahap saat ini beserta satu tombol aksi utamanya (ajukan jadwal /
 // unggah berkas sidang), supaya "apa yang harus dilakukan sekarang" tidak
 // terpisah jauh dari tombolnya.
-function StatusTahap({ v, terverifikasi, lulus, tanggalLulus, evA, jEv, sidang, disetujui, adaUsulan, bolehAjukan, jadwalTeks, onJadwal, pembukuan, onPembukuan }) {
+function StatusTahap({ v, aktif, lulus, tanggalLulus, evA, jEv, sidang, disetujui, adaUsulan, bolehAjukan, jadwalTeks, onJadwal, langkahKP, onDokumen, terkunci }) {
   let pesan = null;
-  if (terverifikasi && pembukuan) {
+  // "Perlu perbaikan": semua kiriman & unduhan dikunci sampai pendaftaran dibetulkan.
+  if (aktif && terkunci && !lulus) {
     return (
       <div className="kartu-status">
-        {pembukuan.berkasLink
-          ? <div className="callout">Bukti pembukuan terkirim, menunggu diperiksa admin.</div>
-          : <div className="callout">Tahap saat ini: <strong>Pembukuan</strong>. Kirim tautan bukti bahwa laporan KP sudah diarsipkan dan ditandatangani.</div>}
-        <button className="btn btn-primary" onClick={onPembukuan}>
-          {pembukuan.berkasLink ? 'Perbarui bukti pembukuan' : 'Kirim bukti pembukuan'}
-        </button>
+        <div className="callout callout-red"><strong>Perlu perbaikan.</strong> Unggah, unduh, dan pengajuan dikunci sampai data pendaftaran dibetulkan sesuai pesan admin lewat "Edit pendaftaran".</div>
+      </div>
+    );
+  }
+  if (aktif && langkahKP && !lulus) {
+    let teks;
+    if (langkahKP.tahap === 'Bimbingan') {
+      teks = <div className="callout">Unduh dan tanda tangani <strong>Lembar Pengesahan KP</strong>, lalu unggah pindaiannya untuk masuk ke tahap Pembukuan.</div>;
+    } else if (langkahKP.disetujui) {
+      teks = <div className="callout callout-green"><strong>Pembukuan disetujui admin.</strong> Surat keterangan selesai pembukuan ada di halaman dokumen.</div>;
+    } else if (langkahKP.linkTerkirim) {
+      teks = <div className="callout">Tautan folder berkas final terkirim, menunggu diperiksa admin.</div>;
+    } else {
+      teks = <div className="callout">Tahap saat ini: <strong>Pembukuan</strong>. Kirim tautan folder Google Drive berisi berkas final KP.</div>;
+    }
+    return (
+      <div className="kartu-status">
+        {teks}
+        <button className="btn btn-primary" onClick={onDokumen}>Buka dokumen {langkahKP.tahap}</button>
       </div>
     );
   }
   if (lulus) {
     pesan = <div className="callout callout-green"><strong>Lulus.</strong>{tanggalLulus ? ` Tanggal lulus: ${formatTanggal(tanggalLulus)}` : ''}</div>;
-  } else if (v.key === 'baru') {
+  } else if (!aktif && v.key === 'baru') {
     pesan = <div className="callout">Pendaftaran sedang menunggu diperiksa admin.</div>;
-  } else if (terverifikasi && !evA) {
+  } else if (aktif && !evA) {
     pesan = <div className="hint">Menunggu proses admin.</div>;
-  } else if (terverifikasi && sidang) {
+  } else if (aktif && sidang) {
     pesan = jEv.tanggal
       ? <div className={'callout ' + (disetujui ? 'callout-green' : 'callout-amber')}><strong>Jadwal Sidang ({disetujui ? 'final' : 'perkiraan'}):</strong> {jadwalTeks}</div>
       : <div className="callout">Menunggu admin menetapkan jadwal sidang.</div>;
-  } else if (terverifikasi) {
+  } else if (aktif) {
     if (disetujui) pesan = <div className="callout callout-green"><strong>Jadwal {evA} (disetujui admin):</strong> {jadwalTeks}</div>;
     else if (adaUsulan) pesan = <div className="callout">Usulan jadwal {evA} terkirim, menunggu verifikasi admin.</div>;
     else if (bolehAjukan) pesan = <div className="callout">Tahap saat ini: <strong>{evA}</strong>. Setelah sepakat dengan dosen, ajukan jadwalnya.</div>;
@@ -136,7 +156,7 @@ function StatusTahap({ v, terverifikasi, lulus, tanggalLulus, evA, jEv, sidang, 
   }
 
   let aksi = null;
-  if (terverifikasi && evA && bolehAjukan && !lulus) {
+  if (aktif && evA && bolehAjukan && !lulus) {
     aksi = sidang ? (
       <button className="btn btn-primary" onClick={() => onJadwal(evA)}>
         {jEv.berkasLink ? 'Perbarui draft & berkas sidang' : 'Unggah draft & berkas sidang'}
@@ -168,8 +188,8 @@ function BarisDokumen({ m, program, konten, onClick }) {
   const semua = dokumenStatus(program, m, konten);
   if (semua.length === 0) return null;
   const terunggah = semua.filter((d) => d.upload).length;
-  const siapUnduh = semua.filter((d) => d.docType && d.eligible).length;
-  const ringkas = [`${terunggah} berkas terunggah`, siapUnduh > 0 ? `${siapUnduh} siap diunduh` : null].filter(Boolean).join(' · ');
+  const siapUnduh = bolehAksesBerkas(m) ? semua.filter((d) => d.docType && d.eligible).length : 0;
+  const ringkas = [`${terunggah} berkas terunggah`, siapUnduh > 0 ? `${siapUnduh} siap diunduh` : null, !bolehAksesBerkas(m) && pernahDiverifikasi(m) ? 'unduhan dikunci' : null].filter(Boolean).join(' · ');
   return (
     <button type="button" className="kartu-dok-entry" onClick={onClick}>
       <span className="kartu-dok-ikon"><IkonMap /></span>
@@ -220,8 +240,8 @@ function Perpanjangan({ m, dosenByKode, onPerpanjangan }) {
     return (
       <div className="callout">
         <div>Surat perpanjangan sudah tersedia. Unduh, tanda tangani, lalu unggah kembali.</div>
-        <button className="btn perpanjangan-btn" onClick={unduhSurat} disabled={dlBusy}>{dlBusy ? 'Menyiapkan PDF…' : `Unduh surat perpanjangan ${programDisplayLabel(m)} (PDF)`}</button>{' '}
-        <button className="btn perpanjangan-btn" onClick={() => onPerpanjangan('final')}>Unggah surat final (ditandatangani)</button>
+        <button className="btn perpanjangan-btn" onClick={unduhSurat} disabled={dlBusy || !bolehAksesBerkas(m)} title={bolehAksesBerkas(m) ? undefined : 'Unduhan dikunci: perbaiki data pendaftaran sesuai pesan admin terlebih dahulu.'}>{dlBusy ? 'Menyiapkan PDF…' : `Unduh surat perpanjangan ${programDisplayLabel(m)} (PDF)`}</button>{' '}
+        <button className="btn perpanjangan-btn" onClick={() => onPerpanjangan('final')} disabled={!bolehAksesBerkas(m)}>Unggah surat final (ditandatangani)</button>
       </div>
     );
   }
@@ -229,7 +249,7 @@ function Perpanjangan({ m, dosenByKode, onPerpanjangan }) {
   return (
     <div className="callout callout-green">
       Perpanjangan selesai. Surat final: <a href={finalHref} target="_blank" rel="noreferrer">buka</a>{' '}
-      <button className="btn btn-sm perpanjangan-btn" onClick={() => onPerpanjangan('final')}>Ganti surat final</button>
+      <button className="btn btn-sm perpanjangan-btn" onClick={() => onPerpanjangan('final')} disabled={!bolehAksesBerkas(m)}>Ganti surat final</button>
     </div>
   );
 }

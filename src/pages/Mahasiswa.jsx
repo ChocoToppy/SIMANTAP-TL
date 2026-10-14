@@ -179,9 +179,10 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
   }, [mahasiswa, programTab, q, fAngkatan, fBidang, fStatus, fVerif, fDosen, sortBy, sortDir, nomorUrut, groupMode]);
 
   const notif = useMemo(() => {
-    let baru = 0, perluJadwal = 0, perluHasil = 0, bentrok = 0, kelompok = 0;
+    let baru = 0, kiriman = 0, perluJadwal = 0, perluHasil = 0, bentrok = 0, kelompok = 0;
     mahasiswa.forEach((m) => {
-      if (statusVerif(m).key === 'baru') baru++;
+      // Menunggu verifikasi: pendaftaran yang belum pernah diverifikasi vs kiriman baru (unggah/jadwal/tautan) dari mahasiswa yang sudah berjalan.
+      if (statusVerif(m).key === 'baru') { if (m.pernahTerverifikasi) kiriman++; else baru++; }
       const evA = eventAktif(m);
       if (evA) {
         const j = (m.jadwal || {})[evA] || {};
@@ -192,7 +193,7 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
       if (cb.bentrok.length) bentrok++;
       if (cb.kelompok.length) kelompok++;
     });
-    return { baru, perluJadwal, perluHasil, bentrok, kelompok };
+    return { baru, kiriman, perluJadwal, perluHasil, bentrok, kelompok };
   }, [mahasiswa]);
 
   // Paginasi — pencarian/filter (di atas) selalu jalan di atas SELURUH `mahasiswa`,
@@ -352,9 +353,10 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
         </button>
       </div>
 
-      {(notif.baru + notif.perluJadwal + notif.perluHasil + notif.bentrok + notif.kelompok) > 0 && (
+      {(notif.baru + notif.kiriman + notif.perluJadwal + notif.perluHasil + notif.bentrok + notif.kelompok) > 0 && (
         <div className="callout" style={{ marginBottom: 12 }}>
           🔔 {notif.baru > 0 && <span><strong>{notif.baru}</strong> pendaftaran baru perlu diperiksa &amp; pembimbing. </span>}
+          {notif.kiriman > 0 && <span><strong>{notif.kiriman}</strong> kiriman baru dari mahasiswa perlu diverifikasi. </span>}
           {notif.perluJadwal > 0 && <span><strong>{notif.perluJadwal}</strong> usulan jadwal perlu diverifikasi. </span>}
           {notif.perluHasil > 0 && <span><strong>{notif.perluHasil}</strong> menunggu hasil (lulus/tidak lulus). </span>}
           {notif.bentrok > 0 && <span>⚠ <strong>{notif.bentrok}</strong> jadwal berpotensi bentrok (tidak mengunci). </span>}

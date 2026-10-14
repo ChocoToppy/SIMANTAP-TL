@@ -258,6 +258,31 @@ export function statusVerif(m) {
   return { key, label: VERIFIKASI[key].label, tone: VERIFIKASI[key].tone };
 }
 
+// Status verifikasi = antrean pekerjaan admin. Hanya kiriman yang menuntut
+// tindakan admin yang mengembalikan status ke "Menunggu verifikasi"
+// (tandaiMenungguVerifikasi): surat balasan (admin menetapkan pembimbing),
+// tautan folder Pembukuan KP (admin menyetujui), usulan jadwal/berkas sidang,
+// dan perpanjangan. Unggahan biasa (mis. lembar pengesahan, yang langsung
+// memindahkan KP ke Pembukuan) tidak. Akses fitur mengikuti pernahDiverifikasi,
+// bukan status saat ini, supaya mahasiswa tidak terkunci selama menunggu.
+export function pernahDiverifikasi(m) {
+  return m.verifikasi === 'terverifikasi' || !!m.pernahTerverifikasi;
+}
+// Unduh template & kirim berkas/tautan (sisi mahasiswa): dikunci saat "Perlu
+// perbaikan" sampai data pendaftaran dibetulkan, karena data yang tercetak di
+// dokumen (mis. judul) mungkin masih salah. Sama dengan perbaikanTerkunci di
+// firestore.rules dan storage.rules.
+export function bolehAksesBerkas(m) {
+  return pernahDiverifikasi(m) && statusVerif(m).key !== 'perbaikan';
+}
+export function tandaiMenungguVerifikasi(rec) {
+  return {
+    ...rec,
+    verifikasi: 'baru',
+    ...(rec.verifikasi === 'terverifikasi' ? { pernahTerverifikasi: true } : {}),
+  };
+}
+
 // Tambah n hari ke 'YYYY-MM-DD'
 export function tambahHari(iso, n) {
   const d = iso ? new Date(iso) : new Date();
@@ -835,9 +860,9 @@ export function normalizeUrl(url) {
   return `https://${trimmed}`;
 }
 
-// Apakah mahasiswa boleh mengajukan jadwal (terverifikasi & sudah ada pembimbing).
+// Apakah mahasiswa boleh mengajukan jadwal (pernah terverifikasi & sudah ada pembimbing).
 export function bolehAjukanJadwal(m) {
-  return statusVerif(m).key === 'terverifikasi' && !!(m.pembimbing1 || m.pembimbing2);
+  return pernahDiverifikasi(m) && !!(m.pembimbing1 || m.pembimbing2);
 }
 
 // ===================== Dokumen KP per-tahap (generate & unggah) =====================
@@ -847,25 +872,25 @@ export const KP_DOKUMEN = [
   {
     key: 'kelayakanKP', stage: 'Pendaftaran', label: 'Surat Kelayakan KP', docType: 'Kelayakan KP',
     syarat: 'Tersedia setelah pendaftaran diverifikasi admin. Unduh, tanda tangani, lalu unggah kembali.',
-    eligible: (m) => statusVerif(m).key === 'terverifikasi',
+    eligible: pernahDiverifikasi,
   },
   {
     key: 'kelayakanProposalKP', stage: 'Pendaftaran', label: 'Surat Kelayakan Proposal KP', docType: 'Kelayakan Proposal KP',
     syarat: 'Tersedia setelah pendaftaran diverifikasi admin. Unduh, tanda tangani, lalu unggah kembali.',
-    eligible: (m) => statusVerif(m).key === 'terverifikasi',
+    eligible: pernahDiverifikasi,
   },
   {
     key: 'permohonan', stage: 'Pendaftaran', label: 'Permohonan KP', docType: null,
     syarat: 'Tersedia setelah pendaftaran diverifikasi admin.',
     catatan: 'Unggah berkas permohonan dari perusahaan tempat Anda diterima KP.',
-    eligible: (m) => statusVerif(m).key === 'terverifikasi',
+    eligible: pernahDiverifikasi,
     linkEksternal: 'https://mandala.undip.ac.id/',
     linkLabel: 'Untuk membuat formulir Permohonan KP silahkan kunjungi Mandala UNDIP',
   },
   {
     key: 'suratBalasan', stage: 'Pendaftaran', label: 'Surat Balasan Perusahaan', docType: null,
     syarat: 'Unggah bukti diterima magang/KP dari perusahaan setelah pendaftaran diverifikasi admin.',
-    eligible: (m) => statusVerif(m).key === 'terverifikasi',
+    eligible: pernahDiverifikasi,
   },
   {
     key: 'stPembimbing', stage: 'Bimbingan', label: 'ST Pembimbing KP', docType: 'ST Pembimbing KP',
@@ -874,14 +899,66 @@ export const KP_DOKUMEN = [
     studentUpload: false,
   },
   {
-    // Bukan berkas: mahasiswa mengirim tautan Google Drive, disimpan di
+    // Template diunduh sebagai Word (bisa diedit), yang diunggah kembali
+    // adalah pindaian PDF bertanda tangan. Unggahan ini memindahkan mahasiswa
+    // dari Bimbingan ke Pembukuan (uploadDokumenKP di Portal.jsx).
+    key: 'lembarPengesahanKP', stage: 'Bimbingan', label: 'Lembar Pengesahan KP', docType: 'Lembar Pengesahan KP',
+    syarat: 'Tersedia setelah tahap Bimbingan dimulai dan admin menetapkan dosen pembimbing.',
+    catatan: 'Unduh template Word, lengkapi, cetak dan tanda tangani, lalu unggah hasil pindaiannya dalam format PDF. Setelah terunggah, Anda masuk ke tahap Pembukuan.',
+    catatanAdminSaja: true, // tidak ditampilkan di halaman dokumen mahasiswa
+    eligible: (m) => tahapIndex('KP', m.tahap) >= tahapIndex('KP', 'Bimbingan') && !!m.pembimbing1,
+  },
+  {
+    // Menggantikan BA Seminar KP. Dinilai dosen pembimbing di kertas lalu
+    // dikembalikan ke admin, jadi hanya admin yang mengunggah hasilnya.
+    key: 'penilaianKP', stage: 'Bimbingan', label: 'Berita Acara & Penilaian KP', docType: 'Penilaian KP',
+    syarat: 'Tersedia setelah tahap Bimbingan dimulai dan admin menetapkan dosen pembimbing.',
+    catatan: 'Unduh, serahkan ke dosen pembimbing untuk dinilai, lalu kembalikan ke admin.',
+    catatanAdminSaja: true,
+    eligible: (m) => tahapIndex('KP', m.tahap) >= tahapIndex('KP', 'Bimbingan') && !!m.pembimbing1,
+    studentUpload: false, adminUpload: true,
+  },
+  {
+    // Bukan berkas: mahasiswa mengirim tautan folder Google Drive, disimpan di
     // m.pembukuan.berkasLink (linkField). Hanya bisa diisi saat tahap Pembukuan.
-    key: 'pembukuan', stage: 'Pembukuan', label: 'Bukti Pembukuan KP', docType: null,
+    // Mengirim tautan mengembalikan status ke "Menunggu verifikasi" (kirimTautan di Portal.jsx).
+    key: 'pembukuan', stage: 'Pembukuan', label: 'Folder Berkas Final KP', docType: null,
     syarat: 'Tersedia saat tahap Pembukuan dimulai.',
-    catatan: 'Tautan Google Drive berisi bukti bahwa laporan KP sudah diarsipkan dan ditandatangani.',
+    catatan: 'Tautan folder Google Drive berisi berkas final Kerja Praktik.',
     eligible: (m) => m.tahap === 'Pembukuan',
     studentUpload: false, linkInput: true, linkField: 'pembukuan',
   },
+  {
+    // Template menyusul: selama getTemplateConfig belum punya case ini,
+    // dokumen tampil "Template surat belum tersedia" walau sudah eligible.
+    key: 'suratPembukuanKP', stage: 'Pembukuan', label: 'Surat Keterangan Selesai Pembukuan', docType: 'Surat Pembukuan KP',
+    syarat: 'Tersedia setelah admin memverifikasi tautan folder berkas final.',
+    eligible: (m) => pembukuanDisetujui(m),
+    studentUpload: false,
+  },
+];
+
+// Pembukuan KP disetujui admin: status Terverifikasi + centang "Sudah
+// diperiksa" pada tautan folder. Membuka Surat Keterangan Selesai Pembukuan.
+export function pembukuanDisetujui(m) {
+  const p = m.pembukuan || {};
+  return programOf(m) === 'KP' && statusVerif(m).key === 'terverifikasi' && !!p.berkasLink && p.berkasDiperiksa === true;
+}
+
+// Petunjuk folder berkas final KP (tahap Pembukuan). Mahasiswa melihat format
+// nama + daftar berkas, admin hanya daftar berkas (lihat PetunjukPembukuan.jsx).
+export const PEMBUKUAN_FORMAT_NAMA = {
+  pola: 'NamaLengkap_NIM_JenisDokumen',
+  contoh: ['BudiSetiawan_123456789_LaporanKerjaPraktik', 'BudiSetiawan_123456789_Jurnal', 'BudiSetiawan_123456789_PPT'],
+};
+export const PEMBUKUAN_SYARAT_LAPORAN = 'Final Laporan Kerja Praktik (Word dan PDF) wajib sudah memuat Lembar Pengesahan yang telah ditandatangani di dalamnya.';
+export const PEMBUKUAN_DAFTAR_BERKAS = [
+  'Final Laporan Kerja Praktik (Word)',
+  'Final Laporan Kerja Praktik (PDF)',
+  'Final Jurnal Kerja Praktik (Word)',
+  'Final Jurnal Kerja Praktik (PDF)',
+  'Final PPT Kerja Praktik (PPT)',
+  'Final PPT Kerja Praktik (PDF)',
 ];
 
 // Deskripsi dokumen per-tahap untuk Magang — sama pola & tahapan dengan
@@ -892,25 +969,25 @@ export const MAGANG_DOKUMEN = [
   {
     key: 'kelayakanMagang', stage: 'Pendaftaran', label: 'Surat Kelayakan Magang', docType: 'Kelayakan Magang',
     syarat: 'Tersedia setelah pendaftaran diverifikasi admin. Unduh, tanda tangani, lalu unggah kembali.',
-    eligible: (m) => statusVerif(m).key === 'terverifikasi',
+    eligible: pernahDiverifikasi,
   },
   {
     key: 'kelayakanProposalMagang', stage: 'Pendaftaran', label: 'Surat Kelayakan Proposal Magang', docType: 'Kelayakan Proposal Magang',
     syarat: 'Tersedia setelah pendaftaran diverifikasi admin. Unduh, tanda tangani, lalu unggah kembali.',
-    eligible: (m) => statusVerif(m).key === 'terverifikasi',
+    eligible: pernahDiverifikasi,
   },
   {
     key: 'permohonanMagang', stage: 'Pendaftaran', label: 'Permohonan Magang', docType: null,
     syarat: 'Tersedia setelah pendaftaran diverifikasi admin.',
     catatan: 'Unggah berkas permohonan dari perusahaan/instansi tempat Anda diterima Magang.',
-    eligible: (m) => statusVerif(m).key === 'terverifikasi',
+    eligible: pernahDiverifikasi,
     linkEksternal: 'https://mandala.undip.ac.id/',
     linkLabel: 'Untuk membuat formulir Permohonan Magang silahkan kunjungi Mandala UNDIP',
   },
   {
     key: 'suratBalasanMagang', stage: 'Pendaftaran', label: 'Surat Balasan Perusahaan', docType: null,
     syarat: 'Unggah bukti diterima magang dari perusahaan/instansi setelah pendaftaran diverifikasi admin.',
-    eligible: (m) => statusVerif(m).key === 'terverifikasi',
+    eligible: pernahDiverifikasi,
   },
   {
     key: 'stPembimbingMagang', stage: 'Bimbingan', label: 'ST Pembimbing Magang', docType: 'ST Pembimbing Magang',
@@ -931,7 +1008,7 @@ export const MAGANG_DOKUMEN = [
   {
     key: 'monevMagang', stage: 'Bimbingan', label: 'Dokumen Monev', docType: null,
     syarat: 'Tautan Dokumen Monev belum diatur admin.',
-    eligible: (m) => statusVerif(m).key === 'terverifikasi',
+    eligible: pernahDiverifikasi,
     studentUpload: false, adminUpload: false,
     linkEksternal: '', linkLabel: 'Dokumen Monev', linkConfigurable: true, linkButton: true,
   },
@@ -954,25 +1031,25 @@ export const MKT_DOKUMEN = [
   {
     key: 'kelayakanMkt', stage: 'Pendaftaran', label: 'Surat Kelayakan MKT', docType: 'Kelayakan Magang',
     syarat: 'Tersedia setelah pendaftaran diverifikasi admin. Unduh, tanda tangani, lalu unggah kembali.',
-    eligible: (m) => statusVerif(m).key === 'terverifikasi',
+    eligible: pernahDiverifikasi,
   },
   {
     key: 'kelayakanProposalMkt', stage: 'Pendaftaran', label: 'Surat Kelayakan Proposal MKT', docType: 'Kelayakan Proposal Magang',
     syarat: 'Tersedia setelah pendaftaran diverifikasi admin. Unduh, tanda tangani, lalu unggah kembali.',
-    eligible: (m) => statusVerif(m).key === 'terverifikasi',
+    eligible: pernahDiverifikasi,
   },
   {
     key: 'permohonanMkt', stage: 'Pendaftaran', label: 'Permohonan MKT', docType: null,
     syarat: 'Tersedia setelah pendaftaran diverifikasi admin.',
     catatan: 'Unggah berkas permohonan dari perusahaan/instansi tempat Anda diterima MKT.',
-    eligible: (m) => statusVerif(m).key === 'terverifikasi',
+    eligible: pernahDiverifikasi,
     linkEksternal: 'https://mandala.undip.ac.id/',
     linkLabel: 'Untuk membuat formulir Permohonan MKT silahkan kunjungi Mandala UNDIP',
   },
   {
     key: 'suratBalasanMkt', stage: 'Pendaftaran', label: 'Surat Balasan Perusahaan', docType: null,
     syarat: 'Unggah bukti diterima MKT dari perusahaan/instansi setelah pendaftaran diverifikasi admin.',
-    eligible: (m) => statusVerif(m).key === 'terverifikasi',
+    eligible: pernahDiverifikasi,
   },
   {
     key: 'stPembimbingMkt', stage: 'Bimbingan', label: 'ST Pembimbing MKT', docType: 'ST Pembimbing Magang',
@@ -993,7 +1070,7 @@ export const MKT_DOKUMEN = [
   {
     key: 'monevMkt', stage: 'Bimbingan', label: 'Dokumen Monev MKT', docType: null,
     syarat: 'Tautan Dokumen Monev MKT belum diatur admin.',
-    eligible: (m) => statusVerif(m).key === 'terverifikasi',
+    eligible: pernahDiverifikasi,
     studentUpload: false, adminUpload: false,
     linkEksternal: '', linkLabel: 'Dokumen Monev MKT', linkConfigurable: true, linkButton: true,
   },
@@ -1014,17 +1091,17 @@ export const TA_DOKUMEN = [
   {
     key: 'persetujuanUgbTA', stage: 'Pendaftaran', label: 'Persetujuan UGB', docType: 'Persetujuan UGB TA',
     syarat: 'Tersedia setelah pendaftaran diverifikasi admin. Unduh, tanda tangani, lalu unggah kembali.',
-    eligible: (m) => statusVerif(m).key === 'terverifikasi',
+    eligible: pernahDiverifikasi,
   },
   {
     key: 'persetujuanDosbingTA', stage: 'Pendaftaran', label: 'Persetujuan Dosen Pembimbing', docType: 'Persetujuan Dosbing TA',
     syarat: 'Tersedia setelah pendaftaran diverifikasi admin. Unduh, tanda tangani, lalu unggah kembali.',
-    eligible: (m) => statusVerif(m).key === 'terverifikasi',
+    eligible: pernahDiverifikasi,
   },
   {
     key: 'kelayakanTA', stage: 'Pendaftaran', label: 'Surat Kelayakan TA', docType: null,
     syarat: 'Tersedia setelah pendaftaran diverifikasi admin. Unduh, tanda tangani, lalu unggah kembali.',
-    eligible: (m) => statusVerif(m).key === 'terverifikasi',
+    eligible: pernahDiverifikasi,
   },
   {
     key: 'baSemproTA', stage: 'Seminar Proposal', label: 'Berita Acara Seminar Proposal', docType: 'BA Sempro TA', event: 'Seminar Proposal',
@@ -1083,7 +1160,10 @@ export function dokumenStatus(program, m, konten = {}) {
       } : {}),
       eligible: d.eligible(m),
       upload: (m[field] || {})[d.key] || null,
-      ...(d.linkInput ? { linkTerkirim: (m[d.linkField] || {}).berkasLink || '' } : {}),
+      ...(d.linkInput ? {
+        linkTerkirim: (m[d.linkField] || {}).berkasLink || '',
+        linkDisetujui: (m[d.linkField] || {}).berkasDiperiksa === true && statusVerif(m).key === 'terverifikasi',
+      } : {}),
     };
   });
 }
@@ -1132,7 +1212,8 @@ export const AKTIVITAS_LABEL = {
   unggah: 'Mengunggah dokumen',
   hapusBerkas: 'Menghapus dokumen',
   tahapBimbingan: 'Memasuki tahap Bimbingan (surat balasan perusahaan diterima)',
-  pembukuan: 'Mengirim tautan bukti pembukuan KP',
+  tahapPembukuan: 'Memasuki tahap Pembukuan (lembar pengesahan diunggah)',
+  pembukuan: 'Mengirim tautan folder berkas final KP',
   perpanjanganMinta: 'Mengajukan perpanjangan',
   perpanjanganFinal: 'Mengunggah surat perpanjangan final',
 };
@@ -1146,6 +1227,7 @@ export const AKTIVITAS_WARNA = {
   unggah: 'violet',
   hapusBerkas: 'red',
   tahapBimbingan: 'green',
+  tahapPembukuan: 'green',
   pembukuan: 'blue',
   perpanjanganMinta: 'amber',
   perpanjanganFinal: 'green',
@@ -1161,7 +1243,8 @@ export const AKTIVITAS_LABEL_SINGKAT = {
   unggah: 'Unggah',
   hapusBerkas: 'Hapus',
   tahapBimbingan: 'Bimbingan',
-  pembukuan: 'Pembukuan',
+  tahapPembukuan: 'Pembukuan',
+  pembukuan: 'Folder',
   perpanjanganMinta: 'Perpanjangan',
   perpanjanganFinal: 'Final',
 };

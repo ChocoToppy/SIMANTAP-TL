@@ -59,7 +59,7 @@ See `src/utils/config.js` for which programs each mode allows.
 to choose:
 
 ```bash
-npm run dev -- --mode prod   # production build: KP & Magang only, manual Nomor Surat, no Registri tab
+npm run dev -- --mode prod   # production build: KP & Magang only
 npm run dev -- --mode full   # experimental build: all programs + experimental features
 ```
 
@@ -69,6 +69,25 @@ npm run dev -- --mode full   # experimental build: all programs + experimental f
   you save on localhost goes to the live database.
 - What each mode turns on is in `src/utils/config.js` (`PROGRAM_SCOPE`,
   `FITUR_EKSPERIMENTAL`).
+
+## Nomor Surat registry
+
+Same in every build. In the student edit form the admin either types a Nomor
+Surat or clicks **Isi nomor berikutnya**, which fills in the smallest sequence
+number not used yet this year (it skips numbers typed further ahead, e.g. 045).
+The field stays editable. On Save the number is recorded in Firestore
+(`nomorSurat/{tahun-urut}`, one document per number, never deleted) and shows in
+Pengaturan → Registri Nomor Surat.
+
+- **Blocked on Save:** a new or changed number in the wrong format, dated after
+  the current month, or already used by another student (including ended numbers).
+- **Confirmation on Save:** a number dated in an earlier month or year.
+- **Older numbers** already on a student record (including the old `.TL` format)
+  are recorded as they are the next time that student is saved, and never block it.
+- **"Current month"** comes from the admin's device clock.
+- `nomorSuratCounter/` is no longer used and can be deleted from the console.
+- Rules for the registry are in `firestore.rules`. After changing them:
+  `npx firebase deploy --only firestore:rules`.
 
 ## Public room schedule embed (WordPress / other sites)
 

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { PROGRAM_KEYS, programLabel, programDisplayLabel, ringkasPendaftaran, normalizeUrl, formatTanggal, judulLabelFor, statusVerif } from '../../utils/helpers.js';
+import { PROGRAM_KEYS, programLabel, programDisplayLabel, ringkasPendaftaran, normalizeUrl, formatTanggal, judulLabelFor, statusVerif, pembukuanDisetujui } from '../../utils/helpers.js';
 import { kpTemaUntukPilihan } from '../../utils/pilihan.js';
 import { Field, Modal, MessageIcon, Badge } from '../../components/ui.jsx';
 import { KpDocumentPanel } from '../../components/kpDocuments.jsx';
 import { LinkBerkasRow } from './LinkBerkasRow.jsx';
+import { PetunjukPembukuan } from '../../components/PetunjukPembukuan.jsx';
 import { RiwayatAktivitas } from './AktivitasCells.jsx';
 import { NomorSuratPanel } from './NomorSuratPanel.jsx';
 import { PersetujuanPerpanjangan } from './PersetujuanPerpanjangan.jsx';
@@ -24,7 +25,7 @@ export function FormMahasiswaKP({
   tahapTab, setTahapTab, p, events, jadwalBlok,
   dosenByKode, konten, uploadAdminDokumenKP, hapusAdminDokumenKP,
   unduhPerpanjanganKP, dlBusyKP,
-  verifAwal, baru, onCancel, submit, navEntri, modalOpsi,
+  verifAwal, nomorTerpakai, baru, onCancel, submit, navEntri, modalOpsi,
 }) {
   // "Halaman" di dalam modal — 'utama' (tab tahap, dokumen, dst) atau 'data'
   // (form identitas/penugasan Program..Batas akhir, dibuka lewat tombol "Edit
@@ -234,7 +235,7 @@ export function FormMahasiswaKP({
               <div className="sched-title">Dosen pembimbing</div>
               <div className="sched-grid">
                 <Field label={pembimbing1Label} full><select value={m.pembimbing1} onChange={(e) => set('pembimbing1', e.target.value)}>{dosenOpts}</select></Field>
-                <NomorSuratPanel m={m} setM={setM} baru={baru} />
+                <NomorSuratPanel m={m} setM={setM} baru={baru} terpakai={nomorTerpakai} />
               </div>
               {bebanBlok('bimbingan')}
               <div className="hint" style={{ marginTop: 6 }}>Pembimbing yang sama dipakai di Seminar Proposal, Seminar Hasil, dan Sidang. Nomor surat dipakai untuk semua dokumen TA.</div>
@@ -260,7 +261,7 @@ export function FormMahasiswaKP({
                 {roles.pembimbing >= 2 && (
                   <Field label="Pembimbing 2" full><select value={m.pembimbing2} onChange={(e) => set('pembimbing2', e.target.value)}>{dosenOpts}</select></Field>
                 )}
-                <NomorSuratPanel m={m} setM={setM} baru={baru} />
+                <NomorSuratPanel m={m} setM={setM} baru={baru} terpakai={nomorTerpakai} />
               </div>
               {bebanBlok('bimbingan')}
             </div>
@@ -284,13 +285,16 @@ export function FormMahasiswaKP({
             <div className="sched">
               <div className="sched-title">Pembukuan</div>
               <LinkBerkasRow
-                label="Link bukti pembukuan"
+                label="Link folder berkas final KP"
                 url={(m.pembukuan || {}).berkasLink}
                 onUbah={(v) => setM((prev) => ({ ...prev, pembukuan: { ...(prev.pembukuan || {}), berkasLink: v } }))}
                 diperiksa={(m.pembukuan || {}).berkasDiperiksa}
                 onDiperiksa={(v) => setM((prev) => ({ ...prev, pembukuan: { ...(prev.pembukuan || {}), berkasDiperiksa: v } }))}
               />
-              <div className="hint" style={{ marginTop: 6 }}>Bukti bahwa laporan KP sudah diarsipkan dan ditandatangani. Setelah diperiksa, lanjutkan mahasiswa ke tahap Lulus.</div>
+              <div style={{ marginTop: 8 }}><PetunjukPembukuan /></div>
+              {pembukuanDisetujui(m)
+                ? <div className="callout callout-green" style={{ marginTop: 8 }}>Disetujui. Surat keterangan selesai pembukuan sudah terbuka untuk mahasiswa (setelah disimpan).</div>
+                : <div className="hint" style={{ marginTop: 6 }}>Untuk menyetujui: centang "Sudah diperiksa" dan ubah Status verifikasi ke Terverifikasi, lalu Simpan. Surat keterangan selesai pembukuan kemudian terbuka untuk mahasiswa. Bila mahasiswa mengganti tautan, persetujuan dicabut otomatis.</div>}
             </div>
           )}
 

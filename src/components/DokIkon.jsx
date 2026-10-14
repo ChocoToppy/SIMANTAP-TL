@@ -7,12 +7,14 @@ import React from 'react';
 
 const garis = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinejoin: 'round', strokeLinecap: 'round' };
 
-export function IkonPdf({ size = 28 }) {
+// label 'DOC' untuk template yang diunduh sebagai Word (.docx). PDF merah,
+// DOC biru (lihat .ikon-pdf / .ikon-doc di styles.css).
+export function IkonPdf({ size = 28, label = 'PDF' }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 28 28" aria-hidden="true">
+    <svg className={label === 'DOC' ? 'ikon-doc' : 'ikon-pdf'} width={size} height={size} viewBox="0 0 28 28" aria-hidden="true">
       <path d="M7 3h9l5 5v6M7 3v11" {...garis} />
       <path d="M16 3v5h5" {...garis} />
-      <text x="14" y="25" textAnchor="middle" fontSize="8" fontWeight="700" fontFamily="inherit" fill="currentColor">PDF</text>
+      <text x="14" y="25" textAnchor="middle" fontSize="8" fontWeight="700" fontFamily="inherit" fill="currentColor">{label}</text>
     </svg>
   );
 }
@@ -24,6 +26,16 @@ export function IkonTerkunci({ size = 28 }) {
       <path d="M16 3v5h5" {...garis} />
       <rect x="14" y="18" width="9" height="7" rx="1" {...garis} />
       <path d="M16 18v-2a2.5 2.5 0 0 1 5 0v2" {...garis} />
+    </svg>
+  );
+}
+
+// Pesawat kertas: kirim tautan.
+export function IkonKirim({ size = 20 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M21 3L10 14" {...garis} />
+      <path d="M21 3l-7 18-4-7-7-4 18-7z" {...garis} />
     </svg>
   );
 }

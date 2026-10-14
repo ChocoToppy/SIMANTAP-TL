@@ -22,6 +22,7 @@ import { bolehMasukDomainIni, KUNCI_DITOLAK } from './utils/domainAccess.js';
 import logoTl from './assets/logo-tl.png';
 import gearIcon from './assets/gear.png';
 import { FITUR_RUANG } from './utils/config.js';
+import { akhiriNomorTerhapus } from './utils/nomorSuratDb.js';
 import { useJadwalRuang, useSinkronProgram } from './modules/ruang';
 
 // Dirender saat akun non-super-admin login di domain terbatas: tandai penolakan
@@ -404,6 +405,7 @@ export default function App() {
     // sama yang masih ada (duplikat lama), penghapusan ditolak — memang seharusnya.
     const slot = slotPengajuanUntuk(m);
     if (slot) deleteDoc(doc(db, 'slotPengajuan', slot)).catch(() => {});
+    akhiriNomorTerhapus(m).catch((e) => console.error('Registri nomor surat:', e));
   }
   // Hapus akun mahasiswa sepenuhnya: akun Auth, akun/{nim}, loginIndex/{nim},
   // dan semua data KP terkait — dipakai untuk membersihkan akun dummy/uji
@@ -411,7 +413,10 @@ export default function App() {
   async function hapusAkun(nim) {
     const { deletedMahasiswaIds } = await adminDeleteStudent(nim);
     setMahasiswaList((prev) => prev.filter((x) => !deletedMahasiswaIds.includes(x.id)));
-    deletedMahasiswaIds.forEach((id) => deleteUploadedFolder(`uploads/${id}`));
+    deletedMahasiswaIds.forEach((id) => {
+      deleteUploadedFolder(`uploads/${id}`);
+      akhiriNomorTerhapus(mahasiswaList.find((x) => x.id === id)).catch((e) => console.error('Registri nomor surat:', e));
+    });
   }
   function simpanDosen(ds) {
     setDosenList((prev) => {

@@ -1,5 +1,14 @@
 Tags for docxtemplater
 
+DOSEN TAGS (2026-10-14) — named by role, the same in every program (KP, Magang/MKT, TA):
+  {nama_pembimbing} / {nip_pembimbing}   = Pembimbing (every document that shows a dosen)
+  {nama_penguji1}   / {nip_penguji1}     = Penguji 1 (TA: ba-sempro-ta, ba-expo-ta, ba-sidang-ta)
+  {nama_penguji2}   / {nip_penguji2}     = Penguji 2 (TA: ba-sidang-ta only)
+  {nama_dosen_wali} / {nip_dosen_wali}   = Dosen Wali (sent with every document)
+The old numbered tags ({nama_dosen1}/{nip1} ... {nama_dosen4}/{nip4}) are gone from all
+templates and are no longer sent — a template containing one would print "undefined".
+KP and Magang/MKT have no penguji, so only the pembimbing tags exist there.
+
 NOTE (added): every KP document data payload now also includes {nama_dosen_wali} and
 {nip_dosen_wali} (resolved from the student's "Dosen Wali" field). These tags are not
 yet present in any existing .docx template — add {nama_dosen_wali} / {nip_dosen_wali}
@@ -33,7 +42,7 @@ KP, the Magang/MKT pair of each document does NOT share tag names — every
 tag below that contains "magang"/"mkt" is suffixed per file (e.g. judul_magang
 in the -magang.docx file vs judul_mkt in the -mkt.docx file); documentGenerator.js
 builds both automatically from a single `sfx = jenisMagang === 'MKT' ? 'mkt' : 'magang'`.
-Tags without that suffix (no_surat, nama_mhs, nim, nama_dosen1, nip1, tgl_cetak,
+Tags without that suffix (no_surat, nama_mhs, nim, nama_pembimbing, nip_pembimbing, tgl_cetak,
 nama_dosen_wali, nip_dosen_wali) are named the same in both files.
 
 kelayakan-magang / kelayakan-mkt
@@ -49,11 +58,8 @@ kelayakan-proposal-magang
 {nama_mhs}
 {nim}
 {tema_magang}
-{judul_kp} — NOTE: this file's judul tag is literally {judul_kp}, not
-  {judul_magang} (looks like a leftover from the KP template it was copied
-  from). documentGenerator.js sends both judul_magang AND judul_kp so it
-  works either way — fix the tag in the .docx to {judul_magang} whenever
-  convenient and the alias can be dropped.
+{judul_magang}
+{tgl_cetak}
 
 kelayakan-proposal-mkt
 
@@ -61,12 +67,13 @@ kelayakan-proposal-mkt
 {nim}
 {tema_mkt}
 {judul_mkt}
+{tgl_cetak}
 
 pembimbing-magang-st
 
 {no_surat}
-{nama_dosen1}
-{nip1}
+{nama_pembimbing}
+{nip_pembimbing}
 {nama_mhs}
 {nim}
 {judul_magang}
@@ -77,8 +84,8 @@ pembimbing-magang-st
 pembimbing-mkt-st
 
 {no_surat}
-{nama_dosen1}
-{nip1}
+{nama_pembimbing}
+{nip_pembimbing}
 {nama_mhs}
 {nim}
 {judul_mkt}
@@ -92,8 +99,8 @@ persetujuan-expo-magang
 {nim}
 {judul_magang}
 {tgl_cetak}
-{nama_dosen1}
-{nip1}
+{nama_pembimbing}
+{nip_pembimbing}
 
 persetujuan-expo-mkt
 
@@ -101,8 +108,8 @@ persetujuan-expo-mkt
 {nim}
 {judul_mkt}
 {tgl_cetak}
-{nama_dosen1}
-{nip1}
+{nama_pembimbing}
+{nip_pembimbing}
 
 seminar-magang-ba
 
@@ -111,12 +118,11 @@ seminar-magang-ba
 {nim}
 {judul_magang}
 {hari_smmagang}
-{tanggal_smmagang}
 {tgl_smmagang}
 {waktu_smmagang}
 {tempat_smmagang}
-{nama_dosen1}
-{nip1}
+{nama_pembimbing}
+{nip_pembimbing}
 
 seminar-mkt-ba
 
@@ -125,12 +131,11 @@ seminar-mkt-ba
 {nim}
 {judul_mkt}
 {hari_smmkt}
-{tanggal_smmkt}
 {tgl_smmkt}
 {waktu_smmkt}
 {tempat_smmkt}
-{nama_dosen1}
-{nip1}
+{nama_pembimbing}
+{nip_pembimbing}
 
 perpanjangan-magang
 
@@ -143,8 +148,8 @@ perpanjangan-magang
 {mulai_ppmagang}
 {akhir_ppmagang}
 {tgl_cetak}
-{nama_dosen1}
-{nip1}
+{nama_pembimbing}
+{nip_pembimbing}
 
 perpanjangan-mkt
 
@@ -157,8 +162,8 @@ perpanjangan-mkt
 {mulai_ppmkt}
 {akhir_ppmkt}
 {tgl_cetak}
-{nama_dosen1}
-{nip1}
+{nama_pembimbing}
+{nip_pembimbing}
 
 NOTE: none of the seven Magang/MKT template pairs above currently render
 {nama_dosen_wali}/{nip_dosen_wali} except kelayakan-magang/kelayakan-mkt —
@@ -201,14 +206,14 @@ perpanjangan-kp
 {mulai_ppkp}
 {akhir_ppkp}
 {tgl_cetak}
-{nama_dosen1}
-{nip1}
+{nama_pembimbing}
+{nip_pembimbing}
 
 pembimbing-kp-st
 
 {no_surat}
-{nama_dosen1}
-{nip1}
+{nama_pembimbing}
+{nip_pembimbing}
 {nama_mhs}
 {nim}
 {judul_kp}
@@ -216,8 +221,40 @@ pembimbing-kp-st
 {akhir_kp}
 {tgl_cetak}
 
+surat pembukuan KP (Surat Keterangan Selesai Pembukuan, tahap Pembukuan) - TEMPLATE
+PENDING. docType 'Surat Pembukuan KP' is already listed in KP_DOKUMEN (key
+suratPembukuanKP) and unlocks when the admin approves the folder link; it needs a
+.docx in public/doc-templates/KP/ and a case in getTemplateConfig.
+
+lempeng_kp (Lembar Pengesahan KP, tahap Bimbingan) - downloaded as an editable
+Word .docx (no PDF conversion); the student uploads the signed scan as PDF.
+Also sent but not in the template: {tgl_cetak}, {nama_dosen_wali}, {nip_dosen_wali}.
+
+{judul_kp}
+{nama_mhs}
+{nim}
+{nama_pembimbing} (bold + underlined in the template)
+{nip_pembimbing}
+
+penilaian-kp (Berita Acara & Penilaian KP, tahap Bimbingan) - replaces seminar-kp-ba.
+docType 'Penilaian KP', KP_DOKUMEN key penilaianKP. Downloaded as PDF; graded by the
+pembimbing on paper and returned to admin, so only the admin uploads it back. There
+is no seminar schedule any more, so the old {hari_smkp}/{tanggal_smkp} became the print
+date and {tempat_smkp} was removed (Tempat is filled in by hand).
+
+{no_surat}
+{hari_cetak} - NEW: day name of the print date (Senin ... Minggu)
+{tgl_cetak} - Hari/Tanggal, Tanggal Seminar, "Semarang, ..." and the footer
+{nama_mhs}
+{nim}
+{judul_kp}
+{nama_pembimbing} - also in the "Dosen Penguji" rows (KP has no penguji)
+{nip_pembimbing}
+Also sent but not in the template: {nama_dosen_wali}, {nip_dosen_wali}.
+
 seminar-kp-ba — REMOVED from the app (2026-10-12), same reason as persetujuan-smkp.
-KP now ends with a "Pembukuan" stage where the student submits a link (no template).
+Replaced by penilaian-kp (above).
+KP now ends with a "Pembukuan" stage: lempeng_kp (above) plus a Google Drive folder link.
 
 
 Tugas Akhir (TA)
@@ -226,39 +263,37 @@ Shared by every TA document: {tema_ta} = the Topik/bidang label picked in the
 registration form (bidangLabel(m.bidang)). Every TA payload also sends
 {tgl_cetak}, {nama_dosen_wali}, {nip_dosen_wali} even where a template doesn't use them.
 
-NOTE (2026-10-12): TA now has 1 Pembimbing + 2 Penguji (Pembimbing 2 removed).
+TA has 1 Pembimbing + 2 Penguji (Pembimbing 2 removed 2026-10-12).
   Sempro & Semhas: Pembimbing + Penguji 1. Sidang: Pembimbing + Penguji 1 + Penguji 2.
-  Dosen tags are numbered in that order:
-    {nama_dosen1}/{nip1} = Pembimbing (every TA document)
-    {nama_dosen2}/{nip2} = Penguji 1 (ba-sempro-ta, ba-expo-ta, ba-sidang-ta)
-    {nama_dosen3}/{nip3} = Penguji 2 (ba-sidang-ta only)
-  {nama_dosen4}/{nip4} is no longer sent. Templates that still contain a tag the app
-  no longer sends will print "undefined" there until the tag is removed from the .docx.
+  Dosen tags: see DOSEN TAGS at the top of this file.
+
+LABELS STILL TO FIX BY HAND (2026-10-14): the TA .docx files still have the old
+4-dosen layout (Pembimbing I, Pembimbing II, Ketua Penguji, Anggota Penguji). Tags were
+moved to the new roles; the row labels/rows themselves were NOT changed:
+  - ba-sempro-ta, ba-expo-ta: rows labelled "Pembimbing II" / "Pembimbing 2" now hold
+    {nama_penguji1}/{nip_penguji1} — relabel them "Penguji".
+  - ba-sidang-ta, pengesahan-ta: "Ketua Penguji" = {nama_penguji1}, "Anggota Penguji" /
+    "Dosen Penguji II" = {nama_penguji2}. The "Pembimbing II" rows/pages now have no tag
+    (print blank) — remove them. ("Dosen Penguji I" page in ba-sidang-ta holds penguji 1.)
+  - perpanjangan-ta, st-pembimbing-ta: the "Dosen Pembimbing II" rows now have no tag
+    (print blank) — remove them.
 
 persetujuan-ugb
 
 {nama_mhs}
 {nim}
 {judul_ta}
-{topik_ta} - this file uses {topik_ta}, not {tema_ta}; documentGenerator.js sends both
-  (same value). Rename to {tema_ta} in the .docx whenever convenient and drop the alias.
-{tgl_cetak} (sent, not in the template yet)
-{nama_dosen1} / {nip1} (sent, not in the template yet)
+{tema_ta}
+{tgl_cetak}
+{nama_pembimbing} / {nip_pembimbing} (sent, not in the template yet)
 
 persetujuan-dosbing
 
-documentGenerator.js reads TA/persetujuan-dosbing.docx; the working copy is currently
-"persetujuan-dosbing (WiP).docx" (uses {nama_mhs} {nim} {nama_dosen1} {nip1}).
-Available from documentGenerator.js:
-{nama_mhs}
-{nim}
-{judul_ta}
-{tema_ta}
-{tgl_cetak}
-{nama_dosen1}
-{nip1}
-{nama_dosen_wali}
-{nip_dosen_wali}
+documentGenerator.js reads TA/persetujuan-dosbing.docx, which DOES NOT EXIST — the file
+is still named "persetujuan-dosbing (WiP).docx", so downloading this document fails
+until the file is renamed (or the path in documentGenerator.js is changed).
+Template tags: {nama_mhs} {nim} {nama_pembimbing} {nip_pembimbing}.
+Also available: {judul_ta} {tema_ta} {tgl_cetak} {nama_dosen_wali} {nip_dosen_wali}
 
 perpanjangan-ta
 
@@ -266,7 +301,6 @@ perpanjangan-ta
 {nama_mhs}
 {nim}
 {judul_ta}
-{judul_TA} - the template has both spellings; both are sent
 {tema_ta} (sent, not in the template yet)
 {mulai_ta}
 {akhir_ta}
@@ -274,11 +308,11 @@ perpanjangan-ta
 {akhir_ta_pp1}
 {mulai_ta_pp2}
 {akhir_ta_pp2}
-{tgl_surat_ppta}
-{nama_dosen1}
-{nip1}
-{nama_dosen2}/{nip2} - NO LONGER SENT (single pembimbing). Still in the template:
-  remove the Dosen Pembimbing II row from perpanjangan-ta.docx.
+{tgl_cetak} (the letter date; was {tgl_surat_ppta})
+{nama_pembimbing}
+{nip_pembimbing}
+NOTE: the footer reads "Dicetak tgl: {mulai_ta} – {akhir_ta}" (a date range, not the
+  print date). Left as is; change it to "Dicetak tgl: {tgl_cetak}" if that was the intent.
 
 st-pembimbing-ta - NOT wired in documentGenerator.js yet (no docType/case)
 
@@ -286,11 +320,11 @@ st-pembimbing-ta - NOT wired in documentGenerator.js yet (no docType/case)
 {nama_mhs}
 {nim}
 {judul_ta}
-{mulai_ta}
+{mulai_ta} (also used as the letter date "Semarang, {mulai_ta}")
 {akhir_ta}
-{nama_dosen1}
-{nip1}
-{nama_dosen2}/{nip2} - template still has these; drop them when wiring this (single pembimbing)
+{nama_pembimbing}
+{nip_pembimbing}
+{tgl_cetak} (footer "Di cetak pada tanggal")
 
 ba-sempro-ta
 
@@ -299,14 +333,13 @@ ba-sempro-ta
 {nim}
 {judul_ta}
 {tema_ta} (sent, not in the template yet)
-{tgl_sempro}
+{tgl_sempro} (also the letter date; was {tgl_surat_sempro}, same value)
 {waktu_sempro}
 {tempat_sempro}
-{tgl_surat_sempro}
-{nama_dosen1} - Pembimbing
-{nip1}
-{nama_dosen2} - Penguji (was Pembimbing 2; relabel the row in the .docx)
-{nip2}
+{nama_pembimbing}
+{nip_pembimbing}
+{nama_penguji1}
+{nip_penguji1}
 
 ba-expo-ta (BA Semhas)
 
@@ -318,10 +351,10 @@ ba-expo-ta (BA Semhas)
 {tgl_expo}
 {waktu_expo}
 {tempat_expo}
-{nama_dosen1} - Pembimbing
-{nip1}
-{nama_dosen2} - Penguji (was Pembimbing 2; relabel the row in the .docx)
-{nip2}
+{nama_pembimbing}
+{nip_pembimbing}
+{nama_penguji1}
+{nip_penguji1}
 
 ba-sidang-ta
 
@@ -334,13 +367,12 @@ ba-sidang-ta
 {tgl_sidang}
 {waktu_sidang}
 {tempat_sidang}
-{nama_dosen1} - Pembimbing
-{nip1}
-{nama_dosen2} - Penguji 1 (was Pembimbing 2)
-{nip2}
-{nama_dosen3} - Penguji 2 (was Ketua Penguji)
-{nip3}
-{nama_dosen4}/{nip4} - NO LONGER SENT; remove the 4th dosen row from ba-sidang-ta.docx
+{nama_pembimbing}
+{nip_pembimbing}
+{nama_penguji1} - Ketua Penguji, also signs as Ketua Tim Sidang
+{nip_penguji1}
+{nama_penguji2} - Anggota Penguji
+{nip_penguji2}
 
 pengesahan-ta - NOT wired in documentGenerator.js yet (no docType/case)
 
@@ -348,12 +380,9 @@ pengesahan-ta - NOT wired in documentGenerator.js yet (no docType/case)
 {nim}
 {judul_ta}
 {tgl_sidang}
-{nama_dosen1}
-{nip1}
-{nama_dosen2}
-{nip2}
-{nama_dosen3}
-{nip3}
-{nama_dosen4}
-{nip4}
-  - when wiring this, use the same numbering as ba-sidang-ta (3 dosen, no {nama_dosen4})
+{nama_pembimbing}
+{nip_pembimbing}
+{nama_penguji1} - Ketua Penguji
+{nip_penguji1}
+{nama_penguji2} - Anggota Penguji
+{nip_penguji2}

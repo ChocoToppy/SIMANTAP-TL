@@ -5,9 +5,9 @@ import { Empty, KotakCari } from '../../components/ui.jsx';
 import { PROGRAM_KEYS, programLabel, formatWaktu } from '../../utils/helpers.js';
 
 // ----- Registri nomor surat -----
-// Catatan SEMUA nomor yang pernah diterbitkan sistem (koleksi nomorSurat/), baru →
-// lama. Hanya dibaca di sini: penerbitan dan pengakhiran dilakukan dari form edit
-// mahasiswa (NomorSuratPanel), supaya nomor selalu terikat ke mahasiswa & program.
+// Catatan SEMUA nomor yang pernah dipakai (koleksi nomorSurat/), baru → lama. Hanya
+// dibaca di sini: pencatatan dan pengakhiran dilakukan dari form edit mahasiswa
+// (NomorSuratPanel + submit FormMahasiswa), supaya nomor selalu terikat ke mahasiswa.
 export function SeksiNomorSurat() {
   const [daftar, setDaftar] = useState(null);
   const [q, setQ] = useState('');
@@ -36,9 +36,9 @@ export function SeksiNomorSurat() {
   return (
     <div className="card">
       <p className="hint" style={{ marginTop: 0 }}>
-        Semua nomor surat yang pernah diterbitkan sistem. Nomor diambil dari form edit mahasiswa
-        (tombol "Ambil nomor"), urut per tahun untuk semua program. Nomor yang sudah kedaluwarsa
-        tetap tercatat di sini dan tidak akan dipakai lagi.
+        Semua nomor surat yang pernah dipakai, urut per tahun untuk semua program. Nomor di form
+        edit mahasiswa, diketik sendiri atau diisi lewat "Isi nomor berikutnya", tercatat di sini saat
+        data disimpan. Nomor yang sudah kedaluwarsa tetap tercatat dan tidak bisa dipakai lagi.
       </p>
       <div className="toolbar" style={{ marginBottom: 12 }}>
         <KotakCari q={q} setQ={setQ} placeholder="Cari nomor, nama, atau NIM…" style={{ maxWidth: 280 }} />
@@ -76,7 +76,7 @@ export function SeksiNomorSurat() {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id}>
-                  <td><strong>{r.nomor}</strong></td>
+                  <td><strong>{r.nomor}</strong>{r.sumber === 'manual' && <div className="cell-sub">Diketik manual</div>}</td>
                   <td>{r.nama}<div className="cell-sub">{r.nim}</div></td>
                   <td>{programLabel(r.program)}</td>
                   <td>

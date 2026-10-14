@@ -1,7 +1,7 @@
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import { saveAs } from 'file-saver';
-import { formatTanggal, todayISO, bidangLabel, jenisMagangOf } from './helpers.js';
+import { formatTanggal, todayISO, bidangLabel, jenisMagangOf, HARI } from './helpers.js';
 import { periodePerpanjangan, periodeSuratPerpanjangan } from './perpanjangan.js';
 
 /**
@@ -93,9 +93,13 @@ export function warmConverter() {
   fetch(CONVERTER_URL).catch(() => { converterWarmed = false; });
 }
 
-export const generateDocument = async (templatePath, outputName, data) => {
+// opts.docx = true: unduh sebagai .docx yang bisa diedit (mis. Lembar
+// Pengesahan KP), tanpa konversi PDF. Ikuti `docx` dari getTemplateConfig.
+export const generateDocument = async (templatePath, outputName, data, opts = {}) => {
   try {
-    const { blob, isPdf } = await buildDocument(templatePath, data);
+    const { blob, isPdf } = opts.docx
+      ? { blob: await buildDocxBlob(templatePath, data), isPdf: false }
+      : await buildDocument(templatePath, data);
     saveAs(blob, isPdf ? outputName.replace(/\.docx$/i, '.pdf') : outputName);
   } catch (error) {
     console.error("Error generating document:", error);
@@ -110,6 +114,7 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
   // Tanggal cetak: tanggal saat berkas ini dibangun (di-prefetch saat halaman
   // dimuat, atau saat tombol Unduh ditekan bila belum ada di cache).
   const tgl_cetak = formatTanggal(todayISO());
+  const hari_cetak = HARI[(new Date().getDay() + 6) % 7]; // HARI mulai Senin, getDay() mulai Minggu
   // Magang & Mata Kuliah Terapan (MKT) berbagi seluruh alur & docType, tapi
   // masing-masing punya berkas .docx sendiri (mis. kelayakan-magang.docx vs
   // kelayakan-mkt.docx) — pilih file yang tepat berdasarkan m.jenisMagang.
@@ -153,10 +158,6 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
           nim: m.nim,
           [`tema_${sfx}`]: bidangLabel(m.bidang),
           [`judul_${sfx}`]: m.judul,
-          // kelayakan-proposal-magang.docx pakai {judul_kp} (bawaan dari
-          // berkas KP, belum diganti) alih-alih {judul_magang} — kirim
-          // kedua-duanya supaya tetap terisi walau tag-nya belum dibetulkan.
-          judul_kp: m.judul,
           tgl_cetak,
         }
       };
@@ -169,8 +170,8 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
         filename: `ST_Pembimbing_${jenisLabel}_${m.nama}.docx`,
         data: {
           no_surat: m.nomorSurat || jEv.nomorST || "___/UN7.../2026",
-          nama_dosen1: d1.nama || m.pembimbing1,
-          nip1: d1.nip || "-",
+          nama_pembimbing: d1.nama || m.pembimbing1,
+          nip_pembimbing: d1.nip || "-",
           nama_mhs: m.nama,
           nim: m.nim,
           [`judul_${sfx}`]: m.judul,
@@ -192,19 +193,18 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
           nim: m.nim,
           [`judul_${sfx}`]: m.judul,
           tgl_cetak,
-          nama_dosen1: d1.nama || m.pembimbing1,
-          nip1: d1.nip || "-",
+          nama_pembimbing: d1.nama || m.pembimbing1,
+          nip_pembimbing: d1.nip || "-",
           ...wali,
         }
       };
     }
 
     case 'BA Expo Magang': {
-      // seminar-magang-ba.docx & seminar-mkt-ba.docx pakai nama tag beda
-      // untuk jadwalnya (hari_smmagang/... vs hari_smmkt/...) dan
-      // judul_magang vs judul_mkt — kirim keduanya sekaligus supaya
-      // masing-masing berkas dapat tag yang benar tanpa perlu 2 docType.
-      const evTag = mktMhs ? 'smmkt' : 'smmagang';
+      // seminar-magang-ba.docx & seminar-mkt-ba.docx: tag jadwalnya
+      // hari_smmagang/... vs hari_smmkt/....
+      const sfx = mktMhs ? 'mkt' : 'magang';
+      const evTag = `sm${sfx}`;
       return {
         template: magangTemplate('Magang/seminar-magang-ba.docx', 'Magang/seminar-mkt-ba.docx'),
         filename: `BA_Expo_${jenisLabel}_${m.nama}.docx`,
@@ -212,16 +212,14 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
           no_surat: m.nomorSurat || jEv.nomorST || "___/UN7.../2026",
           nama_mhs: m.nama,
           nim: m.nim,
-          judul_magang: m.judul,
-          judul_mkt: m.judul,
+          [`judul_${sfx}`]: m.judul,
           [`hari_${evTag}`]: jEv.hari || "-",
-          [`tanggal_${evTag}`]: formatTanggal(jEv.tanggal) || "-",
           [`tgl_${evTag}`]: formatTanggal(jEv.tanggal) || "-",
           [`waktu_${evTag}`]: `${jEv.jamMulai || '-'} s.d ${jEv.jamSelesai || '-'}`,
           [`tempat_${evTag}`]: jEv.ruang || "-",
           tgl_cetak,
-          nama_dosen1: d1.nama || m.pembimbing1,
-          nip1: d1.nip || "-",
+          nama_pembimbing: d1.nama || m.pembimbing1,
+          nip_pembimbing: d1.nip || "-",
           ...wali,
         }
       };
@@ -243,8 +241,8 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
           [`mulai_pp${sfx}`]: formatTanggal(pp.dari) || "-",
           [`akhir_pp${sfx}`]: formatTanggal(pp.sampai) || "-",
           tgl_cetak,
-          nama_dosen1: d1.nama || m.pembimbing1,
-          nip1: d1.nip || "-",
+          nama_pembimbing: d1.nama || m.pembimbing1,
+          nip_pembimbing: d1.nip || "-",
           ...wali,
         }
       };
@@ -263,14 +261,51 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
         }
       };
 
+    // Tetap .docx (docx: true) supaya mahasiswa bisa melengkapinya sebelum
+    // dicetak & ditandatangani.
+    case 'Lembar Pengesahan KP':
+      return {
+        template: 'KP/lempeng_kp.docx',
+        filename: `Lembar_Pengesahan_KP_${m.nama}.docx`,
+        docx: true,
+        data: {
+          nama_mhs: m.nama,
+          nim: m.nim,
+          judul_kp: m.judul,
+          nama_pembimbing: d1.nama || m.pembimbing1 || "-",
+          nip_pembimbing: d1.nip || "-",
+          tgl_cetak,
+          ...wali,
+        }
+      };
+
+    // Menggantikan BA Seminar KP (tahap Seminar sudah dihapus): tidak ada
+    // jadwal, jadi hari/tanggal penilaian = tanggal cetak; tempat diisi tangan.
+    case 'Penilaian KP':
+      return {
+        template: 'KP/penilaian-kp.docx',
+        filename: `Penilaian_KP_${m.nama}.docx`,
+        data: {
+          no_surat: m.nomorSurat || jEv.nomorST || "___/UN7.../2026",
+          nama_mhs: m.nama,
+          nim: m.nim,
+          judul_kp: m.judul,
+          nama_pembimbing: d1.nama || m.pembimbing1 || "-",
+          nip_pembimbing: d1.nip || "-",
+          hari_cetak,
+          tgl_cetak,
+          ...wali,
+        }
+      };
+
     case 'ST Pembimbing KP':
       return {
         template: 'KP/pembimbing-kp-st.docx',
         filename: `ST_Pembimbing_KP_${m.nama}.docx`,
         data: {
           no_surat: m.nomorSurat || jEv.nomorST || "___/UN7.../2026",
-          nama_dosen1: d1.nama || m.pembimbing1,
-          nip1: d1.nip || "-",
+          nama_pembimbing: d1.nama || m.pembimbing1,
+          nip_pembimbing: d1.nip || "-",
           nama_mhs: m.nama,
           nim: m.nim,
           judul_kp: m.judul,
@@ -296,8 +331,8 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
           mulai_ppkp: formatTanggal(pp.dari) || "-",
           akhir_ppkp: formatTanggal(pp.sampai) || "-",
           tgl_cetak,
-          nama_dosen1: d1.nama || m.pembimbing1,
-          nip1: d1.nip || "-",
+          nama_pembimbing: d1.nama || m.pembimbing1,
+          nip_pembimbing: d1.nip || "-",
           ...wali,
         }
       };
@@ -314,11 +349,9 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
           nim: m.nim,
           judul_ta: m.judul,
           tema_ta: bidangLabel(m.bidang),
-          // persetujuan-ugb.docx memakai {topik_ta} (bukan {tema_ta}) — kirim keduanya.
-          topik_ta: bidangLabel(m.bidang),
           tgl_cetak,
-          nama_dosen1: d1.nama || m.pembimbing1,
-          nip1: d1.nip || "-",
+          nama_pembimbing: d1.nama || m.pembimbing1,
+          nip_pembimbing: d1.nip || "-",
           ...wali,
         }
       };
@@ -333,14 +366,14 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
           judul_ta: m.judul,
           tema_ta: bidangLabel(m.bidang),
           tgl_cetak,
-          nama_dosen1: d1.nama || m.pembimbing1,
-          nip1: d1.nip || "-",
+          nama_pembimbing: d1.nama || m.pembimbing1,
+          nip_pembimbing: d1.nip || "-",
           ...wali,
         }
       };
     }
 
-    // Sempro & Semhas: dosen 1 = pembimbing, dosen 2 = penguji (penguji 1).
+    // Sempro & Semhas: pembimbing + penguji 1.
     case 'BA Sempro TA': {
       const d2 = dosenByKode[m.penguji1] || {};
       return {
@@ -355,12 +388,11 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
           tgl_sempro: formatTanggal(jEv.tanggal) || "-",
           waktu_sempro: `${jEv.jamMulai || '-'} s.d ${jEv.jamSelesai || '-'}`,
           tempat_sempro: jEv.ruang || "-",
-          tgl_surat_sempro: formatTanggal(jEv.tanggal) || "-",
           tgl_cetak,
-          nama_dosen1: d1.nama || m.pembimbing1,
-          nip1: d1.nip || "-",
-          nama_dosen2: d2.nama || m.penguji1 || "-",
-          nip2: d2.nip || "-",
+          nama_pembimbing: d1.nama || m.pembimbing1,
+          nip_pembimbing: d1.nip || "-",
+          nama_penguji1: d2.nama || m.penguji1 || "-",
+          nip_penguji1: d2.nip || "-",
           ...wali,
         }
       };
@@ -380,17 +412,15 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
           nim: m.nim,
           judul_ta: m.judul,
           tema_ta: bidangLabel(m.bidang),
-          judul_TA: m.judul,
           mulai_ta: formatTanggal(m.tanggalMulai) || "-",
           akhir_ta: formatTanggal(pp1.dari) || "-",
           mulai_ta_pp1: formatTanggal(pp1.dari) || "-",
           akhir_ta_pp1: formatTanggal(pp1.sampai) || "-",
           mulai_ta_pp2: formatTanggal(pp2.dari) || "-",
           akhir_ta_pp2: formatTanggal(pp2.sampai) || "-",
-          tgl_surat_ppta: tgl_cetak,
           tgl_cetak,
-          nama_dosen1: d1.nama || m.pembimbing1,
-          nip1: d1.nip || "-",
+          nama_pembimbing: d1.nama || m.pembimbing1,
+          nip_pembimbing: d1.nip || "-",
           ...wali,
         }
       };
@@ -411,17 +441,17 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
           waktu_expo: `${jEv.jamMulai || '-'} s.d ${jEv.jamSelesai || '-'}`,
           tempat_expo: jEv.ruang || "-",
           tgl_cetak,
-          nama_dosen1: d1.nama || m.pembimbing1,
-          nip1: d1.nip || "-",
-          nama_dosen2: d2.nama || m.penguji1 || "-",
-          nip2: d2.nip || "-",
+          nama_pembimbing: d1.nama || m.pembimbing1,
+          nip_pembimbing: d1.nip || "-",
+          nama_penguji1: d2.nama || m.penguji1 || "-",
+          nip_penguji1: d2.nip || "-",
           ...wali,
         }
       };
     }
 
     case 'BA Sidang TA': {
-      // Dosen 1 = pembimbing, 2 = penguji 1, 3 = penguji 2.
+      // Pembimbing + penguji 1 + penguji 2.
       const d2 = dosenByKode[m.penguji1] || {};
       const d3 = dosenByKode[m.penguji2] || {};
       return {
@@ -438,12 +468,12 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
           waktu_sidang: `${jEv.jamMulai || '-'} s.d ${jEv.jamSelesai || '-'}`,
           tempat_sidang: jEv.ruang || "-",
           tgl_cetak,
-          nama_dosen1: d1.nama || m.pembimbing1,
-          nip1: d1.nip || "-",
-          nama_dosen2: d2.nama || m.penguji1 || "-",
-          nip2: d2.nip || "-",
-          nama_dosen3: d3.nama || m.penguji2 || "-",
-          nip3: d3.nip || "-",
+          nama_pembimbing: d1.nama || m.pembimbing1,
+          nip_pembimbing: d1.nip || "-",
+          nama_penguji1: d2.nama || m.penguji1 || "-",
+          nip_penguji1: d2.nip || "-",
+          nama_penguji2: d3.nama || m.penguji2 || "-",
+          nip_penguji2: d3.nip || "-",
           ...wali,
         }
       };

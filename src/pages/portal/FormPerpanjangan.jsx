@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { perpanjanganDocType, todayISO, catatAktivitas, programOf, programDisplayLabel } from '../../utils/helpers.js';
+import { bolehAksesBerkas, perpanjanganDocType, todayISO, catatAktivitas, programOf, programDisplayLabel } from '../../utils/helpers.js';
 import { generateDocument, getTemplateConfig } from '../../utils/documentGenerator.js';
 import { readFileForUpload } from '../../utils/fileUpload.js';
 import { Field, FileDropZone, KepalaForm } from '../../components/ui.jsx';
@@ -59,7 +59,7 @@ export function FormPerpanjangan({ awal, allDosen = [], mode, onCancel, onSave }
             {['KP', 'MG', 'TA'].includes(programOf(awal)) && pp.suratAdminTersedia && (
               <div className="callout field-full">
                 Surat dari admin sudah tersedia.{' '}
-                <button type="button" className="btn" onClick={unduhPerpanjanganKP} disabled={dlBusy}>{dlBusy ? 'Menyiapkan PDF…' : `Unduh surat perpanjangan ${programDisplayLabel(awal)} (PDF)`}</button>{' '}
+                <button type="button" className="btn" onClick={unduhPerpanjanganKP} disabled={dlBusy || !bolehAksesBerkas(awal)} title={bolehAksesBerkas(awal) ? undefined : 'Unduhan dikunci: perbaiki data pendaftaran sesuai pesan admin terlebih dahulu.'}>{dlBusy ? 'Menyiapkan PDF…' : `Unduh surat perpanjangan ${programDisplayLabel(awal)} (PDF)`}</button>{' '}
                 Unduh, tanda tangani, lalu unggah berkasnya di bawah.
               </div>
             )}

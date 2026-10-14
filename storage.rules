@@ -25,7 +25,7 @@ service firebase.storage {
     // Berkas yang hanya diunggah admin: sama dengan dokumenAdmin() di
     // firestore.rules, ditambah surat perpanjangan dari admin.
     function berkasAdmin() {
-      return ['stPembimbing', 'baSeminar', 'stPembimbingMagang', 'monevMagang', 'baExpo',
+      return ['stPembimbing', 'baSeminar', 'penilaianKP', 'stPembimbingMagang', 'monevMagang', 'baExpo',
               'stPembimbingMkt', 'monevMkt', 'baExpoMkt', 'baSemproTA', 'baSemhasTA', 'baSidangTA',
               'perpanjangan-admin'];
     }
@@ -42,7 +42,8 @@ service firebase.storage {
     // mahasiswaId (= id dokumen mahasiswa/{id}) di uploads/{id}/{key}/{berkas}.
     // Baca: admin, dosen yang membimbing/menguji, dan mahasiswa pemiliknya.
     // Tulis: seperti di aplikasi — admin bebas; mahasiswa hanya berkasnya sendiri
-    // (bukan berkas admin), PDF ≤ 25 MB, setelah pengajuan diverifikasi; dosen
+    // (bukan berkas admin), PDF ≤ 25 MB, setelah pengajuan diverifikasi dan
+    // selama tidak berstatus "Perlu perbaikan"; dosen
     // tidak mengunggah apa pun.
     match /uploads/{mahasiswaId}/{allPaths=**} {
       allow read: if isAdmin() || isAssignedLecturer(mahasiswaId) || isOwnerStudent(mahasiswaId);
@@ -50,7 +51,8 @@ service firebase.storage {
     }
     match /uploads/{mahasiswaId}/{key}/{fileName} {
       allow create, update: if isOwnerStudent(mahasiswaId) && !(key in berkasAdmin())
-        && pdfSah(fileName) && pernahVerif(mhsDoc(mahasiswaId));
+        && pdfSah(fileName) && pernahVerif(mhsDoc(mahasiswaId))
+        && mhsDoc(mahasiswaId).get('verifikasi', 'baru') != 'perbaikan'; // "Perlu perbaikan" = unggah dikunci
       // Hapus: berkas yang diganti/dihapus, dan seluruh folder saat pengajuan dihapus.
       allow delete: if isOwnerStudent(mahasiswaId) && !(key in berkasAdmin());
     }

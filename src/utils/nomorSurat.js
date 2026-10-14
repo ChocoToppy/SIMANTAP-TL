@@ -12,6 +12,8 @@ import { programOf, todayISO, parseISO, tambahHari } from './helpers.js';
 //   XII / 2025  bulan (romawi) & tahun saat nomor diterbitkan
 export const KODE_NOMOR = { fakultas: 'UN7.F3', penandatangan: '6.8', hal: 'DL' };
 
+// Nomor diketik admin atau diisi lewat tombol "Isi nomor berikutnya" (nomor urut
+// terkecil yang belum dipakai tahun itu), lalu dicatat di registri saat Simpan.
 // Satu nomor berlaku untuk satu siklus (mahasiswa + program) sampai diakhiri
 // admin. Perpanjangan: KP/Magang 1× 1 bulan, TA 2× 1 bulan. Program lain
 // (Capstone, S2) belum punya aturan, jadi tidak ditandai "perlu ditinjau".
@@ -30,6 +32,52 @@ export function idNomor(tahun, urut) { return `${tahun}-${String(urut).padStart(
 export function formatNomor(urut, bulan, tahun) {
   const { fakultas, penandatangan, hal } = KODE_NOMOR;
   return `${String(urut).padStart(3, '0')}/${fakultas}.${penandatangan}/${hal}/${romawiBulan(bulan)}/${tahun}`;
+}
+
+// Baca nomor ketikan manual → { urut, bulan, tahun }, atau null bila tidak persis
+// sesuai format (termasuk kode yang salah, bulan Romawi tidak valid, atau nomor urut
+// yang tidak tiga digit). opsi.longgar: hanya nomor urut, bulan & tahun yang diperiksa,
+// untuk nomor lama yang tersimpan sebelum format berubah (mis. masih memuat ".TL").
+export function bacaNomor(nomor, opsi = {}) {
+  const s = String(nomor || '').trim();
+  const h = s.match(/^(\d+)\/.+\/([IVX]+)\/(\d{4})$/);
+  if (!h) return null;
+  const hasil = { urut: Number(h[1]), bulan: ROMAWI.indexOf(h[2]) + 1, tahun: Number(h[3]) };
+  if (!hasil.urut || !hasil.bulan) return null;
+  if (opsi.longgar) return hasil;
+  return formatNomor(hasil.urut, hasil.bulan, hasil.tahun) === s ? hasil : null;
+}
+
+// Bulan/tahun nomor dibanding bulan ini (jam perangkat admin): 'depan' (ditolak),
+// 'lalu' / 'tahun-lalu' (minta konfirmasi), atau null bila bulan ini.
+export function waktuNomor(p, now = new Date()) {
+  const tahun = now.getFullYear();
+  const bulan = now.getMonth() + 1;
+  if (p.tahun > tahun || (p.tahun === tahun && p.bulan > bulan)) return 'depan';
+  if (p.tahun < tahun) return 'tahun-lalu';
+  return p.bulan < bulan ? 'lalu' : null;
+}
+
+export const NAMA_BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+// Nomor urut tahun `tahun` yang dipakai record mahasiswa tapi belum tercatat di
+// registri (mis. diketik sebelum pencatatan aktif). Ikut dihindari saat menyarankan
+// nomor berikutnya.
+export function urutTerpakaiDiRecord(semua, tahun, kecualiId) {
+  return (semua || [])
+    .filter((x) => x.id !== kecualiId && x.nomorSurat && !x.nomorSuratId)
+    .map((x) => bacaNomor(x.nomorSurat, { longgar: true }))
+    .filter((p) => p && p.tahun === tahun)
+    .map((p) => p.urut);
+}
+
+// Record mahasiswa lain yang memakai nomor (tahun + urut) yang sama.
+export function pemakaiNomorLain(semua, p, kecualiId) {
+  return (semua || []).find((x) => {
+    if (x.id === kecualiId || !x.nomorSurat) return false;
+    const q = bacaNomor(x.nomorSurat, { longgar: true });
+    return q && q.tahun === p.tahun && q.urut === p.urut;
+  }) || null;
 }
 
 // Kunci sortir: tahun dulu, baru nomor urut (urutan reset tiap tahun, jadi 001/2026

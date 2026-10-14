@@ -2,6 +2,8 @@ import React, { useState, useMemo, useRef } from 'react';
 import { perpanjanganDocType, PROGRAMS, programOf, stagesFor, eventsFor, rolesFor, syaratLabel, SEMUA, buatId, todayISO, RUANG, jamTampil, cariBentrok, waMahasiswa, tahapBerikut, tahapSebelumnya, eventAktif, berkasSyarat, catatAktivitas, formatTanggal, normalizeUrl, dokumenFieldFor, dosenAktifUntuk } from '../../utils/helpers.js';
 import { opsiRuang, periksaUsulanRuang, teksBentrokRuang, milikProgram } from '../../modules/ruang';
 import { FITUR_RUANG } from '../../utils/config.js';
+import { catatNomorManual } from '../../utils/nomorSuratDb.js';
+import { bacaNomor, waktuNomor, pemakaiNomorLain, urutTerpakaiDiRecord, NAMA_BULAN } from '../../utils/nomorSurat.js';
 import { Field } from '../../components/ui.jsx';
 import { generateDocument, getTemplateConfig } from '../../utils/documentGenerator.js';
 import { readFileForUpload } from '../../utils/fileUpload.js';
@@ -66,6 +68,9 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
     return (awal && initStages.includes(awal.tahap)) ? awal.tahap : initStages[0];
   });
   const dosenByKode = useMemo(() => Object.fromEntries((allDosen || []).map((d) => [d.kode, d])), [allDosen]);
+  // Nomor urut tahun ini yang dipakai record lain tapi belum tercatat di registri,
+  // supaya "Isi nomor berikutnya" tidak menyarankannya.
+  const nomorTerpakai = useMemo(() => urutTerpakaiDiRecord(allMahasiswa, new Date().getFullYear(), m.id), [allMahasiswa, m.id]);
   const bentrokLive = useMemo(() => cariBentrok(allMahasiswa, m), [allMahasiswa, m]);
   // Bentrok dengan jadwal ruang (kuliah/kegiatan) — peringatan untuk admin, boleh tetap disimpan.
   const bentrokRuangLive = useMemo(() => {
@@ -148,7 +153,7 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
     });
   }
 
-  function submit() {
+  async function submit() {
     if (!m.nama.trim()) { setErr('Nama wajib diisi.'); return; }
     let calon = { ...m, angkatan: Number(m.angkatan) || m.angkatan };
     const masalah = [];
@@ -168,6 +173,37 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
     if (masalah.length) { setErr('Tidak bisa menyimpan:\n• ' + masalah.join('\n• ')); return; }
     const semuaBentrok = [...cb.bentrok, ...bentrokRuangLive.map((x) => 'Ruang: ' + x)];
     if (semuaBentrok.length && !window.confirm('Ada bentrok jadwal:\n• ' + semuaBentrok.join('\n• ') + '\n\nTetap simpan?')) return;
+    // Nomor surat dicatat di registri dulu; kalau ditolak (format salah, bulan depan,
+    // dipakai mahasiswa lain), record tidak disimpan dan pesannya tampil di form.
+    // Nomor lama yang belum tercatat & tidak diubah dicatat dengan pemeriksaan longgar
+    // (format lama masih memuat ".TL"); yang tidak terbaca dilewati, tidak memblokir simpan.
+    const { nomorDisarankan, ...tanpaSaran } = calon;
+    calon = tanpaSaran;
+    const nomorSurat = (calon.nomorSurat || '').trim();
+    const berubah = nomorSurat !== ((awal && awal.nomorSurat) || '').trim();
+    if (berubah && nomorSurat) {
+      const p = bacaNomor(nomorSurat);
+      if (!p) { setErr('Tidak bisa menyimpan: format nomor surat tidak sesuai. Lihat panduan format di samping isian Nomor Surat.'); return; }
+      const now = new Date();
+      const bulanIni = `${NAMA_BULAN[now.getMonth()]} ${now.getFullYear()}`;
+      const bulanNomor = `${NAMA_BULAN[p.bulan - 1]} ${p.tahun}`;
+      const waktu = waktuNomor(p, now);
+      if (waktu === 'depan') { setErr(`Tidak bisa menyimpan: nomor surat bertanggal ${bulanNomor}, melewati bulan ini (${bulanIni}).`); return; }
+      const lain = pemakaiNomorLain(allMahasiswa, p, calon.id);
+      if (lain) { setErr(`Tidak bisa menyimpan: nomor surat ini sudah dipakai ${lain.nama} (${lain.nim}).`); return; }
+      if (waktu && !window.confirm(`Nomor surat ini bertanggal ${bulanNomor}, bukan bulan ini (${bulanIni}).`
+        + (waktu === 'tahun-lalu' ? `\n\nNomor ini masuk urutan tahun ${p.tahun}.` : '') + '\n\nTetap simpan?')) return;
+    }
+    if (berubah || (nomorSurat && !calon.nomorSuratId && bacaNomor(nomorSurat, { longgar: true }))) {
+      try {
+        const sumber = nomorDisarankan && nomorDisarankan === nomorSurat ? 'saran' : 'manual';
+        const nomorSuratId = await catatNomorManual({ ...calon, nomorSurat }, awal, { longgar: !berubah, sumber });
+        calon = { ...calon, nomorSurat, nomorSuratId };
+      } catch (e) {
+        setErr('Tidak bisa menyimpan: ' + (e.message || 'gagal mencatat nomor surat.'));
+        return;
+      }
+    }
     setErr('');
     onSave(baru ? catatAktivitas(calon, 'dibuat') : calon);
   }
@@ -339,7 +375,7 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
         tahapTab={tahapTab} setTahapTab={setTahapTab} p={p} events={events} jadwalBlok={jadwalBlok}
         dosenByKode={dosenByKode} konten={konten} uploadAdminDokumenKP={uploadAdminDokumenKP} hapusAdminDokumenKP={hapusAdminDokumenKP}
         unduhPerpanjanganKP={unduhPerpanjanganKP} dlBusyKP={dlBusyKP}
-        verifAwal={awal ? awal.verifikasi : null}
+        verifAwal={awal ? awal.verifikasi : null} nomorTerpakai={nomorTerpakai}
         baru={baru} onCancel={onCancel} submit={submit} navEntri={navEntri} modalOpsi={modalOpsi}
       />
     );
@@ -351,7 +387,7 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
       roles={roles} pembimbing1Label={pembimbing1Label} penguji1Label={penguji1Label} dosenOpts={dosenOpts} bebanBlok={bebanBlok} stages={stages} events={events} jadwalBlok={jadwalBlok}
       alurTahapBlok={alurTahapBlok} notifikasiBlok={notifikasiBlok} peringatanBlok={peringatanBlok} p={p}
       dosenByKode={dosenByKode}
-      verifAwal={awal ? awal.verifikasi : null}
+      verifAwal={awal ? awal.verifikasi : null} nomorTerpakai={nomorTerpakai}
       baru={baru} onCancel={onCancel} submit={submit} navEntri={navEntri} modalOpsi={modalOpsi}
     />
   );

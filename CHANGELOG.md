@@ -1,5 +1,46 @@
 # Changelog
 
+## 14-10-2026 (5) — Tombol kirim tautan jadi ikon
+- Halaman dokumen Portal mahasiswa: tombol "Kirim tautan" (mis. Folder Berkas Final KP) diganti tombol ikon pesawat kertas di kanan isian tautan (`IkonKirim` di `DokIkon.jsx`). Tombol "Batal" saat mengganti tautan tetap di bawah isian.
+- Ikon dokumen di halaman yang sama: PDF berwarna merah, DOC (Word) biru (`.ikon-pdf` / `.ikon-doc`).
+
+## 14-10-2026 (4) — Berita Acara & Penilaian KP
+- Dokumen baru "Berita Acara & Penilaian KP" di tahap Bimbingan, di samping Lembar Pengesahan (`penilaianKP` di `KP_DOKUMEN`, docType `Penilaian KP`, template `KP/penilaian-kp.docx`), menggantikan BA Seminar KP. Tersedia setelah dosen pembimbing ditetapkan. Dinilai pembimbing di kertas lalu dikembalikan ke admin, jadi hanya admin yang mengunggah hasilnya; `penilaianKP` ditambahkan ke `dokumenAdmin()` (`firestore.rules`) dan `berkasAdmin()` (`storage.rules`).
+- Tag jadwal seminar di template diganti karena tahap Seminar KP sudah tidak ada: `{hari_smkp}` → `{hari_cetak}` (tag baru: nama hari tanggal cetak), `{tanggal_smkp}` → `{tgl_cetak}`, `{tempat_smkp}` dihapus (Tempat diisi tangan).
+
+## 14-10-2026 (3) — Alur Pembukuan KP + "Menunggu verifikasi" untuk setiap kiriman
+- Lembar Pengesahan KP (template Word + unggahan PDF bertanda tangan) pindah ke tahap Bimbingan (tersedia setelah dosen pembimbing ditetapkan). Mengunggahnya memindahkan mahasiswa dari Bimbingan ke Pembukuan secara otomatis (aktivitas `tahapPembukuan`), sama seperti surat balasan memindahkan Pendaftaran → Bimbingan; `tahapMhsAman` di `firestore.rules` mengizinkan langkah ini.
+- Di tahap Pembukuan mahasiswa mengirim tautan folder berkas final. Admin menyetujuinya dengan mencentang "Sudah diperiksa" dan mengubah status ke Terverifikasi (`pembukuanDisetujui` di `helpers.js`); persetujuan ini membuka dokumen baru "Surat Keterangan Selesai Pembukuan" (`suratPembukuanKP`, docType `Surat Pembukuan KP`). Templatenya menyusul: sampai case-nya ada di `getTemplateConfig`, dokumen ini tampil "Template surat belum tersedia". Mengirim/mengganti tautan mencabut centang.
+- Kiriman yang menuntut tindakan admin mengembalikan status ke "Menunggu verifikasi" (`tandaiMenungguVerifikasi`): surat balasan (Pendaftaran → Bimbingan, admin menetapkan pembimbing), tautan folder Pembukuan (admin menyetujui), usulan jadwal & berkas sidang, dan perpanjangan. Unggahan biasa tidak, termasuk lembar pengesahan yang langsung memindahkan KP ke Pembukuan. `firestore.rules` mewajibkannya (`ditandaiMenunggu`).
+- Akses fitur (unggah, ajukan jadwal, perpanjangan, tombol di kartu, unduh dokumen) kini mengikuti "pernah terverifikasi" (`pernahDiverifikasi`), bukan status saat ini, jadi mahasiswa berstatus "Menunggu verifikasi" tetap bisa mengunduh semua dokumennya. Pengecualian: status "Perlu perbaikan" mengunci semua unduhan template dan semua kiriman mahasiswa (unggah/ganti berkas, tautan Pembukuan, usulan jadwal & berkas sidang, surat perpanjangan final) sampai pendaftaran dibetulkan (`bolehAksesBerkas`; halaman dokumen dengan pemberitahuan merah, kartu, form perpanjangan), karena data yang tercetak (mis. judul) mungkin masih salah. Menghapus berkas sendiri dan mengajukan perpanjangan tetap boleh. Panel admin tidak terkunci. `firestore.rules` (`perbaikanTerkunci`) dan `storage.rules` ikut menolaknya. Pesan "Pendaftaran sedang menunggu diperiksa admin" hanya untuk pendaftaran yang belum pernah diverifikasi.
+- Banner di halaman Mahasiswa memisahkan "pendaftaran baru" dari "kiriman baru dari mahasiswa perlu diverifikasi".
+- Kartu KP: di Bimbingan meminta lembar pengesahan, di Pembukuan menampilkan status tautan (belum dikirim / menunggu diperiksa / disetujui), masing-masing dengan tombol ke halaman dokumen.
+
+## 14-10-2026 (2) — Pembukuan KP: lembar pengesahan + folder berkas final
+- Tahap Pembukuan KP punya dokumen baru "Lembar Pengesahan KP" (`lembarPengesahanKP` di `KP_DOKUMEN`, template `KP/lempeng_kp.docx`). Templatenya diunduh sebagai Word (.docx) yang bisa diedit, bukan PDF: `getTemplateConfig` mengembalikan `docx: true` dan `generateDocument(..., { docx: true })` melewati konversi PDF. Tombolnya bertuliskan "Unduh Word". Mahasiswa mengunggah kembali pindaian PDF bertanda tangan di slot unggah yang sama.
+- Isian tautan Pembukuan kini untuk folder Google Drive berisi berkas final ("Folder Berkas Final KP"). Di bawahnya, Portal mahasiswa menampilkan format nama berkas + contoh dan daftar 6 berkas wajib; modal admin hanya menampilkan daftar berkasnya (`components/PetunjukPembukuan.jsx`, teks di `PEMBUKUAN_FORMAT_NAMA`/`PEMBUKUAN_DAFTAR_BERKAS` di `helpers.js`).
+- Kartu mahasiswa di tahap Pembukuan meminta kedua berkas dan baru menyatakan "terkirim" setelah lembar pengesahan terunggah dan tautan folder terkirim.
+
+## 14-10-2026 — Tag dosen di template diganti nama peran
+- Tag dosen di semua template `.docx` kini memakai nama peran: `{nama_pembimbing}`/`{nip_pembimbing}`, `{nama_penguji1}`/`{nip_penguji1}`, `{nama_penguji2}`/`{nip_penguji2}`, menggantikan `{nama_dosen1}`…`{nama_dosen4}`/`{nip1}`…`{nip4}`. `documentGenerator.js` mengirim nama baru. Hanya teks tag yang diubah; tata letak dan label baris template tidak disentuh.
+- `ba-sidang-ta.docx` tidak bisa dicetak sama sekali karena tag `{tgl_sidang}}` (kurung tutup ganda); sudah dibetulkan.
+- Di template TA lama (4 dosen): Ketua Penguji = penguji 1, Anggota Penguji = penguji 2. Tag di baris "Pembimbing II" yang tidak lagi dikirim dihapus (sebelumnya tercetak "undefined"); barisnya perlu dihapus/diganti labelnya manual, lihat `List of Tags.txt`.
+- Tag ganda/alias disatukan: `{judul_kp}` di kelayakan-proposal-magang → `{judul_magang}`, `{tanggal_smmagang}`/`{tanggal_smmkt}` → `{tgl_smmagang}`/`{tgl_smmkt}`, `{judul_TA}` → `{judul_ta}`, `{tgl_surat_ppta}` → `{tgl_cetak}`, `{tgl_surat_sempro}` → `{tgl_sempro}`. Alias `topik_ta`, `judul_kp` (Magang), `judul_TA`, `tgl_surat_*` tidak dikirim lagi.
+
+## 13-10-2026 (2) — Nomor surat hibrida aktif di semua build
+- Satu panel Nomor Surat untuk semua build (`NomorSuratPanel.jsx`): isian tetap bisa diketik, ditambah tombol "Isi nomor berikutnya" yang mengisi nomor urut terkecil tahun ini yang belum dipakai (`nomorBerikutnya` di `utils/nomorSuratDb.js`). Nomor yang diketik lebih jauh (mis. 045) dilewati, begitu juga nomor di record mahasiswa yang belum tercatat di registri. Alur "Ambil nomor" (isian hanya-baca, nomor langsung diterbitkan) di build eksperimental dihapus, begitu juga tombol "Akhiri nomor" (cukup kosongkan isian lalu Simpan). "Akhiri & daftar ulang" tetap ada untuk nomor yang tercatat.
+- Pencatatan ke registri saat Simpan kini aktif di build yang di-deploy (`CATAT_NOMOR_MANUAL` dihapus). Registri mencatat `sumber: 'saran'` bila nomor berasal dari tombol dan tidak diubah, `'manual'` bila diketik.
+- Simpan ditolak bila bulan/tahun nomor baru/diubah melewati bulan ini, dan meminta konfirmasi bila bulan/tahunnya sudah lewat (`waktuNomor` di `utils/nomorSurat.js`, memakai jam perangkat admin). Simpan juga ditolak bila nomor yang sama (tahun + nomor urut) dipakai record mahasiswa lain, termasuk yang belum tercatat di registri.
+- `nomorSuratCounter/` tidak dipakai lagi: nomor berikutnya dicari langsung dari registri, dan aturannya dihapus dari `firestore.rules`.
+- Tab Registri Nomor Surat tampil di semua build.
+
+## 13-10-2026 — Nomor surat manual tercatat di registri (sementara hanya localhost)
+- Build produksi: nomor surat yang diketik di modal edit mahasiswa dicatat di registri `nomorSurat/` saat Simpan (`sumber: 'manual'`, tampil "Diketik manual" di Registri), dan `nomorSuratCounter/{tahun}` dinaikkan bila nomor urutnya lebih besar, supaya penomoran otomatis nanti melanjutkan dari nomor terakhir. Nomor lama mahasiswa itu, bila diganti atau dikosongkan, ditandai kedaluwarsa. Simpan ditolak bila nomor baru/diubah tidak persis sesuai format (`bacaNomor` di `utils/nomorSurat.js`), sudah dipakai mahasiswa lain, atau sudah pernah diakhiri. Nomor lama yang tidak diubah (termasuk format lama dengan `.TL`) dicatat dengan pemeriksaan longgar dan tidak pernah memblokir simpan.
+- Tab Pengaturan → Registri Nomor Surat juga tampil di build produksi selama fitur ini aktif.
+- Semua build: menghapus mahasiswa (atau akunnya) menandai nomornya di registri sebagai kedaluwarsa, bila nomornya tercatat.
+- Counter dibaca dengan `Number()`, jadi nilai `terakhir` yang tersimpan sebagai teks (mis. diisi lewat Firebase console) tidak lagi menghasilkan nomor 51 dari "5".
+- Sementara hanya aktif di `npm run dev` (`CATAT_NOMOR_MANUAL` di `utils/config.js`); build yang di-deploy tidak berubah. Lihat DEPLOY.md.
+
 ## 12-10-2026 (4) — Grafik beban dosen dipisah per peran
 - Panduan format nomor surat (isian manual) kini dibuka/ditutup lewat tombol lampu di kanan isian "Nomor Surat", menggantikan tautan lipat di bawahnya. Ikon `LampIcon` ada di `ui.jsx`.
 - Dropdown dosen pembimbing/penguji di tab tahap modal edit KP/Magang/TA (Pendaftaran TA, Bimbingan, Seminar Proposal, Sidang) dibuat selebar penuh.

@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { dokumenPerTahap, eventsFor, formatTanggal, getJadwal, normalizeUrl, programDisplayLabel, programOf, stagesFor } from '../../utils/helpers.js';
+import { bolehAksesBerkas, pernahDiverifikasi, dokumenPerTahap, eventsFor, formatTanggal, getJadwal, normalizeUrl, programDisplayLabel, programOf, stagesFor } from '../../utils/helpers.js';
 import { generateDocument, getTemplateConfig, prefetchTemplate, warmConverter } from '../../utils/documentGenerator.js';
-import { IkonKembali, IkonLanjut, IkonPdf, IkonSebelum, IkonSelesai, IkonTautan, IkonTerkunci, IkonUnggah } from '../../components/DokIkon.jsx';
+import { PetunjukPembukuan } from '../../components/PetunjukPembukuan.jsx';
+import { IkonKembali, IkonKirim, IkonLanjut, IkonPdf, IkonSebelum, IkonSelesai, IkonTautan, IkonTerkunci, IkonUnggah } from '../../components/DokIkon.jsx';
 
 // ===================== HalamanDokumen.jsx =====================
 // Halaman dokumen satu pengajuan (Portal mahasiswa), dibuka dari baris
@@ -49,6 +50,7 @@ export function HalamanDokumen({ m, allDosen = [], konten = {}, onBack, onUpload
   const unduhan = aktif ? aktif.dokumen.filter((d) => d.docType || d.linkEksternal || d.linkButton) : [];
   const unggahan = aktif ? aktif.dokumen.filter((d) => d.upload || d.studentUpload !== false) : [];
   const tautanMhs = aktif ? aktif.dokumen.filter((d) => d.linkInput) : [];
+  const terkunci = !bolehAksesBerkas(m);
 
   return (
     <div className="dok-page">
@@ -57,6 +59,12 @@ export function HalamanDokumen({ m, allDosen = [], konten = {}, onBack, onUpload
         <h2 className="dok-page-title">Dokumen</h2>
         <span className="dok-page-prog">{programDisplayLabel(m)}</span>
       </div>
+
+      {terkunci && pernahDiverifikasi(m) && (
+        <div className="callout callout-red" style={{ marginBottom: 16 }}>
+          <strong>Perlu perbaikan.</strong> Unduh dan unggah dokumen dikunci sampai data pendaftaran dibetulkan sesuai pesan admin (tombol "Edit pendaftaran" di kartu).
+        </div>
+      )}
 
       {grup.length === 0 ? (
         <p className="hint dok-kosong">Program ini belum punya dokumen.</p>
@@ -88,9 +96,9 @@ export function HalamanDokumen({ m, allDosen = [], konten = {}, onBack, onUpload
           {unggahan.length > 0 && (
             <section className="dok-seksi">
               <h3 className="dok-eyebrow">Unggah berkas</h3>
-              <p className="hint dok-seksi-hint">Unggah versi yang sudah ditandatangani atau dinilai, dalam format PDF.</p>
+              <p className="hint dok-seksi-hint">Unggah versi yang sudah ditandatangani dalam format PDF.</p>
               <div className="dok-slots">
-                {unggahan.map((d) => <SlotUnggah key={d.key} d={d} onUpload={onUpload} onDeleteUpload={onDeleteUpload} />)}
+                {unggahan.map((d) => <SlotUnggah key={d.key} d={d} terkunci={terkunci} onUpload={onUpload} onDeleteUpload={onDeleteUpload} />)}
               </div>
             </section>
           )}
@@ -99,7 +107,7 @@ export function HalamanDokumen({ m, allDosen = [], konten = {}, onBack, onUpload
             <section className="dok-seksi">
               <h3 className="dok-eyebrow">Kirim tautan</h3>
               <div className="dok-slots">
-                {tautanMhs.map((d) => <SlotTautan key={d.key} d={d} onKirim={(url) => onKirimTautan(d.linkField, url)} />)}
+                {tautanMhs.map((d) => <SlotTautan key={d.key} d={d} terkunci={terkunci} onKirim={(url) => onKirimTautan(d.linkField, url)} />)}
               </div>
             </section>
           )}
@@ -143,7 +151,11 @@ function BarisUnduh({ d, m, jEv, dosenByKode }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const tautan = !d.docType;
-  const siap = tautan ? !!d.linkEksternal : d.eligible;
+  const config = tautan ? null : getTemplateConfig(d.docType, m, dosenByKode, jEv);
+  const tanpaTemplate = !tautan && d.eligible && !config; // docType sudah ada, template menyusul
+  const dikunci = !tautan && !bolehAksesBerkas(m); // status "Perlu perbaikan"
+  const siap = tautan ? !!d.linkEksternal : d.eligible && !!config && !dikunci;
+  const docx = !!(config && config.docx);
 
   async function unduh() {
     const config = getTemplateConfig(d.docType, m, dosenByKode, jEv);
@@ -151,7 +163,7 @@ function BarisUnduh({ d, m, jEv, dosenByKode }) {
     setErr('');
     setBusy(true);
     try {
-      await generateDocument(config.template, config.filename, config.data);
+      await generateDocument(config.template, config.filename, config.data, { docx: config.docx });
     } catch (ex) {
       setErr(ex.message || 'Gagal menyiapkan PDF. Coba lagi.');
     } finally {
@@ -160,12 +172,12 @@ function BarisUnduh({ d, m, jEv, dosenByKode }) {
   }
 
   let keterangan = null;
-  if (!siap) keterangan = <span className="dok-syarat">{tautan ? 'Tautan belum tersedia.' : (d.syarat || 'Belum tersedia.')}</span>;
-  else if (d.catatan) keterangan = <span>{d.catatan}</span>;
+  if (!siap) keterangan = <span className="dok-syarat">{tautan ? 'Tautan belum tersedia.' : dikunci && d.eligible ? 'Unduhan dikunci: perbaiki data pendaftaran sesuai pesan admin terlebih dahulu.' : tanpaTemplate ? 'Template surat belum tersedia.' : (d.syarat || 'Belum tersedia.')}</span>;
+  else if (d.catatan && !d.catatanAdminSaja) keterangan = <span>{d.catatan}</span>;
 
   return (
     <li className={'dok-row' + (siap ? '' : ' dok-row-off')}>
-      <span className={'dok-row-ikon' + (siap ? '' : ' off')}>{!siap ? <IkonTerkunci /> : tautan ? <IkonTautan /> : <IkonPdf />}</span>
+      <span className={'dok-row-ikon' + (siap ? '' : ' off')}>{!siap ? <IkonTerkunci /> : tautan ? <IkonTautan /> : <IkonPdf label={docx ? 'DOC' : 'PDF'} />}</span>
       <div className="dok-row-teks">
         <div className="dok-row-nama">{d.label}</div>
         {keterangan && <div className="dok-row-sub">{keterangan}</div>}
@@ -182,13 +194,14 @@ function BarisUnduh({ d, m, jEv, dosenByKode }) {
           ? <a className="btn dok-btn" href={d.linkEksternal} target="_blank" rel="noreferrer">{(d.linkButton && d.linkLabel) || 'Buka'}</a>
           : <button type="button" className="btn dok-btn" disabled>Buka</button>
       ) : (
-        <button type="button" className="btn dok-btn" onClick={unduh} disabled={!siap || busy}>{busy ? 'Menyiapkan…' : 'Unduh'}</button>
+        <button type="button" className="btn dok-btn" onClick={unduh} disabled={!siap || busy}>{busy ? 'Menyiapkan…' : (docx ? 'Unduh Word' : 'Unduh')}</button>
       )}
     </li>
   );
 }
 
-function SlotUnggah({ d, onUpload, onDeleteUpload }) {
+// terkunci = status "Perlu perbaikan" (bolehAksesBerkas); menghapus berkas tetap boleh.
+function SlotUnggah({ d, terkunci, onUpload, onDeleteUpload }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [ganti, setGanti] = useState(false);
@@ -225,7 +238,7 @@ function SlotUnggah({ d, onUpload, onDeleteUpload }) {
           </div>
           {bolehUnggah && (
             <div className="dok-terunggah-aksi">
-              {d.eligible && <button type="button" className="link-btn dok-link" onClick={() => setGanti(true)}>Ganti</button>}
+              {d.eligible && !terkunci && <button type="button" className="link-btn dok-link" onClick={() => setGanti(true)}>Ganti</button>}
               {onDeleteUpload && <button type="button" className="link-btn danger dok-link" onClick={hapus}>Hapus</button>}
             </div>
           )}
@@ -234,13 +247,13 @@ function SlotUnggah({ d, onUpload, onDeleteUpload }) {
     );
   }
 
-  if (!d.eligible) {
+  if (!d.eligible || terkunci) {
     return (
       <div className="dok-slot">
         <div className="dok-slot-nama">{d.label}</div>
         <div className="dok-slot-off">
           <IkonTerkunci size={22} />
-          <span>Belum bisa diunggah.{!d.docType && d.syarat ? ` ${d.syarat}` : ''}</span>
+          <span>{terkunci && d.eligible ? 'Dikunci: perbaiki data pendaftaran sesuai pesan admin terlebih dahulu.' : `Belum bisa diunggah.${!d.docType && d.syarat ? ` ${d.syarat}` : ''}`}</span>
         </div>
       </div>
     );
@@ -256,10 +269,10 @@ function SlotUnggah({ d, onUpload, onDeleteUpload }) {
   );
 }
 
-// Slot tautan Google Drive yang diisi mahasiswa (mis. bukti Pembukuan KP).
+// Slot tautan Google Drive yang diisi mahasiswa (mis. folder berkas final KP).
 // Setelah terkirim tampil sebagai tautan dengan tombol "Ganti" selama masih
 // boleh diisi (eligible).
-function SlotTautan({ d, onKirim }) {
+function SlotTautan({ d, terkunci, onKirim }) {
   const [edit, setEdit] = useState(false);
   const [nilai, setNilai] = useState(d.linkTerkirim || '');
   const [err, setErr] = useState('');
@@ -279,25 +292,26 @@ function SlotTautan({ d, onKirim }) {
           <span className="dok-terunggah-ikon"><IkonSelesai /></span>
           <div className="dok-row-teks">
             <a className="dok-terunggah-file" href={normalizeUrl(d.linkTerkirim)} target="_blank" rel="noreferrer">{d.linkTerkirim}</a>
-            <div className="dok-terunggah-meta">Terkirim, menunggu diperiksa admin</div>
+            <div className="dok-terunggah-meta">{d.linkDisetujui ? 'Disetujui admin' : 'Terkirim, menunggu diperiksa admin'}</div>
           </div>
-          {d.eligible && (
+          {d.eligible && !terkunci && (
             <div className="dok-terunggah-aksi">
               <button type="button" className="link-btn dok-link" onClick={() => { setNilai(d.linkTerkirim); setEdit(true); }}>Ganti</button>
             </div>
           )}
         </div>
+        {d.key === 'pembukuan' && <PetunjukPembukuan denganFormat />}
       </div>
     );
   }
 
-  if (!d.eligible) {
+  if (!d.eligible || terkunci) {
     return (
       <div className="dok-slot">
         <div className="dok-slot-nama">{d.label}</div>
         <div className="dok-slot-off">
           <IkonTerkunci size={22} />
-          <span>Belum bisa dikirim. {d.syarat}</span>
+          <span>{terkunci && d.eligible ? 'Dikunci: perbaiki data pendaftaran sesuai pesan admin terlebih dahulu.' : `Belum bisa dikirim. ${d.syarat}`}</span>
         </div>
       </div>
     );
@@ -307,12 +321,17 @@ function SlotTautan({ d, onKirim }) {
     <div className="dok-slot">
       <div className="dok-slot-nama">{d.label}</div>
       {d.catatan && <p className="hint" style={{ margin: 0 }}>{d.catatan}</p>}
-      <input value={nilai} onChange={(e) => setNilai(e.target.value)} placeholder="https://drive.google.com/..." aria-label={`Tautan ${d.label}`} />
-      {err && <div className="login-err">{err}</div>}
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button type="button" className="btn btn-primary" onClick={kirim}>Kirim tautan</button>
-        {edit && <button type="button" className="btn ghost" onClick={() => { setEdit(false); setErr(''); }}>Batal</button>}
+      <div className="dok-kirim-row">
+        <input value={nilai} onChange={(e) => setNilai(e.target.value)} placeholder="https://drive.google.com/..." aria-label={`Tautan ${d.label}`} />
+        <button type="button" className="btn btn-primary dok-kirim-btn" onClick={kirim} aria-label="Kirim tautan" title="Kirim tautan"><IkonKirim /></button>
       </div>
+      {err && <div className="login-err">{err}</div>}
+      {edit && (
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="button" className="btn ghost" onClick={() => { setEdit(false); setErr(''); }}>Batal</button>
+        </div>
+      )}
+      {d.key === 'pembukuan' && <PetunjukPembukuan denganFormat />}
     </div>
   );
 }

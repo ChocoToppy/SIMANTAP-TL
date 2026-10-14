@@ -9,7 +9,7 @@ import { SeksiStaf } from './pengaturan/SeksiStaf.jsx';
 import { SeksiForm } from './pengaturan/SeksiForm.jsx';
 import { SeksiNomorSurat } from './pengaturan/SeksiNomorSurat.jsx';
 import { SeksiJadwalRuang } from '../modules/ruang';
-import { FITUR_EKSPERIMENTAL, FITUR_RUANG } from '../utils/config.js';
+import { FITUR_RUANG } from '../utils/config.js';
 import { ErrorBoundary } from '../components/ErrorBoundary.jsx';
 import { TabIcon } from '../components/ui.jsx';
 import { konfirmasiKeluar } from '../utils/perubahanBelumDisimpan.js';
@@ -35,8 +35,7 @@ const SUB_TABS = [
   { key: 'konten', label: 'Konten', icon: 'dokumen' },
   { key: 'akun', label: 'Akun Mahasiswa', icon: 'kunci' },
   { key: 'staf', label: 'Dosen & Admin', icon: 'akun' },
-  // Eksperimental: hanya ada di build `full`, lihat FITUR_EKSPERIMENTAL.
-  ...(FITUR_EKSPERIMENTAL ? [{ key: 'nomorSurat', label: 'Registri Nomor Surat', icon: 'dokumen' }] : []),
+  { key: 'nomorSurat', label: 'Registri Nomor Surat', icon: 'dokumen' },
   ...(FITUR_RUANG ? [{ key: 'ruang', label: 'Jadwal Ruang', icon: 'ruang' }] : []),
 ];
 

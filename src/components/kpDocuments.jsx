@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { dokumenPerTahap, eventsFor, formatTanggal, getJadwal, normalizeUrl, stagesFor } from '../utils/helpers.js';
+import { bolehAksesBerkas, dokumenPerTahap, eventsFor, formatTanggal, getJadwal, normalizeUrl, stagesFor } from '../utils/helpers.js';
 import { generateDocument, getTemplateConfig, prefetchTemplate, warmConverter } from '../utils/documentGenerator.js';
 import { Badge, FileDropZone } from './ui.jsx';
 
@@ -119,7 +119,8 @@ export function KpDocumentPanel({ m, program = 'KP', dosenByKode = {}, konten = 
 // sendiri dari kombinasi tombol & keterangan.
 function statusDokumen(d, bolehUnggah) {
   if (d.linkInput) {
-    if (d.linkTerkirim) return { tone: 'green', label: 'Terkirim' };
+    if (d.linkDisetujui) return { tone: 'green', label: 'Disetujui' };
+    if (d.linkTerkirim) return { tone: 'amber', label: 'Menunggu diperiksa' };
     return d.eligible ? { tone: 'amber', label: 'Belum dikirim' } : { tone: 'gray', label: 'Belum tersedia' };
   }
   if (d.upload) return { tone: 'green', label: 'Terunggah' };
@@ -137,18 +138,23 @@ function KpDokumenItem({ d, m, jEv, dosenByKode, canUpload, role, onUpload, onDe
   const bolehUnggahDiSini = canUpload && (
     role === 'admin' ? !!d.adminUpload : d.studentUpload !== false
   );
-  const status = statusDokumen(d, bolehUnggahDiSini);
-  const bisaUnduh = d.docType && d.eligible;
-  const bisaUnggah = bolehUnggahDiSini && d.eligible;
+  const config = d.docType ? getTemplateConfig(d.docType, m, dosenByKode, jEv) : null;
+  const tanpaTemplate = !!d.docType && d.eligible && !config; // template menyusul
+  const status = tanpaTemplate ? { tone: 'gray', label: 'Template belum ada' } : statusDokumen(d, bolehUnggahDiSini);
+  // Mahasiswa berstatus "Perlu perbaikan" tidak bisa mengunduh/mengunggah; admin selalu bisa.
+  const aksesMhs = role === 'admin' || bolehAksesBerkas(m);
+  const bisaUnduh = d.docType && d.eligible && !!config && aksesMhs;
+  const bisaUnggah = bolehUnggahDiSini && d.eligible && aksesMhs;
   const bisaHapus = d.upload && bolehUnggahDiSini && onDeleteUpload;
   const tautan = role !== 'admin' && d.linkEksternal;
 
+  const docx = !!(config && config.docx);
+
   async function unduh() {
-    const config = getTemplateConfig(d.docType, m, dosenByKode, jEv);
     if (!config) return;
     setDlBusy(true);
     try {
-      await generateDocument(config.template, config.filename, config.data);
+      await generateDocument(config.template, config.filename, config.data, { docx: config.docx });
     } finally {
       setDlBusy(false);
     }
@@ -203,7 +209,7 @@ function KpDokumenItem({ d, m, jEv, dosenByKode, canUpload, role, onUpload, onDe
         <div className="kp-dok-aksi">
           {bisaUnduh && (
             <button type="button" className={'btn' + (d.upload ? '' : ' btn-primary')} onClick={unduh} disabled={dlBusy}>
-              {dlBusy ? 'Menyiapkan PDF…' : 'Unduh PDF'}
+              {dlBusy ? (docx ? 'Menyiapkan…' : 'Menyiapkan PDF…') : (docx ? 'Unduh Word' : 'Unduh PDF')}
             </button>
           )}
           {tautan && d.linkButton && (

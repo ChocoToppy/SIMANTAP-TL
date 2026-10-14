@@ -512,6 +512,12 @@ html[data-theme="dark"] .kp-dok-toggle:hover { background: rgba(241, 241, 238, 0
 .nomor-surat-row .lampu-btn:hover,
 .nomor-surat-row .lampu-btn.aktif { color: var(--amber); }
 .nomor-surat-row .lampu-btn.aktif { background: var(--amber-bg); border-color: var(--amber); }
+.nomor-surat-row .btn { white-space: nowrap; }
+@media (max-width: 640px) {
+  .nomor-surat-row { flex-wrap: wrap; }
+  .nomor-surat-row input { flex-basis: 100%; }
+  .nomor-surat-row .btn { flex: 1; }
+}
 
 /* Dashboard: grafik pembimbing dipecah per program */
 .beban-grup + .beban-grup { margin-top: 18px; }
@@ -1004,6 +1010,8 @@ html[data-theme="dark"] .icon-btn-outline:hover { background: rgba(241, 241, 238
 .dok-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 16px 0; border-bottom: 1px solid var(--border-strong); }
 .dok-row-ikon { display: inline-flex; flex: none; color: var(--blue); align-self: flex-start; padding-top: 2px; }
 .dok-row-ikon.off { color: var(--muted-2); }
+.ikon-pdf { color: var(--red); }
+.ikon-doc { color: var(--blue); }
 .dok-row-teks { flex: 1 1 140px; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .dok-terunggah .dok-row-teks { flex: 1 1 0; }
 .dok-row-tautan { font-size: 0.85rem; color: var(--blue); overflow-wrap: anywhere; }
@@ -1032,6 +1040,10 @@ html[data-theme="dark"] .icon-btn-outline:hover { background: rgba(241, 241, 238
 .dok-terunggah-meta { font-size: 0.8rem; }
 .dok-terunggah-aksi { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex: none; }
 .dok-link { min-height: 40px; font-size: 0.88rem; }
+/* Isian tautan + tombol kirim (ikon pesawat kertas) sebaris */
+.dok-kirim-row { display: flex; gap: 8px; align-items: stretch; }
+.dok-kirim-row input { flex: 1; min-width: 0; }
+.dok-kirim-btn { flex: none; padding: 0 14px; display: inline-flex; align-items: center; justify-content: center; }
 .dok-terunggah .dok-link:not(.danger) { color: var(--green-text); }
 .dok-slot-off {
   display: flex; align-items: center; gap: 10px; padding: 12px 14px; font-size: 0.85rem; color: var(--muted);

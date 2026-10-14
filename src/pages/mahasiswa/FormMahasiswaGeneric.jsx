@@ -18,7 +18,7 @@ export function FormMahasiswaGeneric({
   roles, pembimbing1Label, penguji1Label, dosenOpts, bebanBlok, stages, events, jadwalBlok,
   alurTahapBlok, notifikasiBlok, peringatanBlok, p,
   dosenByKode, ppBusy, ppErr, berikanSuratPerpanjangan,
-  verifAwal, baru, onCancel, submit, navEntri, modalOpsi,
+  verifAwal, nomorTerpakai, baru, onCancel, submit, navEntri, modalOpsi,
 }) {
   return (
     <Modal
@@ -54,7 +54,7 @@ export function FormMahasiswaGeneric({
                 <option value="perbaikan">Perlu perbaikan</option>
               </select>
             </Field>
-            <NomorSuratPanel m={m} setM={setM} baru={baru} />
+            <NomorSuratPanel m={m} setM={setM} baru={baru} terpakai={nomorTerpakai} />
           </div>
           <div className="hint" style={{ marginTop: 6 }}>Nomor surat ini dipakai untuk semua surat program ini — ambil saat verifikasi pertama kali.</div>
           <PengingatPesan m={m} set={set} verifAwal={verifAwal} />
