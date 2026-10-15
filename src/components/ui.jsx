@@ -73,6 +73,42 @@ export function LampIcon() {
   );
 }
 
+// Pensil: sama dengan ikon edit tautan di LinkBerkasRow.
+export function PencilIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  );
+}
+
+export function ArrowIcon({ arah = 'kanan' }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {arah === 'kiri' ? <path d="M19 12H5M11 6l-6 6 6 6" /> : <path d="M5 12h14M13 6l6 6-6 6" />}
+    </svg>
+  );
+}
+
+export function CheckIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20 6L9 17l-5-5" />
+    </svg>
+  );
+}
+
+export function PrintIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6 9V2h12v7" />
+      <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+      <rect x="6" y="14" width="12" height="8" />
+    </svg>
+  );
+}
+
 // Tombol ✕ di ujung kanan kotak cari, muncul hanya bila ada isi. Pembungkusnya
 // harus position: relative (.search-wrap / .cari-wrap). mousedown dicegah supaya
 // fokus tetap di kotak cari (tidak memicu onBlur).
@@ -215,7 +251,8 @@ export function StageBar({ program, tahap }) {
 // sudah lewat) + keterangan "Tahap x dari n" di bawahnya. Nama tiap tahap
 // tidak ditulis di bawah nodenya karena program TA punya sampai 6 tahap dan
 // tidak muat di lebar HP; nama tahap aktif cukup di keterangan.
-export function StageStepper({ program, tahap }) {
+// `aksi` (opsional): tombol di kanan baris keterangan, mis. panah mundur/lanjut di modal admin.
+export function StageStepper({ program, tahap, aksi = null }) {
   const stages = stagesFor(program);
   const idx = Math.max(0, stages.indexOf(tahap));
   return (
@@ -234,6 +271,7 @@ export function StageStepper({ program, tahap }) {
       <div className="stepper-caption">
         <span className="stepper-count">Tahap {idx + 1} dari {stages.length}</span>
         <strong>{tahap}</strong>
+        {aksi && <span className="stepper-aksi">{aksi}</span>}
       </div>
     </div>
   );

@@ -4,7 +4,7 @@ import { opsiRuang, periksaUsulanRuang, teksBentrokRuang, milikProgram } from '.
 import { FITUR_RUANG } from '../../utils/config.js';
 import { catatNomorManual } from '../../utils/nomorSuratDb.js';
 import { bacaNomor, waktuNomor, pemakaiNomorLain, urutTerpakaiDiRecord, NAMA_BULAN } from '../../utils/nomorSurat.js';
-import { Field } from '../../components/ui.jsx';
+import { Field, Badge, StageStepper, ArrowIcon } from '../../components/ui.jsx';
 import { generateDocument, getTemplateConfig } from '../../utils/documentGenerator.js';
 import { readFileForUpload } from '../../utils/fileUpload.js';
 import { LinkBerkasRow } from './LinkBerkasRow.jsx';
@@ -59,7 +59,6 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
   const modalOpsi = { stabil: !!navEntri, tanpaAnimasi: sudahPindah };
 
   const set = (k, v) => setM((prev) => ({ ...prev, [k]: v }));
-  const setPP = (k, v) => setM((prev) => ({ ...prev, perpanjangan: { ...(prev.perpanjangan || {}), [k]: v } }));
   const setTahap = (v) => set('tahap', v);
   // Tab tahap yang sedang dilihat admin di modal KP — navigasi tampilan saja,
   // TIDAK mengubah m.tahap (yang sebenarnya) sampai admin memakai tombol "Alur tahap".
@@ -69,7 +68,7 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
   });
   const dosenByKode = useMemo(() => Object.fromEntries((allDosen || []).map((d) => [d.kode, d])), [allDosen]);
   // Nomor urut tahun ini yang dipakai record lain tapi belum tercatat di registri,
-  // supaya "Isi nomor berikutnya" tidak menyarankannya.
+  // supaya "Ambil nomor" tidak menyarankannya.
   const nomorTerpakai = useMemo(() => urutTerpakaiDiRecord(allMahasiswa, new Date().getFullYear(), m.id), [allMahasiswa, m.id]);
   const bentrokLive = useMemo(() => cariBentrok(allMahasiswa, m), [allMahasiswa, m]);
   // Bentrok dengan jadwal ruang (kuliah/kegiatan) — peringatan untuk admin, boleh tetap disimpan.
@@ -109,10 +108,7 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
     });
   }
 
-  // Admin memberikan surat perpanjangan ke mahasiswa sebagai berkas terunggah
-  // (bukan tautan Drive) — langsung muncul di Portal mahasiswa untuk diunduh.
-  const [ppBusy, setPpBusy] = useState(false);
-  const [ppErr, setPpErr] = useState('');
+  // Cetak surat perpanjangan dari template (panel Perpanjangan di FormMahasiswaKP).
   const [dlBusyKP, setDlBusyKP] = useState(false);
   async function unduhPerpanjanganKP() {
     const docType = perpanjanganDocType(m);
@@ -123,18 +119,6 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
       await generateDocument(config.template, config.filename, config.data);
     } finally {
       setDlBusyKP(false);
-    }
-  }
-  async function berikanSuratPerpanjangan(file) {
-    setPpErr('');
-    setPpBusy(true);
-    try {
-      const hasil = await readFileForUpload(file, `${m.id}/perpanjangan-admin`);
-      setPP('suratAdmin', hasil);
-    } catch (ex) {
-      setPpErr(ex.message || 'Gagal mengunggah berkas.');
-    } finally {
-      setPpBusy(false);
     }
   }
 
@@ -155,6 +139,7 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
 
   async function submit() {
     if (!m.nama.trim()) { setErr('Nama wajib diisi.'); return; }
+    if (m.dibatalkan && !((m.penutupan || {}).alasan || '').trim()) { setErr('Alasan penutupan wajib diisi.'); return; }
     let calon = { ...m, angkatan: Number(m.angkatan) || m.angkatan };
     const masalah = [];
     // Validasi tanggal jadwal: dalam rentang & berurutan sesuai tahapan.
@@ -204,10 +189,16 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
         return;
       }
     }
+    // Disimpan sebagai Terverifikasi = perubahan data mahasiswa sudah diperiksa:
+    // hapus penandanya supaya unduhan dokumen terbuka lagi (bolehUnduhDokumen).
+    if (calon.verifikasi === 'terverifikasi' && calon.perubahanData) calon = { ...calon, perubahanData: null };
     setErr('');
     onSave(baru ? catatAktivitas(calon, 'dibuat') : calon);
   }
 
+  // Pengajuan lain yang masih terbuka untuk mahasiswa & program yang sama: pengajuan
+  // yang ditutup ini tidak boleh dibuka kembali (satu pengajuan terbuka per program).
+  const adaPengganti = !!m.owner && allMahasiswa.some((x) => x.id !== m.id && x.owner === m.owner && programOf(x) === programOf(m) && !x.dibatalkan);
   const dosenPilihan = dosenAktifUntuk(allDosen, m.pembimbing1, m.pembimbing2, m.penguji1, m.penguji2, m.dosenWali);
   const dosenOpts = (
     <>
@@ -288,38 +279,42 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
     });
     const tidakLulus = () => setM((prev) => ({ ...prev, jadwal: { ...(prev.jadwal || {}), [evA]: { ...((prev.jadwal || {})[evA] || {}), hasil: 'tidak', dikonfirmasi: false } } }));
     // Admin punya wewenang penuh: mundurkan ke tahap sebelumnya kapan pun,
-    // termasuk membatalkan status Lulus. Tidak ada field yang dibersihkan
-    // otomatis — semua (termasuk tanggal lulus) tetap bisa diedit manual.
+    // termasuk membatalkan status Lulus. Mundur dari Lulus mengosongkan tanggal
+    // lulus, supaya saat dilanjutkan lagi tanggalnya terisi ulang (hari itu),
+    // bukan tanggal lama. Field lain tidak dibersihkan.
     const mundurkan = () => setM((prev) => {
       const pv = tahapSebelumnya(programOf(prev), prev.tahap);
-      return pv ? { ...prev, tahap: pv } : prev;
+      if (!pv) return prev;
+      return prev.tahap === 'Lulus' ? { ...prev, tahap: pv, tanggalLulus: '' } : { ...prev, tahap: pv };
     });
+    // Status jadwal kegiatan tahap ini dalam satu lencana; isian lengkapnya
+    // (tanggal, ruang, berkas) ada di blok Jadwal pada tab/bagian tahap itu.
+    const statusJadwal = jA.hasil === 'tidak' ? { tone: 'red', label: 'Tidak lulus, ulang' }
+      : jA.dikonfirmasi ? { tone: 'green', label: 'Jadwal final' }
+      : jA.tanggal ? { tone: 'amber', label: 'Menunggu verifikasi' }
+      : { tone: 'gray', label: 'Belum dijadwalkan' };
     return (
-      <div className="sched field-full">
+      <div className="sched field-full alur-tahap">
         <div className="sched-title">Alur tahap</div>
-        <div className="cell-sub">Tahap saat ini: <strong>{m.tahap}</strong>{next ? ` → berikutnya: ${next}` : ' (tahap akhir)'}</div>
+        <StageStepper
+          program={programOf(m)}
+          tahap={m.tahap}
+          aksi={(prevStage || next) && (
+            <>
+              <button type="button" className="icon-btn-outline alur-panah" onClick={mundurkan} disabled={!prevStage}
+                aria-label={prevStage ? `Mundurkan ke ${prevStage}` : 'Tahap pertama'} title={prevStage ? `Mundurkan ke ${prevStage}` : 'Tahap pertama'}><ArrowIcon arah="kiri" /></button>
+              <button type="button" className="icon-btn-outline alur-panah lanjut" onClick={luluskan} disabled={!next}
+                aria-label={next ? `Lanjut ke ${next}` : 'Tahap terakhir'} title={next ? `Lanjut ke ${next}` : 'Tahap terakhir'}><ArrowIcon /></button>
+            </>
+          )}
+        />
         {evA && (
-          <div className="verif-info" style={{ marginTop: 8 }}>
-            <div>Jadwal {evA}: {jA.tanggal ? formatTanggal(jA.tanggal) : '—'} {jamTampil(jA)} {jA.ruang || ''}</div>
-            <div style={{ margin: '8px 0' }}>
-              <LinkBerkasRow label="Link berkas persyaratan" url={jA.berkasLink} onUbah={(v) => setJadwal(evA, 'berkasLink', v)} diperiksa={jA.berkasDiperiksa} onDiperiksa={(v) => setJadwal(evA, 'berkasDiperiksa', v)} />
-            </div>
-            <div>Status: {jA.dikonfirmasi ? 'jadwal final' : (jA.tanggal ? 'perkiraan / menunggu verifikasi' : 'belum ada jadwal')}{jA.hasil ? ` · hasil terakhir: ${jA.hasil}` : ''}</div>
+          <div className="alur-jadwal">
+            <span>{evA}{jA.tanggal ? `: ${formatTanggal(jA.tanggal)} ${jamTampil(jA)} ${jA.ruang || ''}` : ''}</span>
+            <Badge tone={statusJadwal.tone}>{statusJadwal.label}</Badge>
+            <button type="button" className="btn btn-sm alur-tidak-lulus" onClick={tidakLulus} title={`Tandai ${evA} tidak lulus (harus diulang)`}>Tidak lulus</button>
           </div>
         )}
-        <div className="notif-actions" style={{ marginTop: 8 }}>
-          {prevStage && (
-            <button type="button" className="btn" onClick={mundurkan}>
-              ← Mundurkan ke {prevStage}</button>
-          )}
-          {next && (
-            <button type="button" className="btn btn-primary" onClick={luluskan}>
-              Lanjut ke Tahap Berikutnya{next ? ` (${next})` : ''}</button>
-          )}
-          {evA && <button type="button" className="btn" onClick={tidakLulus}>Tandai tidak lulus (ulang)</button>}
-          {!next && !prevStage && <span className="hint">Satu-satunya tahap pada program ini.</span>}
-        </div>
-        <div className="hint">Tahap saat ini juga bisa diganti langsung lewat dropdown "Tahap saat ini" di atas. Perubahan tersimpan saat klik "Simpan".</div>
       </div>
     );
   })();
@@ -376,7 +371,7 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
         dosenByKode={dosenByKode} konten={konten} uploadAdminDokumenKP={uploadAdminDokumenKP} hapusAdminDokumenKP={hapusAdminDokumenKP}
         unduhPerpanjanganKP={unduhPerpanjanganKP} dlBusyKP={dlBusyKP}
         verifAwal={awal ? awal.verifikasi : null} nomorTerpakai={nomorTerpakai}
-        baru={baru} onCancel={onCancel} submit={submit} navEntri={navEntri} modalOpsi={modalOpsi}
+        baru={baru} onCancel={onCancel} submit={submit} navEntri={navEntri} modalOpsi={modalOpsi} adaPengganti={adaPengganti}
       />
     );
   }
@@ -386,9 +381,8 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
       m={m} setM={setM} set={set} gantiProgram={gantiProgram} periodeList={periodeList} daftarAngkatan={daftarAngkatan}
       roles={roles} pembimbing1Label={pembimbing1Label} penguji1Label={penguji1Label} dosenOpts={dosenOpts} bebanBlok={bebanBlok} stages={stages} events={events} jadwalBlok={jadwalBlok}
       alurTahapBlok={alurTahapBlok} notifikasiBlok={notifikasiBlok} peringatanBlok={peringatanBlok} p={p}
-      dosenByKode={dosenByKode}
       verifAwal={awal ? awal.verifikasi : null} nomorTerpakai={nomorTerpakai}
-      baru={baru} onCancel={onCancel} submit={submit} navEntri={navEntri} modalOpsi={modalOpsi}
+      baru={baru} onCancel={onCancel} submit={submit} navEntri={navEntri} modalOpsi={modalOpsi} adaPengganti={adaPengganti}
     />
   );
 }

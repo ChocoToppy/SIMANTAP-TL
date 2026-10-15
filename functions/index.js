@@ -411,7 +411,9 @@ exports.studentUpdateProfile = functions.https.onCall(async (data, context) => {
     // jadi ID-nya tidak lagi "{nim}_{program}" — tandai di slotPengajuan supaya
     // batas satu pengajuan per program tetap berlaku (lihat firestore.rules).
     slotSnap.docs.forEach((d) => batch.delete(d.ref));
+    // Pengajuan yang ditutup (dibatalkan) tidak memegang slot — sama dengan slotPengajuanUntuk di App.jsx.
     mahasiswaSnap.docs.forEach((d) => {
+      if (d.data().dibatalkan) return;
       const program = d.data().program || 'TA';
       const slotId = `${newNim}_${program}`;
       if (d.id !== slotId) batch.set(db.collection('slotPengajuan').doc(slotId), { mahasiswaId: d.id, owner: newNim, program });

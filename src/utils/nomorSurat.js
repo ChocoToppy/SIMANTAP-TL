@@ -1,4 +1,4 @@
-import { programOf, todayISO, parseISO, tambahHari } from './helpers.js';
+import { programOf, todayISO, parseISO } from './helpers.js';
 
 // ===================== Nomor surat =====================
 // Logika murni (tanpa Firestore) untuk nomor surat: format, aturan perpanjangan,
@@ -12,7 +12,7 @@ import { programOf, todayISO, parseISO, tambahHari } from './helpers.js';
 //   XII / 2025  bulan (romawi) & tahun saat nomor diterbitkan
 export const KODE_NOMOR = { fakultas: 'UN7.F3', penandatangan: '6.8', hal: 'DL' };
 
-// Nomor diketik admin atau diisi lewat tombol "Isi nomor berikutnya" (nomor urut
+// Nomor diketik admin atau diisi lewat tombol "Ambil nomor" (nomor urut
 // terkecil yang belum dipakai tahun itu), lalu dicatat di registri saat Simpan.
 // Satu nomor berlaku untuk satu siklus (mahasiswa + program) sampai diakhiri
 // admin. Perpanjangan: KP/Magang 1× 1 bulan, TA 2× 1 bulan. Program lain
@@ -114,7 +114,8 @@ export function bolehPerpanjang(m) {
 
 // Nomor aktif yang tenggatnya sudah lewat DAN jatah perpanjangannya habis:
 // saatnya admin memutuskan (dosen mau lanjut → perpanjang lewat batas akhir,
-// tidak mau → "Akhiri & daftar ulang"). Sistem tidak pernah mengakhiri sendiri.
+// tidak mau → centang "Ditutup", mahasiswa mendaftar ulang sebagai pengajuan
+// baru). Sistem tidak pernah mengakhiri sendiri.
 export function perluDitinjau(m) {
   if (!m || !m.nomorSuratId || m.dibatalkan || m.tahap === 'Lulus') return false;
   const a = aturanPerpanjangan(m);
@@ -122,17 +123,3 @@ export function perluDitinjau(m) {
   return m.batasAkhir < todayISO() && perpanjanganDisetujui(m) >= a.maks;
 }
 
-// Perubahan record saat "Akhiri & daftar ulang": nomor & pembimbing dikosongkan,
-// kembali ke Pendaftaran dengan rentang baru. Tahap bisa dimajukan admin lewat
-// dropdown tahap (lewati langkah yang sudah pernah dijalani).
-export function patchDaftarUlang(m, durasiHari = 180) {
-  const mulai = todayISO();
-  return {
-    nomorSurat: '', nomorSuratId: '',
-    pembimbing1: '', pembimbing2: '',
-    tahap: 'Pendaftaran',
-    tanggalMulai: mulai,
-    batasAkhir: tambahHari(mulai, durasiHari),
-    perpanjangan: {},
-  };
-}

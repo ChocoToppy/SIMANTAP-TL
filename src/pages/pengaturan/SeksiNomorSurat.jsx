@@ -37,7 +37,7 @@ export function SeksiNomorSurat() {
     <div className="card">
       <p className="hint" style={{ marginTop: 0 }}>
         Semua nomor surat yang pernah dipakai, urut per tahun untuk semua program. Nomor di form
-        edit mahasiswa, diketik sendiri atau diisi lewat "Isi nomor berikutnya", tercatat di sini saat
+        edit mahasiswa, diketik sendiri atau diisi lewat "Ambil nomor", tercatat di sini saat
         data disimpan. Nomor yang sudah kedaluwarsa tetap tercatat dan tidak bisa dipakai lagi.
       </p>
       <div className="toolbar" style={{ marginBottom: 12 }}>

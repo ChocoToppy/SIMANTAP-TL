@@ -73,9 +73,10 @@ function writeDoc(collectionName, id, value, label) {
 
 // ID penanda slotPengajuan untuk dokumen yang memegang pasangan (owner, program)
 // dengan ID selain idPengajuan (data lama, buatan admin, atau setelah ganti NIM),
-// atau null bila tidak perlu penanda. Lihat firestore.rules.
+// atau null bila tidak perlu penanda. Pengajuan yang ditutup tidak memegang
+// slot (mahasiswa boleh mendaftar ulang). Lihat firestore.rules.
 function slotPengajuanUntuk(m) {
-  if (!m || !m.owner) return null;
+  if (!m || !m.owner || m.dibatalkan) return null;
   const slotId = idPengajuan(m.owner, programOf(m));
   return slotId === m.id ? null : slotId;
 }

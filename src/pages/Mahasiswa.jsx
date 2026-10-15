@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, punyaKlasifikasi, formatTanggal, formatTanggalSingkat, kondisi, SEMUA, statusVerif, cariBentrok, eventAktif, bidangLabel, tanggalDibuat, hitungNomorUrut, jenisMagangOf } from '../utils/helpers.js';
+import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, punyaKlasifikasi, formatTanggal, formatTanggalSingkat, kondisi, SEMUA, statusVerif, cariBentrok, eventAktif, bidangLabel, tanggalDibuat, aktivitasTerakhir, hitungNomorUrut, jenisMagangOf } from '../utils/helpers.js';
 import { semuaKpTema, semuaBidang } from '../utils/pilihan.js';
 import { Badge, StageBar, ExportMenu, ColumnMenu, ColResizeHandle, Empty, TombolHapusCari } from '../components/ui.jsx';
 import { useColumnWidths } from '../utils/useColumnWidths.js';
@@ -20,7 +20,7 @@ const STATUS_FILTER = [
   { key: 'mendekati', label: 'Mendekati deadline' },
   { key: 'lewat', label: 'Lewat batas' },
   { key: 'lulus', label: 'Lulus' },
-  { key: 'batal', label: 'Dibatalkan' },
+  { key: 'batal', label: 'Ditutup' },
 ];
 
 // Kolom "peran dosen" beda tiap program (lihat PROGRAMS di helpers.js) — KP/Magang
@@ -80,11 +80,12 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
   const [filtersOpen, setFiltersOpen] = useState(false);
   // Kolom cari diciutkan jadi ikon di layar sempit; melebar saat ditekan.
   const [searchOpen, setSearchOpen] = useState(false);
-  const [sortBy, setSortBy] = useState('nama'); // nama | tahap | deadline | dibuat
+  const [sortBy, setSortBy] = useState('nama'); // nama | tahap | deadline | aktivitas | …
   const [sortDir, setSortDir] = useState('asc');
   function ubahSort(key) {
     if (sortBy === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-    else { setSortBy(key); setSortDir('asc'); }
+    // Aktivitas: klik pertama langsung yang terbaru di atas.
+    else { setSortBy(key); setSortDir(key === 'aktivitas' ? 'desc' : 'asc'); }
   }
   const panah = (key) => (sortBy === key ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '');
 
@@ -172,7 +173,9 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
           : sortBy === 'penguji1' ? (m.penguji1 || '')
           : sortBy === 'penguji2' ? (m.penguji2 || '')
           : sortBy === 'deadline' ? (m.batasAkhir || '')
-          : sortBy === 'dibuat' ? tanggalDibuat(m)
+          // Aktivitas: waktu entri log terbaru (sama dengan yang tampil di sel);
+          // data lama tanpa log memakai tanggal pendaftaran.
+          : sortBy === 'aktivitas' ? ((aktivitasTerakhir(m) || {}).at || tanggalDibuat(m))
           : m.nama;
         return String(val(a.m)).localeCompare(String(val(b.m)), 'id') * arah;
       });
@@ -380,7 +383,7 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
                 !hiddenCols.has(c.key) && <th key={c.key} className="th-sort" onClick={() => ubahSort(c.key)}>{c.label}{panah(c.key)}<ColResizeHandle onMouseDown={(e) => startResize(4 + i, e)} /></th>
               ))}
               {!hiddenCols.has('deadline') && <th className="th-sort" onClick={() => ubahSort('deadline')}>Deadline{panah('deadline')}<ColResizeHandle onMouseDown={(e) => startResize(4 + dosenCols.length, e)} /></th>}
-              {!hiddenCols.has('aktivitas') && <th className="th-sort" onClick={() => ubahSort('dibuat')}>Aktivitas{panah('dibuat')}<ColResizeHandle onMouseDown={(e) => startResize(5 + dosenCols.length, e)} /></th>}
+              {!hiddenCols.has('aktivitas') && <th className="th-sort" onClick={() => ubahSort('aktivitas')}>Aktivitas{panah('aktivitas')}<ColResizeHandle onMouseDown={(e) => startResize(5 + dosenCols.length, e)} /></th>}
               {!hiddenCols.has('nomorSurat') && <th className="th-sort" onClick={() => ubahSort('nomorSurat')}>No. Surat{panah('nomorSurat')}<ColResizeHandle onMouseDown={(e) => startResize(6 + dosenCols.length, e)} /></th>}
               <th></th>
             </tr>

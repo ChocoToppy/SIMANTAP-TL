@@ -61,6 +61,11 @@ export const META = {
   nomorWA: { nama: 'Nomor WA', tipe: 'text', di: 'p', kolom: 'nomorWA', label: () => 'Nomor WA', placeholder: '08xxxxxxxxxx' },
 };
 
+// Data perusahaan yang tertera di surat balasan (KP & Magang/MKT): ditampilkan
+// ulang untuk dikonfirmasi saat surat balasan diunggah (FormSuratBalasan) dan
+// terkunci di form pendaftaran selama surat itu ada (adaSuratBalasan di helpers.js).
+export const MEDAN_SURAT_BALASAN = ['tempatKP', 'instansi', 'tanggalMulai', 'batasAkhir'];
+
 // Butir di dalam blok "Syarat pendaftaran" (TA/Capstone). Urutannya tetap.
 export const BUTIR_SYARAT = ['syaratSKS', 'ipk', 'statusKP', 'terdaftarKRS', 'sudahUGB'];
 export const META_SYARAT = {

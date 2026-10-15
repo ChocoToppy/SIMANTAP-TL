@@ -36,6 +36,7 @@ async function main() {
   mhsSnap.docs.forEach((d) => {
     const m = d.data();
     if (!m.owner) { tanpaOwner++; return; }
+    if (m.dibatalkan) return; // pengajuan yang ditutup tidak memegang slot (arsip)
     const kunci = `${m.owner}_${programOf(m)}`;
     if (!grup.has(kunci)) grup.set(kunci, []);
     grup.get(kunci).push({ id: d.id, m });

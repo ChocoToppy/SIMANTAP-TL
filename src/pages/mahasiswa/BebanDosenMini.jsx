@@ -17,7 +17,7 @@ export function BebanDosenMini({ m, allMahasiswa, dosen, peran }) {
     const list = [...lain, m];
     return dosen
       .map((d) => ({ kode: d.kode, nama: d.nama, n: hitungBeban(list, d.kode, { semua: true })[peran] }))
-      .sort((a, b) => a.n - b.n || a.kode.localeCompare(b.kode));
+      .sort((a, b) => a.kode.localeCompare(b.kode));
   }, [allMahasiswa, m, dosen, peran, perProgram, program]);
 
   const dipilih = peran === 'bimbingan' ? [m.pembimbing1, m.pembimbing2] : [m.penguji1, m.penguji2];

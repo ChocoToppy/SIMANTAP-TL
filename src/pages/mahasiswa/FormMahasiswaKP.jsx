@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { PROGRAM_KEYS, programLabel, programDisplayLabel, ringkasPendaftaran, normalizeUrl, formatTanggal, judulLabelFor, statusVerif, pembukuanDisetujui } from '../../utils/helpers.js';
 import { kpTemaUntukPilihan } from '../../utils/pilihan.js';
-import { Field, Modal, MessageIcon, Badge } from '../../components/ui.jsx';
+import { Field, Modal, MessageIcon, Badge, LampIcon, PencilIcon } from '../../components/ui.jsx';
 import { KpDocumentPanel } from '../../components/kpDocuments.jsx';
 import { LinkBerkasRow } from './LinkBerkasRow.jsx';
 import { PetunjukPembukuan } from '../../components/PetunjukPembukuan.jsx';
+import { PenutupanPengajuan, BannerDitutup } from './PenutupanPengajuan.jsx';
+import { BannerPerubahanData } from './BannerPerubahanData.jsx';
 import { RiwayatAktivitas } from './AktivitasCells.jsx';
 import { NomorSuratPanel } from './NomorSuratPanel.jsx';
-import { PersetujuanPerpanjangan } from './PersetujuanPerpanjangan.jsx';
+import { PanelPerpanjangan } from './PanelPerpanjangan.jsx';
 import { PengingatPesan } from './PengingatPesan.jsx';
 
 // Tata letak tab-per-tahap di dalam modal FormMahasiswa (lihat
@@ -25,13 +27,15 @@ export function FormMahasiswaKP({
   tahapTab, setTahapTab, p, events, jadwalBlok,
   dosenByKode, konten, uploadAdminDokumenKP, hapusAdminDokumenKP,
   unduhPerpanjanganKP, dlBusyKP,
-  verifAwal, nomorTerpakai, baru, onCancel, submit, navEntri, modalOpsi,
+  verifAwal, nomorTerpakai, baru, onCancel, submit, navEntri, modalOpsi, adaPengganti,
 }) {
   // "Halaman" di dalam modal — 'utama' (tab tahap, dokumen, dst) atau 'data'
   // (form identitas/penugasan Program..Batas akhir, dibuka lewat tombol "Edit
-  // data pendaftaran"). Mahasiswa baru selalu tampil satu halaman penuh (semua
+  // data" di kotak identitas, terlihat di semua tab). Mahasiswa baru selalu tampil satu halaman penuh (semua
   // field wajib langsung terlihat, belum ada apa-apa untuk disembunyikan).
   const [page, setPage] = useState('utama');
+  // Daftar berkas folder Pembukuan disembunyikan, dibuka lewat tombol lampu.
+  const [petunjukPembukuan, setPetunjukPembukuan] = useState(false);
   // Catatan/pesan untuk mahasiswa disembunyikan default — cuma dibuka lewat
   // tombol ikon pesan di ringkasan identitas.
   const [catatanOpen, setCatatanOpen] = useState(false);
@@ -43,7 +47,7 @@ export function FormMahasiswaKP({
     <span className="modal-breadcrumb">
       <button type="button" className="modal-breadcrumb-link" onClick={() => setPage('utama')}>Edit mahasiswa</button>
       <span className="modal-breadcrumb-sep">›</span>
-      <span className="modal-breadcrumb-current">Edit data pendaftaran</span>
+      <span className="modal-breadcrumb-current">Edit data</span>
     </span>
   ) : 'Edit mahasiswa');
   // Status verifikasi ditaruh di header modal (tidak ikut ter-scroll) supaya selalu terlihat.
@@ -65,6 +69,8 @@ export function FormMahasiswaKP({
         </>
       }
     >
+      <BannerDitutup m={m} setM={setM} adaPengganti={adaPengganti} />
+      <BannerPerubahanData m={m} setM={setM} />
       {!baru && page === 'utama' && (
         <div className="mhs-edit-top">
           <RiwayatAktivitas m={m} />
@@ -170,13 +176,16 @@ export function FormMahasiswaKP({
             </select>
           </div>
         </div>
-        <button
-          type="button"
-          className="icon-btn"
-          onClick={() => setCatatanOpen((v) => !v)}
-          aria-label="Catatan/pesan untuk mahasiswa"
-          title="Catatan/pesan untuk mahasiswa"
-        ><MessageIcon /></button>
+        <div className="mhs-edit-identity-aksi">
+          {!baru && <button type="button" className="icon-btn" onClick={() => setPage('data')} aria-label="Edit data" title="Edit data"><PencilIcon /></button>}
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={() => setCatatanOpen((v) => !v)}
+            aria-label="Catatan/pesan untuk mahasiswa"
+            title="Catatan/pesan untuk mahasiswa"
+          ><MessageIcon /></button>
+        </div>
       </div>
 
       <PengingatPesan m={m} set={set} verifAwal={verifAwal} />
@@ -194,18 +203,16 @@ export function FormMahasiswaKP({
         </div>
       )}
 
-      <div className="form-grid" style={{ marginTop: 12 }}>
-        <label className="check field-full">
-          <input type="checkbox" checked={!!m.dibatalkan} onChange={(e) => set('dibatalkan', e.target.checked)} />
-          <span>Dibatalkan (tidak dihitung sebagai aktif &amp; beban dosen)</span>
-        </label>
-      </div>
-
       <div className="modal-kp-layout" style={{ marginTop: 20 }}>
         <div className="modal-kp-main">
           <div className="tabs" style={{ marginBottom: 0 }}>
             {stages.map((s) => (
-              <button key={s} type="button" className={'tab' + (tahapTab === s ? ' active' : '')} onClick={() => setTahapTab(s)}>{s}</button>
+              <button key={s} type="button" className={'tab' + (tahapTab === s ? ' active' : '')} onClick={() => setTahapTab(s)} title={s === m.tahap ? 'Tahap mahasiswa saat ini' : undefined}>
+                {/* Penanda tahap mahasiswa saat ini (warna sama dengan langkah aktif di stepper). */}
+                {s === m.tahap && <span className="tab-tahap-kini" aria-hidden="true" />}
+                {s}
+                {s === m.tahap && <span className="sr-only"> (tahap saat ini)</span>}
+              </button>
             ))}
           </div>
 
@@ -222,11 +229,6 @@ export function FormMahasiswaKP({
               <div style={{ marginTop: 10 }}>
                 <LinkBerkasRow label="Link berkas pendaftaran" url={p.berkasLink} onUbah={(v) => setM((prev) => ({ ...prev, pendaftaran: { ...(prev.pendaftaran || {}), berkasLink: v } }))} diperiksa={p.berkasDiperiksa} onDiperiksa={(v) => setM((prev) => ({ ...prev, pendaftaran: { ...(prev.pendaftaran || {}), berkasDiperiksa: v } }))} />
               </div>
-              {!baru && (
-                <div style={{ marginTop: 10 }}>
-                  <button type="button" className="btn" onClick={() => setPage('data')}>Edit data pendaftaran</button>
-                </div>
-              )}
             </div>
           )}
 
@@ -283,7 +285,18 @@ export function FormMahasiswaKP({
 
           {tahapTab === 'Pembukuan' && (
             <div className="sched">
-              <div className="sched-title">Pembukuan</div>
+              <div className="sched-title-row">
+                <div className="sched-title">Pembukuan</div>
+                <button
+                  type="button"
+                  className={'icon-btn-outline lampu-btn' + (petunjukPembukuan ? ' aktif' : '')}
+                  onClick={() => setPetunjukPembukuan((v) => !v)}
+                  aria-expanded={petunjukPembukuan}
+                  aria-label="Daftar berkas dalam folder"
+                  title="Daftar berkas dalam folder"
+                ><LampIcon /></button>
+              </div>
+              {petunjukPembukuan && <div style={{ marginBottom: 8 }}><PetunjukPembukuan /></div>}
               <LinkBerkasRow
                 label="Link folder berkas final KP"
                 url={(m.pembukuan || {}).berkasLink}
@@ -291,7 +304,6 @@ export function FormMahasiswaKP({
                 diperiksa={(m.pembukuan || {}).berkasDiperiksa}
                 onDiperiksa={(v) => setM((prev) => ({ ...prev, pembukuan: { ...(prev.pembukuan || {}), berkasDiperiksa: v } }))}
               />
-              <div style={{ marginTop: 8 }}><PetunjukPembukuan /></div>
               {pembukuanDisetujui(m)
                 ? <div className="callout callout-green" style={{ marginTop: 8 }}>Disetujui. Surat keterangan selesai pembukuan sudah terbuka untuk mahasiswa (setelah disimpan).</div>
                 : <div className="hint" style={{ marginTop: 6 }}>Untuk menyetujui: centang "Sudah diperiksa" dan ubah Status verifikasi ke Terverifikasi, lalu Simpan. Surat keterangan selesai pembukuan kemudian terbuka untuk mahasiswa. Bila mahasiswa mengganti tautan, persetujuan dicabut otomatis.</div>}
@@ -326,28 +338,14 @@ export function FormMahasiswaKP({
 
         <div className="modal-kp-side">
           <KpDocumentPanel m={m} program={m.program} dosenByKode={dosenByKode} konten={konten} canUpload role="admin" onUpload={uploadAdminDokumenKP} onDeleteUpload={hapusAdminDokumenKP} collapsible={false} title={`Dokumen ${programDisplayLabel(m)}`} activeStage={tahapTab} />
-          <div className="sched">
-            <div className="sched-title">Perpanjangan {programDisplayLabel(m)}</div>
-            {(m.perpanjangan && m.perpanjangan.diminta)
-              ? <div className="verif-info"><div>Alasan mahasiswa: <strong>{m.perpanjangan.alasan || '—'}</strong>{m.perpanjangan.tanggalDiminta ? ` · ${formatTanggal(m.perpanjangan.tanggalDiminta)}` : ''}</div></div>
-              : <div className="hint">Belum ada pengajuan perpanjangan dari mahasiswa.</div>}
-            {(m.perpanjangan || {}).suratAdminTersedia
-              ? <div className="callout callout-green">Surat perpanjangan sudah terlihat di Portal mahasiswa.</div>
-              : <div className="hint">Surat perpanjangan belum ditampilkan ke mahasiswa.</div>}
-            {((m.perpanjangan || {}).suratFinal || (m.perpanjangan || {}).suratFinalLink)
-              ? <div className="callout callout-green">Surat final (ditandatangani) dari mahasiswa: <a href={m.perpanjangan.suratFinal ? (m.perpanjangan.suratFinal.url || m.perpanjangan.suratFinal.dataUrl) : normalizeUrl(m.perpanjangan.suratFinalLink)} target="_blank" rel="noreferrer">{m.perpanjangan.suratFinal ? m.perpanjangan.suratFinal.fileName : 'buka'}</a></div>
-              : <div className="hint">Surat final dari mahasiswa belum diunggah.</div>}
-            <PersetujuanPerpanjangan m={m} setM={setM} />
-            <div className="notif-actions" style={{ marginTop: 8 }}>
-              <button type="button" className="btn" onClick={unduhPerpanjanganKP} disabled={dlBusyKP}>{dlBusyKP ? 'Menyiapkan PDF…' : `Cetak surat perpanjangan ${programDisplayLabel(m)} (PDF)`}</button>
-            </div>
-          </div>
+          <PanelPerpanjangan m={m} setM={setM} onCetak={unduhPerpanjanganKP} cetakBusy={dlBusyKP} />
         </div>
       </div>
 
       <div className="form-grid" style={{ marginTop: 20 }}>
         {notifikasiBlok}
         {peringatanBlok}
+        <PenutupanPengajuan m={m} setM={setM} baru={baru} />
       </div>
       </>
       )}

@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
-import { Badge, LampIcon } from '../../components/ui.jsx';
-import { formatTanggal, orphanedUploadPaths } from '../../utils/helpers.js';
-import { deleteUploadedFile } from '../../utils/fileUpload.js';
-import { aturanPerpanjangan, perpanjanganDisetujui, perluDitinjau, patchDaftarUlang, formatNomor, bacaNomor, KODE_NOMOR } from '../../utils/nomorSurat.js';
-import { nomorBerikutnya, akhiriNomor } from '../../utils/nomorSuratDb.js';
+import { LampIcon } from '../../components/ui.jsx';
+import { formatTanggal } from '../../utils/helpers.js';
+import { perluDitinjau, formatNomor, bacaNomor, KODE_NOMOR } from '../../utils/nomorSurat.js';
+import { nomorBerikutnya } from '../../utils/nomorSuratDb.js';
 
 // Blok "Nomor Surat" di modal edit admin. Admin mengetik nomor sendiri, atau menekan
-// "Isi nomor berikutnya" untuk mengisi nomor urut terkecil yang belum dipakai tahun
+// "Ambil nomor" untuk mengisi nomor urut terkecil yang belum dipakai tahun
 // ini (tetap bisa diubah). Nomor dicatat di registri (nomorSurat/) saat Simpan, lihat
 // submit() di FormMahasiswa.jsx. Aturan & format: utils/nomorSurat.js.
 // div, bukan <Field> (label): klik tombol di dalam label ikut memfokuskan input.
@@ -14,7 +13,6 @@ export function NomorSuratPanel({ m, setM, baru, terpakai = [] }) {
   const [panduan, setPanduan] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  const aturan = aturanPerpanjangan(m);
   const tinjau = perluDitinjau(m);
   const nomor = (m.nomorSurat || '').trim();
 
@@ -30,25 +28,12 @@ export function NomorSuratPanel({ m, setM, baru, terpakai = [] }) {
     setM((prev) => ({ ...prev, nomorSurat: saran, nomorDisarankan: saran }));
   });
 
-  function daftarUlang() {
-    const alasan = window.prompt(
-      'Nomor ini akan dikedaluwarsakan, pembimbing dikosongkan, dan mahasiswa kembali ke tahap Pendaftaran.\n\nAlasan (mis. dosen tidak melanjutkan membimbing):',
-      'Dosen pembimbing tidak melanjutkan'
-    );
-    if (alasan === null) return;
-    jalankan(async () => {
-      const patch = await akhiriNomor(m, alasan.trim() || '-', patchDaftarUlang(m));
-      orphanedUploadPaths(m, { ...m, ...patch }).forEach((p) => deleteUploadedFile(p));
-      setM((prev) => ({ ...prev, ...patch }));
-    });
-  }
-
   return (
     <div className="field field-full nomor-surat">
       <span className="field-label">Nomor Surat</span>
       <div className="nomor-surat-row">
         <input value={m.nomorSurat || ''} onChange={(e) => setM((prev) => ({ ...prev, nomorSurat: e.target.value }))} placeholder={`mis. ${CONTOH_NOMOR}`} />
-        <button type="button" className="btn" disabled={busy} onClick={isiBerikutnya}>{busy ? 'Mencari…' : 'Isi nomor berikutnya'}</button>
+        <button type="button" className="btn" disabled={busy} onClick={isiBerikutnya} title="Isi nomor urut terkecil yang belum dipakai tahun ini">{busy ? 'Mencari…' : 'Ambil nomor'}</button>
         <button
           type="button"
           className={'icon-btn-outline lampu-btn' + (panduan ? ' aktif' : '')}
@@ -65,18 +50,7 @@ export function NomorSuratPanel({ m, setM, baru, terpakai = [] }) {
 
       {tinjau && (
         <div className="callout callout-amber" style={{ marginTop: 8 }}>
-          ⚠ Batas akhir ({formatTanggal(m.batasAkhir)}) sudah lewat dan jatah perpanjangan habis. Jika dosen masih bersedia, ubah Batas akhir; jika tidak, pakai “Akhiri & daftar ulang”.
-        </div>
-      )}
-      {!baru && m.nomorSuratId && (
-        <div className="notif-actions" style={{ marginTop: 8 }}>
-          <button type="button" className="btn" disabled={busy} onClick={daftarUlang}>Akhiri & daftar ulang</button>
-        </div>
-      )}
-      {aturan && !baru && (
-        <div className="hint" style={{ marginTop: 8 }}>
-          Perpanjangan disetujui: {perpanjanganDisetujui(m)} / {aturan.maks} (+{aturan.bulan} bulan tiap kali, disetujui di bagian Perpanjangan).{' '}
-          {tinjau && <Badge tone="amber">Perlu ditinjau</Badge>}
+          ⚠ Batas akhir ({formatTanggal(m.batasAkhir)}) sudah lewat dan jatah perpanjangan habis. Jika dosen masih bersedia, ubah Batas akhir lewat Edit data. Jika tidak, centang Ditutup (di bawah kotak identitas) supaya mahasiswa bisa mendaftar ulang.
         </div>
       )}
       {err && <div className="login-err" style={{ marginTop: 6 }}>{err}</div>}
@@ -111,7 +85,7 @@ function PanduanFormatNomor() {
       </table>
       <div className="hint" style={{ marginBottom: 0 }}>
         Bagian {fakultas}.{penandatangan}/{hal} selalu sama. Yang berubah hanya nomor urut, bulan, dan tahun.
-        Tombol "Isi nomor berikutnya" mengisi nomor urut terkecil yang belum dipakai tahun ini; nomor dicatat di Registri saat Simpan.
+        Tombol "Ambil nomor" mengisi nomor urut terkecil yang belum dipakai tahun ini; nomor dicatat di Registri saat Simpan.
       </div>
     </div>
   );

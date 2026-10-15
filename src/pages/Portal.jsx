@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { catatAktivitas, tandaiMenungguVerifikasi, dokumenConfigFor, dokumenFieldFor, eventAktif, programOf, programLabel } from '../utils/helpers.js';
+import { catatAktivitas, ditutup, tandaiMenungguVerifikasi, hitungPerubahanData, KUNCI_SURAT_BALASAN, dokumenConfigFor, dokumenFieldFor, eventAktif, programOf, programLabel } from '../utils/helpers.js';
 import { PROGRAM_KEYS_PENDAFTARAN } from './portal/shared.js';
 import { Empty, TextSizeToggle, ThemeToggle, TabIcon } from '../components/ui.jsx';
 import { readFileForUpload } from '../utils/fileUpload.js';
@@ -11,6 +11,8 @@ import { HalamanDokumen } from './portal/HalamanDokumen.jsx';
 import { FormPendaftaran } from './portal/FormPendaftaran.jsx';
 import { FormJadwalMhs } from './portal/FormJadwalMhs.jsx';
 import { FormPerpanjangan } from './portal/FormPerpanjangan.jsx';
+import { FormSuratBalasan } from './portal/FormSuratBalasan.jsx';
+import { MEDAN_SURAT_BALASAN, META } from '../utils/formPendaftaran.js';
 
 // ===================== Portal.jsx =====================
 // Portal.jsx — tampilan untuk mahasiswa (Rute A)
@@ -26,9 +28,10 @@ const PORTAL_TABS = [
 ];
 
 export function Portal({ nim, nama, email, mahasiswa, allDosen, periodeBuka = [], angkatanAktif = [], panduan = [], konten = {}, jadwalRuang = null, onSave, onDelete, onSimpanAkun, onLogout, onOpenPanduan, initialTab = 'pengajuan' }) {
-  const mine = mahasiswa.filter((m) => m.owner === nim);
-  // Satu pengajuan per program (lihat idPengajuan & firestore.rules).
-  const programTerpakai = mine.map((m) => programOf(m));
+  // Pengajuan yang ditutup admin tampil paling bawah sebagai arsip.
+  const mine = mahasiswa.filter((m) => m.owner === nim).sort((a, b) => Number(ditutup(a)) - Number(ditutup(b)));
+  // Satu pengajuan TERBUKA per program (lihat idPengajuanBaru & firestore.rules).
+  const programTerpakai = mine.filter((m) => !ditutup(m)).map((m) => programOf(m));
   const semuaTerpakai = PROGRAM_KEYS_PENDAFTARAN.every((k) => programTerpakai.includes(k));
   const [tab, setTab] = useState(initialTab);
   const [view, setView] = useState({ mode: 'list' });
@@ -38,16 +41,32 @@ export function Portal({ nim, nama, email, mahasiswa, allDosen, periodeBuka = []
   // perpanjangan) → status kembali "Menunggu verifikasi".
   function simpanAjuan(rec) { simpan(tandaiMenungguVerifikasi(rec)); }
 
-  async function uploadDokumenKP(m, key, file) {
+  // dataPerusahaan diisi FormSuratBalasan. Surat balasan tanpa data itu belum
+  // diunggah: mahasiswa diarahkan dulu ke form konfirmasi.
+  async function uploadDokumenKP(m, key, file, dataPerusahaan = null) {
+    const suratBalasan = KUNCI_SURAT_BALASAN.includes(key);
+    if (suratBalasan && !dataPerusahaan) { setView({ mode: 'suratBalasan', id: m.id, key, file }); return; }
     const hasil = await readFileForUpload(file, `${m.id}/${key}`);
     const field = dokumenFieldFor(programOf(m)) || 'dokumenKP';
     const label = ((dokumenConfigFor(programOf(m), m) || []).find((d) => d.key === key) || {}).label || key;
     let rec = { ...m, [field]: { ...(m[field] || {}), [key]: hasil } };
     rec = catatAktivitas(rec, 'unggah', label);
-    // Surat balasan → Bimbingan dan menunggu admin menetapkan pembimbing.
-    if (['suratBalasan', 'suratBalasanMagang', 'suratBalasanMkt'].includes(key) && m.tahap === 'Pendaftaran') {
-      rec = { ...rec, tahap: 'Bimbingan' };
-      rec = catatAktivitas(rec, 'tahapBimbingan');
+    // Surat balasan: data perusahaan ikut tersimpan (lalu terkunci), tahap ke
+    // Bimbingan, dan admin memeriksa (menetapkan pembimbing / mengecek data baru).
+    if (suratBalasan) {
+      const pendaftaran = { ...(rec.pendaftaran || {}) };
+      MEDAN_SURAT_BALASAN.forEach((id) => {
+        const { di, kolom } = META[id];
+        if (di === 'p') pendaftaran[kolom] = dataPerusahaan[id];
+        else rec = { ...rec, [kolom]: dataPerusahaan[id] };
+      });
+      rec = { ...rec, pendaftaran };
+      // Data perusahaan yang tercetak di dokumen ikut berubah: kunci unduhan sampai diverifikasi ulang.
+      rec = { ...rec, perubahanData: hitungPerubahanData(m, rec) };
+      if (m.tahap === 'Pendaftaran') {
+        rec = { ...rec, tahap: 'Bimbingan' };
+        rec = catatAktivitas(rec, 'tahapBimbingan');
+      }
       rec = tandaiMenungguVerifikasi(rec);
     }
     // Lembar pengesahan → Pembukuan langsung, tanpa verifikasi admin.
@@ -69,6 +88,12 @@ export function Portal({ nim, nama, email, mahasiswa, allDosen, periodeBuka = []
     delete dokumen[key];
     let rec = { ...m, [field]: dokumen };
     rec = catatAktivitas(rec, 'hapusBerkas', label);
+    // Tanpa surat balasan, mahasiswa kembali ke Pendaftaran (pembimbing & nomor
+    // surat tetap) dan data perusahaan bisa diubah lagi.
+    if (KUNCI_SURAT_BALASAN.includes(key) && m.tahap === 'Bimbingan') {
+      rec = { ...rec, tahap: 'Pendaftaran' };
+      rec = catatAktivitas(rec, 'kembaliPendaftaran');
+    }
     onSave(rec);
   }
 
@@ -146,6 +171,7 @@ export function Portal({ nim, nama, email, mahasiswa, allDosen, periodeBuka = []
                 angkatanAktif={angkatanAktif}
                 konten={konten}
                 programTerpakai={programTerpakai}
+                idAda={mine.map((m) => m.id)}
                 onCancel={() => setView({ mode: 'list' })}
                 onSave={simpan}
               />
@@ -157,6 +183,15 @@ export function Portal({ nim, nama, email, mahasiswa, allDosen, periodeBuka = []
                 onUpload={(key, file) => uploadDokumenKP(editing, key, file)}
                 onDeleteUpload={(key) => hapusDokumenKP(editing, key)}
                 onKirimTautan={(field, url) => kirimTautan(editing, field, url)} />
+            )}
+
+            {view.mode === 'suratBalasan' && editing && (
+              <FormSuratBalasan awal={editing} file={view.file} konten={konten}
+                onCancel={() => setView({ mode: 'dokumen', id: editing.id })}
+                onKirim={async (data) => {
+                  await uploadDokumenKP(editing, view.key, view.file, data);
+                  setView({ mode: 'dokumen', id: editing.id });
+                }} />
             )}
 
             {view.mode === 'jadwal' && editing && (

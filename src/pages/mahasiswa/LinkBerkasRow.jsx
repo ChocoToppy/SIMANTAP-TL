@@ -35,8 +35,10 @@ export function LinkBerkasRow({ label, url, onUbah, diperiksa, onDiperiksa }) {
       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
         <input
           style={{ flex: 1, minWidth: 0 }}
+          className={mengedit ? undefined : 'input-terkunci'}
           value={url || ''}
           readOnly={!mengedit}
+          tabIndex={mengedit ? undefined : -1}
           onChange={(e) => onUbah(e.target.value)}
           placeholder={mengedit ? 'https://drive.google.com/...' : 'Mahasiswa belum mengunggah link'}
           title={url || ''}

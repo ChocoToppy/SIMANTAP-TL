@@ -66,7 +66,7 @@ service cloud.firestore {
               'klasifikasi', 'bidang', 'tanggalMulai', 'batasAkhir', 'pendaftaran',
               'id', 'verifikasi', 'pernahTerverifikasi', 'aktivitas', 'tahap',
               'jadwal', 'riwayatJadwal', 'perpanjangan', 'dokumenKP', 'dokumenMagang', 'dokumenTA',
-              'pembukuan'];
+              'pembukuan', 'perubahanData'];
     }
     function semuaEvent() {
       return ['Seminar Proposal', 'Seminar Hasil', 'Sidang', 'Expo'];
@@ -112,12 +112,37 @@ service cloud.firestore {
         || (la.size() > lb.size() && la[0:lb.size()] == lb);
     }
 
+    // ----- Surat balasan perusahaan (KP & Magang/MKT), lihat adaSuratBalasan di helpers.js -----
+    function sbKunci() { return ['suratBalasan', 'suratBalasanMagang', 'suratBalasanMkt']; }
+    function sbField(m) { return m.program == 'KP' ? 'dokumenKP' : 'dokumenMagang'; }
+    function sbDiff(a, b) { return a.get(sbField(b), {}).diff(b.get(sbField(b), {})); }
+    function adaSB(m) { return m.program in ['KP', 'MG'] && m.get(sbField(m), {}).keys().hasAny(sbKunci()); }
+    // Diunggah/diganti pada tulisan ini (lewat FormSuratBalasan).
+    function sbBaru(a, b) {
+      return b.program in ['KP', 'MG']
+        && (sbDiff(a, b).addedKeys().hasAny(sbKunci()) || sbDiff(a, b).changedKeys().hasAny(sbKunci()));
+    }
+    function sbDihapus(a, b) { return b.program in ['KP', 'MG'] && sbDiff(a, b).removedKeys().hasAny(sbKunci()); }
+    // Data perusahaan (tempatKP, instansi, tanggal mulai/berakhir) terkunci selama
+    // surat balasan ada, kecuali diubah bersamaan dengan mengganti suratnya.
+    function dataPerusahaanAman(a, b) {
+      let ubah = a.diff(b).affectedKeys().hasAny(['tanggalMulai', 'batasAkhir'])
+        || a.get('pendaftaran', {}).diff(b.get('pendaftaran', {})).affectedKeys().hasAny(['tempatKP', 'instansi']);
+      return !ubah || !adaSB(b) || sbBaru(a, b);
+    }
+    // Sejak tahap setelah Bimbingan, surat balasan final: tidak bisa diganti/dihapus mahasiswa.
+    function sbFinalAman(a, b) {
+      return b.get('tahap', '') in ['Pendaftaran', 'Bimbingan'] || !sbDiff(a, b).affectedKeys().hasAny(sbKunci());
+    }
+
     // Edit form pendaftaran: wajib kembali ke 'baru', tanggal hanya untuk KP/Magang.
     function formMhsAman(a, b) {
       let k = a.diff(b).affectedKeys();
       let kp = a.get('pendaftaran', {}).diff(b.get('pendaftaran', {})).affectedKeys();
       return (!k.hasAny(fieldForm()) || a.get('verifikasi', 'baru') == 'baru')
         && (!k.hasAny(['tanggalMulai', 'batasAkhir']) || b.program in ['KP', 'MG'])
+        && dataPerusahaanAman(a, b)
+        && sbFinalAman(a, b)
         && (!k.hasAny(['jenisMagang']) || a.jenisMagang in ['Magang', 'MKT'])
         && (!k.hasAny(['periode']) || periodeBuka(a.periode))
         && (!k.hasAny(['angkatan']) || angkatanAktif(a.angkatan))
@@ -139,7 +164,8 @@ service cloud.firestore {
     }
     // Tahap hanya bisa digeser mahasiswa lewat unggahan (uploadDokumenKP di
     // Portal.jsx): Pendaftaran → Bimbingan saat KP/Magang mengunggah surat
-    // balasan, dan KP Bimbingan → Pembukuan saat mengunggah lembar pengesahan.
+    // balasan, KP Bimbingan → Pembukuan saat mengunggah lembar pengesahan, dan
+    // Bimbingan → Pendaftaran saat menghapus surat balasan (hapusDokumenKP).
     function tahapMhsAman(a, b) {
       let kKP = a.get('dokumenKP', {}).diff(b.get('dokumenKP', {})).affectedKeys();
       let kMG = a.get('dokumenMagang', {}).diff(b.get('dokumenMagang', {})).affectedKeys();
@@ -148,7 +174,9 @@ service cloud.firestore {
             && ((b.program == 'KP' && kKP.hasAny(['suratBalasan']))
               || (b.program == 'MG' && kMG.hasAny(['suratBalasanMagang', 'suratBalasanMkt']))))
         || (b.program == 'KP' && b.get('tahap', '') == 'Bimbingan' && a.get('tahap', '') == 'Pembukuan'
-            && kKP.hasAny(['lembarPengesahanKP']) && 'lembarPengesahanKP' in a.get('dokumenKP', {}));
+            && kKP.hasAny(['lembarPengesahanKP']) && 'lembarPengesahanKP' in a.get('dokumenKP', {}))
+        || (b.get('tahap', '') == 'Bimbingan' && a.get('tahap', '') == 'Pendaftaran'
+            && sbDihapus(a, b) && !adaSB(a));
     }
     // Berkas: hanya ke field program ini, bukan berkas admin, dan menambah/mengganti
     // hanya setelah pengajuan diverifikasi (syarat eligible di helpers.js).
@@ -218,12 +246,14 @@ service cloud.firestore {
     }
     // Kiriman yang menuntut tindakan admin wajib mengembalikan status ke 'baru'
     // (tandaiMenungguVerifikasi di helpers.js): usulan jadwal/berkas sidang,
-    // perpanjangan, tautan Pembukuan, dan surat balasan (Pendaftaran → Bimbingan,
-    // admin menetapkan pembimbing). Unggahan lain, termasuk lembar pengesahan
+    // perpanjangan, tautan Pembukuan, dan setiap unggahan surat balasan (pertama:
+    // admin menetapkan pembimbing; pengganti: admin mengecek data perusahaan
+    // baru). Unggahan lain, termasuk lembar pengesahan
     // (Bimbingan → Pembukuan), tidak.
     function ditandaiMenunggu(a, b) {
       let ada = a.diff(b).affectedKeys().hasAny(['jadwal', 'perpanjangan', 'pembukuan'])
-        || (b.get('tahap', '') == 'Pendaftaran' && a.get('tahap', '') == 'Bimbingan');
+        || (b.get('tahap', '') == 'Pendaftaran' && a.get('tahap', '') == 'Bimbingan')
+        || sbBaru(a, b);
       return !ada || a.get('verifikasi', 'baru') == 'baru';
     }
     // Status "Perlu perbaikan": mahasiswa tidak bisa mengirim berkas/tautan,
@@ -239,10 +269,17 @@ service cloud.firestore {
         || unggahBaru(a, b, 'dokumenKP') || unggahBaru(a, b, 'dokumenMagang') || unggahBaru(a, b, 'dokumenTA')
         || a.get('perpanjangan', {}).diff(b.get('perpanjangan', {})).affectedKeys().hasAny(['suratFinal', 'suratFinalLink']));
     }
+    // Penanda perubahan data (hitungPerubahanData di helpers.js): mahasiswa hanya
+    // menulisnya bersama edit pendaftaran / surat balasan, yang wajib mengembalikan
+    // status ke 'baru'. Penghapusannya saat verifikasi hanya dari admin.
+    function perubahanDataAman(a, b) {
+      return !a.diff(b).affectedKeys().hasAny(['perubahanData']) || a.get('verifikasi', 'baru') == 'baru';
+    }
     function perubahanMhsAman(a, b, id) {
       let k = a.diff(b).affectedKeys();
       return k.hasOnly(fieldMahasiswa())
         && ditandaiMenunggu(a, b)
+        && perubahanDataAman(a, b)
         && perbaikanTerkunci(a, b)
         && (!k.hasAny(['id']) || a.id == id)
         && formMhsAman(a, b)
@@ -261,12 +298,23 @@ service cloud.firestore {
     // Pengajuan baru dari mahasiswa: hanya isi form pendaftaran dengan pilihan
     // yang dibuka admin, status awal, tanpa dosen/jadwal/berkas, dan belum ada
     // pengajuan lain untuk program itu.
+    // ID pengajuan: "{nim}_{program}", atau "{nim}_{program}_{n}" (n ≥ 2) bila
+    // pengajuan sebelumnya (tanpa nomor untuk n = 2) ada dan sudah ditutup admin —
+    // satu pengajuan TERBUKA per program (idPengajuanBaru di helpers.js).
+    function idPengajuanSah(id, dasar) {
+      return (id == dasar && !exists(/databases/$(database)/documents/slotPengajuan/$(id)))
+        || (id.matches(dasar + '_[0-9]+') && int(id.split('_')[2]) >= 2
+            && sebelumnyaDitutup(int(id.split('_')[2]) == 2 ? dasar : dasar + '_' + string(int(id.split('_')[2]) - 1)));
+    }
+    function sebelumnyaDitutup(idSebelum) {
+      return exists(/databases/$(database)/documents/mahasiswa/$(idSebelum))
+        && get(/databases/$(database)/documents/mahasiswa/$(idSebelum)).data.get('dibatalkan', false) == true;
+    }
     function pengajuanBaruAman(d, id) {
       return d.owner == studentNim() && d.nim == studentNim()
         && d.program in ['TA', 'KP', 'CAP', 'MG', 'S2']
-        && id == studentNim() + '_' + d.program
+        && idPengajuanSah(id, studentNim() + '_' + d.program)
         && d.get('id', id) == id
-        && !exists(/databases/$(database)/documents/slotPengajuan/$(id))
         && d.keys().hasOnly(['id', 'program', 'nama', 'nim', 'owner', 'jenisMagang', 'judul', 'periode',
               'angkatan', 'klasifikasi', 'bidang', 'dosenWali', 'pembimbing1', 'pembimbing2', 'penguji1',
               'penguji2', 'tahap', 'tanggalMulai', 'batasAkhir', 'dibatalkan', 'catatan', 'jadwal',
@@ -291,10 +339,12 @@ service cloud.firestore {
       allow read: if isAdmin()
         || (isLecturer() && assignedTo(resource.data))
         || (isStudent() && ownedByMe(resource.data));
+      // Pengajuan yang ditutup admin (dibatalkan) = arsip baca-saja bagi mahasiswa.
       allow update: if isAdmin()
-        || (isStudent() && ownedByMe(resource.data) && perubahanMhsAman(request.resource.data, resource.data, id));
+        || (isStudent() && ownedByMe(resource.data) && resource.data.get('dibatalkan', false) != true
+            && perubahanMhsAman(request.resource.data, resource.data, id));
       allow delete: if isAdmin()
-        || (isStudent() && ownedByMe(resource.data)
+        || (isStudent() && ownedByMe(resource.data) && resource.data.get('dibatalkan', false) != true
             && resource.data.get('verifikasi', 'baru') != 'terverifikasi'
             && resource.data.get('pernahTerverifikasi', false) != true);
       allow create: if isAdmin()

@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { bolehAksesBerkas, pernahDiverifikasi, dokumenPerTahap, eventsFor, formatTanggal, getJadwal, normalizeUrl, programDisplayLabel, programOf, stagesFor } from '../../utils/helpers.js';
+import { bolehAksesBerkas, bolehUnduhDokumen, alasanUnduhTerkunci, pernahDiverifikasi, dokumenPerTahap, eventsFor, formatTanggal, getJadwal, normalizeUrl, programDisplayLabel, programOf, stagesFor } from '../../utils/helpers.js';
 import { generateDocument, getTemplateConfig, prefetchTemplate, warmConverter } from '../../utils/documentGenerator.js';
 import { PetunjukPembukuan } from '../../components/PetunjukPembukuan.jsx';
 import { IkonKembali, IkonKirim, IkonLanjut, IkonPdf, IkonSebelum, IkonSelesai, IkonTautan, IkonTerkunci, IkonUnggah } from '../../components/DokIkon.jsx';
+import { PerubahanDataNotice } from './PerubahanDataNotice.jsx';
 
 // ===================== HalamanDokumen.jsx =====================
 // Halaman dokumen satu pengajuan (Portal mahasiswa), dibuka dari baris
@@ -60,9 +61,10 @@ export function HalamanDokumen({ m, allDosen = [], konten = {}, onBack, onUpload
         <span className="dok-page-prog">{programDisplayLabel(m)}</span>
       </div>
 
+      <PerubahanDataNotice m={m} style={{ marginBottom: 16 }} />
       {terkunci && pernahDiverifikasi(m) && (
         <div className="callout callout-red" style={{ marginBottom: 16 }}>
-          <strong>Perlu perbaikan.</strong> Unduh dan unggah dokumen dikunci sampai data pendaftaran dibetulkan sesuai pesan admin (tombol "Edit pendaftaran" di kartu).
+          <strong>Perlu perbaikan.</strong> Unduh dan unggah dikunci sampai data dibetulkan lewat Edit pendaftaran.
         </div>
       )}
 
@@ -153,7 +155,7 @@ function BarisUnduh({ d, m, jEv, dosenByKode }) {
   const tautan = !d.docType;
   const config = tautan ? null : getTemplateConfig(d.docType, m, dosenByKode, jEv);
   const tanpaTemplate = !tautan && d.eligible && !config; // docType sudah ada, template menyusul
-  const dikunci = !tautan && !bolehAksesBerkas(m); // status "Perlu perbaikan"
+  const dikunci = !tautan && !bolehUnduhDokumen(m); // "Perlu perbaikan" atau perubahan data belum diverifikasi ulang
   const siap = tautan ? !!d.linkEksternal : d.eligible && !!config && !dikunci;
   const docx = !!(config && config.docx);
 
@@ -172,7 +174,7 @@ function BarisUnduh({ d, m, jEv, dosenByKode }) {
   }
 
   let keterangan = null;
-  if (!siap) keterangan = <span className="dok-syarat">{tautan ? 'Tautan belum tersedia.' : dikunci && d.eligible ? 'Unduhan dikunci: perbaiki data pendaftaran sesuai pesan admin terlebih dahulu.' : tanpaTemplate ? 'Template surat belum tersedia.' : (d.syarat || 'Belum tersedia.')}</span>;
+  if (!siap) keterangan = <span className="dok-syarat">{tautan ? 'Tautan belum tersedia.' : dikunci && d.eligible ? alasanUnduhTerkunci(m) : tanpaTemplate ? 'Template surat belum tersedia.' : (d.syarat || 'Belum tersedia.')}</span>;
   else if (d.catatan && !d.catatanAdminSaja) keterangan = <span>{d.catatan}</span>;
 
   return (
@@ -227,14 +229,18 @@ function SlotUnggah({ d, terkunci, onUpload, onDeleteUpload }) {
   }
 
   if (d.upload && !ganti) {
+    // perluUlang: admin meminta unggah ulang karena data berubah setelah berkas ini diunggah.
+    const ulang = !!d.upload.perluUlang;
     return (
       <div className="dok-slot">
         <div className="dok-slot-nama">{d.label}</div>
-        <div className="dok-terunggah">
-          <span className="dok-terunggah-ikon"><IkonSelesai /></span>
+        <div className={'dok-terunggah' + (ulang ? ' dok-perlu-ulang' : '')}>
+          <span className="dok-terunggah-ikon">{ulang ? <IkonUnggah /> : <IkonSelesai />}</span>
           <div className="dok-row-teks">
             <a className="dok-terunggah-file" href={d.upload.url || d.upload.dataUrl} target="_blank" rel="noreferrer">{d.upload.fileName}</a>
-            <div className="dok-terunggah-meta">Terunggah{d.upload.uploadedAt ? ` ${formatTanggal(d.upload.uploadedAt)}` : ''}</div>
+            <div className="dok-terunggah-meta" title={ulang ? 'Data berubah setelah berkas ini diunggah' : undefined}>
+              {ulang ? 'Unggah ulang' : `Terunggah${d.upload.uploadedAt ? ` ${formatTanggal(d.upload.uploadedAt)}` : ''}`}
+            </div>
           </div>
           {bolehUnggah && (
             <div className="dok-terunggah-aksi">
@@ -253,7 +259,7 @@ function SlotUnggah({ d, terkunci, onUpload, onDeleteUpload }) {
         <div className="dok-slot-nama">{d.label}</div>
         <div className="dok-slot-off">
           <IkonTerkunci size={22} />
-          <span>{terkunci && d.eligible ? 'Dikunci: perbaiki data pendaftaran sesuai pesan admin terlebih dahulu.' : `Belum bisa diunggah.${!d.docType && d.syarat ? ` ${d.syarat}` : ''}`}</span>
+          <span>{terkunci && d.eligible ? 'Dikunci: perbaiki data sesuai pesan admin.' : `Belum bisa diunggah.${!d.docType && d.syarat ? ` ${d.syarat}` : ''}`}</span>
         </div>
       </div>
     );
@@ -311,7 +317,7 @@ function SlotTautan({ d, terkunci, onKirim }) {
         <div className="dok-slot-nama">{d.label}</div>
         <div className="dok-slot-off">
           <IkonTerkunci size={22} />
-          <span>{terkunci && d.eligible ? 'Dikunci: perbaiki data pendaftaran sesuai pesan admin terlebih dahulu.' : `Belum bisa dikirim. ${d.syarat}`}</span>
+          <span>{terkunci && d.eligible ? 'Dikunci: perbaiki data sesuai pesan admin.' : `Belum bisa dikirim. ${d.syarat}`}</span>
         </div>
       </div>
     );

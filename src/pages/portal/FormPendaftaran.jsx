@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
-import { buatId, idPengajuan, todayISO, tambahHari, catatAktivitas, ringkasPerubahanPendaftaran, KLASIFIKASI, programLabel, dosenAktifUntuk } from '../../utils/helpers.js';
+import { buatId, idPengajuanBaru, todayISO, tambahHari, catatAktivitas, ringkasPerubahanPendaftaran, hitungPerubahanData, KLASIFIKASI, programLabel, dosenAktifUntuk, adaSuratBalasan } from '../../utils/helpers.js';
 import { kpTemaUntukPilihan, bidangUntukPilihan, kodeKpTemaPertama, kodeBidangPertama, adalahKodeKpTema } from '../../utils/pilihan.js';
 import { Field, KepalaForm } from '../../components/ui.jsx';
-import { META, BUTIR_SYARAT, kunciProgram, gayaKP, urutanForm, medanForm, galatWajib } from '../../utils/formPendaftaran.js';
+import { META, BUTIR_SYARAT, MEDAN_SURAT_BALASAN, kunciProgram, gayaKP, urutanForm, medanForm, galatWajib } from '../../utils/formPendaftaran.js';
 import { PROGRAM_KEYS_PENDAFTARAN } from './shared.js';
 
 // `pratinjau` (opsional) = mode editor Pengaturan → Form Pendaftaran: form yang SAMA
 // dirender apa adanya (kontrol dinonaktifkan, tanpa tombol), tiap field dibungkus
 // tombol pilih supaya admin mengeditnya langsung di tampilan yang dilihat mahasiswa.
 // { program, jenisMagang, terpilih, onPilih(id) }
-export function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], angkatanAktif = [], konten = {}, programTerpakai = [], pratinjau, onCancel, onSave }) {
+export function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], angkatanAktif = [], konten = {}, programTerpakai = [], idAda = [], pratinjau, onCancel, onSave }) {
   const baru = pratinjau ? true : !awal;
   // Satu pengajuan per program: program yang sudah punya pengajuan tetap tampil di
   // pilihan tapi tidak bisa dipilih (hapus dulu pengajuan lamanya).
@@ -68,7 +68,10 @@ export function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], a
     if (galat) { setErr(galat); return; }
     if (baru && programTerpakai.includes(m.program)) { setErr(`Kamu sudah punya pengajuan ${programLabel(m.program)}. Hapus pengajuan lama dulu untuk membuat yang baru.`); return; }
     setErr('');
-    const rec = { ...m, angkatan: Number(m.angkatan) || m.angkatan, verifikasi: 'baru', ...(baru ? { id: idPengajuan(nim, m.program) } : {}) };
+    let rec = { ...m, angkatan: Number(m.angkatan) || m.angkatan, verifikasi: 'baru', ...(baru ? { id: idPengajuanBaru(nim, m.program, idAda) } : {}) };
+    // Data yang tercetak di dokumen berubah setelah diverifikasi: unduhan dikunci
+    // sampai admin memverifikasi ulang (hitungPerubahanData di helpers.js).
+    if (!baru) rec = { ...rec, perubahanData: hitungPerubahanData(awal, rec) };
     const catatan = baru ? '' : ringkasPerubahanPendaftaran(awal, rec).join(', ');
     onSave(catatAktivitas(rec, baru ? 'daftar' : 'perbaikan', catatan));
   }
@@ -84,6 +87,7 @@ export function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], a
       </Field>
     );
   }
+  const dataPerusahaanTerkunci = !!awal && adaSuratBalasan(awal);
   const nilai = (id) => (META[id].di === 'p' ? p[META[id].kolom] : m[META[id].kolom]) || '';
   const ubah = (id, v) => (META[id].di === 'p' ? setP(META[id].kolom, v) : set(META[id].kolom, v));
   const opsiKosong = <option value="">—</option>;
@@ -174,6 +178,18 @@ export function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], a
       case 'syarat':
         return renderSyarat();
       default: // text | textarea | date
+        // Data perusahaan terkunci selama surat balasan ada (dataPerusahaanAman di firestore.rules).
+        if (dataPerusahaanTerkunci && MEDAN_SURAT_BALASAN.includes(id)) {
+          return bungkus(id, (f) => (
+            <div className="isian-terkunci">
+              <input type={f.tipe === 'date' ? 'date' : 'text'} value={nilai(id)} disabled aria-label={`${f.label} (terkunci)`} />
+              <svg className="isian-terkunci-ikon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="5" y="11" width="14" height="10" rx="2" />
+                <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+              </svg>
+            </div>
+          ));
+        }
         return bungkus(id, (f) => (f.tipe === 'textarea'
           ? <textarea rows={2} value={nilai(id)} onChange={(e) => ubah(id, e.target.value)} placeholder={f.placeholder} />
           : <input type={f.tipe === 'date' ? 'date' : 'text'} value={nilai(id)} onChange={(e) => ubah(id, e.target.value)} placeholder={f.placeholder} />));

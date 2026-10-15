@@ -52,7 +52,8 @@ service firebase.storage {
     match /uploads/{mahasiswaId}/{key}/{fileName} {
       allow create, update: if isOwnerStudent(mahasiswaId) && !(key in berkasAdmin())
         && pdfSah(fileName) && pernahVerif(mhsDoc(mahasiswaId))
-        && mhsDoc(mahasiswaId).get('verifikasi', 'baru') != 'perbaikan'; // "Perlu perbaikan" = unggah dikunci
+        && mhsDoc(mahasiswaId).get('verifikasi', 'baru') != 'perbaikan' // "Perlu perbaikan" = unggah dikunci
+        && mhsDoc(mahasiswaId).get('dibatalkan', false) != true; // pengajuan ditutup = arsip
       // Hapus: berkas yang diganti/dihapus, dan seluruh folder saat pengajuan dihapus.
       allow delete: if isOwnerStudent(mahasiswaId) && !(key in berkasAdmin());
     }

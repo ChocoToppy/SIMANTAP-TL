@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { bolehAksesBerkas, dokumenPerTahap, eventsFor, formatTanggal, getJadwal, normalizeUrl, stagesFor } from '../utils/helpers.js';
+import { bolehAksesBerkas, bolehUnduhDokumen, dokumenPerTahap, eventsFor, formatTanggal, getJadwal, normalizeUrl, stagesFor } from '../utils/helpers.js';
 import { generateDocument, getTemplateConfig, prefetchTemplate, warmConverter } from '../utils/documentGenerator.js';
-import { Badge, FileDropZone } from './ui.jsx';
+import { FileDropZone, PrintIcon } from './ui.jsx';
 
 // ===================== kpDocuments.jsx =====================
 // Panel dokumen per tahap (KP/Magang/TA) — dipakai bersama oleh Portal
@@ -22,7 +22,7 @@ function tahapAwal(grup, program, tahap) {
 
 export function KpDocumentPanel({ m, program = 'KP', dosenByKode = {}, konten = {}, canUpload = false, role = 'student', onUpload, onDeleteUpload, collapsible = true, title = 'Dokumen Kerja Praktek', activeStage, pratinjau }) {
   const [expanded, setExpanded] = useState(!collapsible);
-  const grup = dokumenPerTahap(program, m, konten);
+  const grup = dokumenPerTahap(program, m, konten, { admin: role === 'admin' });
   // Dokumen yang butuh jadwal (mis. BA Expo) merujuk `d.event`; kalau tidak
   // diisi, pakai kegiatan utama program (Magang cuma punya satu, TA tiga).
   const jadwalDok = (d) => getJadwal(m, d.event || eventsFor(program)[0]);
@@ -95,7 +95,9 @@ export function KpDocumentPanel({ m, program = 'KP', dosenByKode = {}, konten = 
           {aktif ? (
             <div className="kp-dok-group">
               {aktif.dokumen.map((d) => {
-                const item = <KpDokumenItem key={d.key} d={d} m={m} jEv={jadwalDok(d)} dosenByKode={dosenByKode} canUpload={canUpload} role={role} onUpload={onUpload} onDeleteUpload={onDeleteUpload} />;
+                // Dokumen dari tahap lain (adminJugaDiTahap, mis. Penilaian KP di Lulus): tampilan ringkas baca-saja.
+                const ringkas = d.stage !== aktif.stage;
+                const item = <KpDokumenItem key={d.key} d={d} m={m} jEv={jadwalDok(d)} dosenByKode={dosenByKode} canUpload={canUpload && !ringkas} ringkas={ringkas} role={role} onUpload={onUpload} onDeleteUpload={onDeleteUpload} />;
                 if (!pratinjau) return item;
                 // Mode pratinjau (editor Pengaturan → Konten): tiap dokumen bisa dipilih untuk diedit.
                 return (
@@ -115,22 +117,55 @@ export function KpDocumentPanel({ m, program = 'KP', dosenByKode = {}, konten = 
   );
 }
 
-// Satu label status per dokumen, supaya mahasiswa tidak perlu menyimpulkan
-// sendiri dari kombinasi tombol & keterangan.
+// Satu status per dokumen, supaya pembaca tidak perlu menyimpulkan sendiri dari
+// kombinasi tombol & keterangan. Ditampilkan sebagai ikon berwarna (warna sama
+// dengan Badge); labelnya jadi tooltip & teks pembaca layar.
 function statusDokumen(d, bolehUnggah) {
   if (d.linkInput) {
-    if (d.linkDisetujui) return { tone: 'green', label: 'Disetujui' };
-    if (d.linkTerkirim) return { tone: 'amber', label: 'Menunggu diperiksa' };
-    return d.eligible ? { tone: 'amber', label: 'Belum dikirim' } : { tone: 'gray', label: 'Belum tersedia' };
+    if (d.linkDisetujui) return { tone: 'green', label: 'Disetujui', ikon: 'centang' };
+    if (d.linkTerkirim) return { tone: 'amber', label: 'Menunggu diperiksa', ikon: 'jam' };
+    return d.eligible ? { tone: 'amber', label: 'Belum dikirim', ikon: 'tautan' } : { tone: 'gray', label: 'Belum tersedia', ikon: 'kunci' };
   }
-  if (d.upload) return { tone: 'green', label: 'Terunggah' };
-  if (!d.eligible) return { tone: 'gray', label: 'Belum tersedia' };
-  if (d.docType) return { tone: 'blue', label: 'Siap diunduh' };
-  if (bolehUnggah) return { tone: 'amber', label: 'Belum diunggah' };
+  if (d.upload && d.upload.perluUlang) return { tone: 'amber', label: 'Diminta unggah ulang', ikon: 'unggah' };
+  if (d.upload) return { tone: 'green', label: 'Terunggah', ikon: 'centang' };
+  if (!d.eligible) return { tone: 'gray', label: 'Belum tersedia', ikon: 'kunci' };
+  if (d.docType) return { tone: 'blue', label: 'Siap diunduh', ikon: 'unduh' };
+  if (bolehUnggah) return { tone: 'amber', label: 'Belum diunggah', ikon: 'unggah' };
   return null;
 }
 
-function KpDokumenItem({ d, m, jEv, dosenByKode, canUpload, role, onUpload, onDeleteUpload }) {
+const IKON_STATUS = {
+  centang: <path d="M5 12.5l4.5 4.5L19 7.5" />,
+  jam: <><circle cx="12" cy="12" r="8" /><path d="M12 8v4.5l3 2" /></>,
+  tautan: <><path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1" /><path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1" /></>,
+  kunci: <><rect x="5.5" y="11" width="13" height="9" rx="1" /><path d="M8.5 11V8a3.5 3.5 0 0 1 7 0v3" /></>,
+  unduh: <><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5" /><path d="M5 19h14" /></>,
+  unggah: <><path d="M12 15V4M7.5 8.5L12 4l4.5 4.5" /><path d="M5 19h14" /></>,
+  kosong: <><path d="M7 3h7l4 4v14H7z" /><path d="M5 5l14 14" /></>,
+};
+
+// Ikon kecil di depan berkas terunggah / tautan terkirim.
+function IkonBerkas({ jenis }) {
+  return (
+    <svg className="kp-dok-file-ikon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {jenis === 'tautan' ? IKON_STATUS.tautan : <><path d="M7 3h7l4 4v14H7z" /><path d="M14 3v4h4" /></>}
+    </svg>
+  );
+}
+
+function StatusIkon({ tone, label, ikon }) {
+  return (
+    <span className={`status-ikon badge-${tone}`} title={label} role="img" aria-label={label}>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        {IKON_STATUS[ikon]}
+      </svg>
+    </span>
+  );
+}
+
+// ringkas: salinan baca-saja di tahap lain (adminJugaDiTahap). Yang dibutuhkan
+// di sana hanya berkas terunggahnya, jadi tanpa unduh templat dan tanpa aksi.
+function KpDokumenItem({ d, m, jEv, dosenByKode, canUpload, ringkas = false, role, onUpload, onDeleteUpload }) {
   const [busy, setBusy] = useState(false);
   const [dlBusy, setDlBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -140,15 +175,20 @@ function KpDokumenItem({ d, m, jEv, dosenByKode, canUpload, role, onUpload, onDe
   );
   const config = d.docType ? getTemplateConfig(d.docType, m, dosenByKode, jEv) : null;
   const tanpaTemplate = !!d.docType && d.eligible && !config; // template menyusul
-  const status = tanpaTemplate ? { tone: 'gray', label: 'Template belum ada' } : statusDokumen(d, bolehUnggahDiSini);
+  let status = ringkas
+    ? (d.upload ? { tone: 'green', label: 'Terunggah', ikon: 'centang' } : { tone: 'gray', label: 'Belum diunggah (unggah di tab Bimbingan)', ikon: 'unggah' })
+    : tanpaTemplate ? { tone: 'gray', label: 'Template belum ada', ikon: 'kosong' } : statusDokumen(d, bolehUnggahDiSini);
+  if (role === 'admin' && status && status.ikon === 'kunci' && d.syarat) status = { ...status, label: `${status.label}. ${d.syarat}` };
   // Mahasiswa berstatus "Perlu perbaikan" tidak bisa mengunduh/mengunggah; admin selalu bisa.
   const aksesMhs = role === 'admin' || bolehAksesBerkas(m);
-  const bisaUnduh = d.docType && d.eligible && !!config && aksesMhs;
+  const bisaUnduh = !ringkas && d.docType && d.eligible && !!config && (role === 'admin' || bolehUnduhDokumen(m));
   const bisaUnggah = bolehUnggahDiSini && d.eligible && aksesMhs;
   const bisaHapus = d.upload && bolehUnggahDiSini && onDeleteUpload;
   const tautan = role !== 'admin' && d.linkEksternal;
 
   const docx = !!(config && config.docx);
+  const unduhIkon = role === 'admin' && bisaUnduh;
+  const labelUnduh = docx ? 'Unduh Word' : 'Unduh PDF';
 
   async function unduh() {
     if (!config) return;
@@ -183,31 +223,50 @@ function KpDokumenItem({ d, m, jEv, dosenByKode, canUpload, role, onUpload, onDe
     <div className="kp-dok-item">
       <div className="kp-dok-item-head">
         <span className="kp-dok-item-nama">{d.label}</span>
-        {status && <Badge tone={status.tone}>{status.label}</Badge>}
+        {/* Admin: unduh templat lewat tombol ikon printer (sama dengan cetak surat perpanjangan). */}
+        {unduhIkon && (
+          <button
+            type="button"
+            className="icon-btn-outline kp-dok-cetak"
+            onClick={unduh}
+            disabled={dlBusy}
+            aria-label={labelUnduh}
+            title={dlBusy ? 'Menyiapkan…' : labelUnduh}
+          ><PrintIcon /></button>
+        )}
+        {status && <StatusIkon {...status} />}
       </div>
 
       {d.upload && (
-        <div className="kp-dok-berkas">
-          <a href={d.upload.url || d.upload.dataUrl} target="_blank" rel="noreferrer">{d.upload.fileName}</a>
-          {d.upload.uploadedAt ? <span className="kp-dok-tgl"> · {formatTanggal(d.upload.uploadedAt)}</span> : null}
-        </div>
+        <a className="kp-dok-file" href={d.upload.url || d.upload.dataUrl} target="_blank" rel="noreferrer" title={d.upload.fileName}>
+          <IkonBerkas jenis="file" />
+          <span className="kp-dok-file-teks">
+            <span className="kp-dok-file-nama">{d.upload.fileName}</span>
+            {d.upload.uploadedAt && <span className="kp-dok-file-tgl">{formatTanggal(d.upload.uploadedAt)}</span>}
+          </span>
+        </a>
       )}
       {d.linkTerkirim && (
-        <div className="kp-dok-berkas" style={{ overflowWrap: 'anywhere' }}>
-          <a href={normalizeUrl(d.linkTerkirim)} target="_blank" rel="noreferrer">{d.linkTerkirim}</a>
-        </div>
+        <a className="kp-dok-file" href={normalizeUrl(d.linkTerkirim)} target="_blank" rel="noreferrer" title={d.linkTerkirim}>
+          <IkonBerkas jenis="tautan" />
+          <span className="kp-dok-file-teks">
+            <span className="kp-dok-file-nama">{d.linkTerkirim}</span>
+          </span>
+        </a>
       )}
-      {!d.eligible && !d.upload && !d.linkTerkirim && d.syarat && <div className="hint">{d.syarat}</div>}
-      {d.catatan && <div className="hint">{d.catatan}</div>}
+      {/* Admin: syarat cukup di tooltip ikon gembok, tidak sebagai kalimat. */}
+      {!d.eligible && !d.upload && !d.linkTerkirim && d.syarat && role !== 'admin' && <div className="hint">{d.syarat}</div>}
+      {/* Catatan dokumen ditulis untuk mahasiswa ("Anda …"), jadi tidak tampil untuk admin. */}
+      {d.catatan && role !== 'admin' && <div className="hint">{d.catatan}</div>}
       {d.linkButton && role !== 'admin' && !d.linkEksternal && <div className="hint">Tautan belum tersedia.</div>}
       {/* linkLabel non-tombol berupa kalimat, jadi tampil sebagai tautan teks. */}
       {tautan && !d.linkButton && (
         <div className="hint"><a href={d.linkEksternal} target="_blank" rel="noreferrer">{d.linkLabel || d.linkEksternal}</a></div>
       )}
 
-      {(bisaUnduh || bisaUnggah || bisaHapus || (tautan && d.linkButton)) && !showDrop && (
+      {((bisaUnduh && !unduhIkon) || bisaUnggah || bisaHapus || (tautan && d.linkButton)) && !showDrop && (
         <div className="kp-dok-aksi">
-          {bisaUnduh && (
+          {bisaUnduh && !unduhIkon && (
             <button type="button" className={'btn' + (d.upload ? '' : ' btn-primary')} onClick={unduh} disabled={dlBusy}>
               {dlBusy ? (docx ? 'Menyiapkan…' : 'Menyiapkan PDF…') : (docx ? 'Unduh Word' : 'Unduh PDF')}
             </button>

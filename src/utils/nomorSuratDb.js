@@ -5,7 +5,7 @@ import { formatNomor, idNomor, bacaNomor } from './nomorSurat.js';
 
 // ===================== Registri nomor surat (Firestore) =====================
 // nomorSurat/{tahun-urut}   satu dokumen per nomor yang pernah dipakai, diketik admin
-//                           atau diisi lewat tombol "Isi nomor berikutnya". TIDAK pernah
+//                           atau diisi lewat tombol "Ambil nomor". TIDAK pernah
 //                           dihapus, jadi nomor yang sudah kedaluwarsa tidak mungkin
 //                           dipakai lagi.
 // Nomor dicatat saat data mahasiswa disimpan (catatNomorManual), lewat transaksi yang
@@ -14,7 +14,7 @@ import { formatNomor, idNomor, bacaNomor } from './nomorSurat.js';
 
 const oleh = () => (auth.currentUser && (auth.currentUser.email || auth.currentUser.uid)) || 'admin';
 
-// Saran untuk tombol "Isi nomor berikutnya": nomor urut terkecil tahun ini yang belum
+// Saran untuk tombol "Ambil nomor": nomor urut terkecil tahun ini yang belum
 // ada di registri dan belum dipakai record mahasiswa mana pun (`terpakai`: nomor urut
 // dari record yang belum tercatat di registri). Hanya saran; tidak menulis apa pun.
 // Nomor yang diketik lebih jauh (mis. 045) dilewati saat urutan sampai ke sana.
@@ -33,7 +33,7 @@ export async function nomorBerikutnya(terpakai = []) {
 // mahasiswa ini (bila diganti atau dikosongkan) ditandai kedaluwarsa. Mengembalikan
 // nomorSuratId untuk record itu ('' bila nomor dikosongkan). Menolak nomor yang dipakai
 // mahasiswa lain atau yang sudah pernah diakhiri. opsi.longgar: lihat bacaNomor.
-// opsi.sumber: 'saran' bila nomor berasal dari tombol "Isi nomor berikutnya".
+// opsi.sumber: 'saran' bila nomor berasal dari tombol "Ambil nomor".
 export async function catatNomorManual(m, lama, opsi = {}) {
   const nomor = (m.nomorSurat || '').trim();
   const p = nomor ? bacaNomor(nomor, opsi) : null;
@@ -65,26 +65,6 @@ export async function catatNomorManual(m, lama, opsi = {}) {
       });
     }
     return idBaru;
-  });
-}
-
-// Tandai nomor aktif milik `m` sebagai kedaluwarsa, lalu terapkan `patch` ke
-// dokumen mahasiswa dalam transaksi yang sama (mengosongkan nomor + perubahan
-// tambahan, mis. reset pendaftaran untuk "daftar ulang").
-export async function akhiriNomor(m, alasan, patch = {}) {
-  const mhsRef = doc(db, 'mahasiswa', m.id);
-  return runTransaction(db, async (tx) => {
-    const mhsSnap = await tx.get(mhsRef);
-    if (!mhsSnap.exists()) throw new Error('Data mahasiswa tidak ditemukan di server.');
-    const id = mhsSnap.data().nomorSuratId;
-    const regRef = id ? doc(db, 'nomorSurat', id) : null;
-    const regSnap = regRef ? await tx.get(regRef) : null;
-    if (regSnap && regSnap.exists()) {
-      tx.update(regRef, { status: 'kedaluwarsa', diakhiri: nowStamp(), diakhiriOleh: oleh(), alasanAkhir: alasan });
-    }
-    const penuh = { nomorSurat: '', nomorSuratId: '', ...patch };
-    tx.update(mhsRef, penuh);
-    return penuh;
   });
 }
 

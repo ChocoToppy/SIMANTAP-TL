@@ -27,7 +27,7 @@ export function Dashboard({ mahasiswa, dosen, prog, setProg }) {
   // pembimbing tidak dijumlah lintas program (pembimbing KP ≠ pembimbing TA),
   // jadi dipecah per program; beban penguji tetap lintas program.
   const opsBeban = { semua: bebanMode === 'semua' };
-  const urutPeran = (list, peran) => list.filter((d) => d[peran] > 0).sort((a, b) => b[peran] - a[peran]);
+  const urutPeran = (list, peran) => list.filter((d) => d[peran] > 0).sort((a, b) => a.kode.localeCompare(b.kode));
   const bebanPenguji = urutPeran(dosen.map((d) => ({ ...d, ...hitungBeban(scoped, d.kode, opsBeban) })), 'penguji');
   const grupBimbingan = (prog === 'ALL' ? PROGRAM_KEYS : [prog])
     .map((p) => ({
@@ -232,9 +232,9 @@ function BebanChart({ judul, data, peran, tone }) {
   );
 }
 
-// `data` sudah terurut menurun, jadi data[0] adalah nilai terbesar.
+// `data` terurut alfabetis menurut kode dosen.
 function BebanBars({ data, peran, label, tone }) {
-  const max = data[0][peran];
+  const max = Math.max(...data.map((d) => d[peran]));
   return (
     <div className="bars">
       {data.map((d) => (

@@ -1,24 +1,23 @@
 import React from 'react';
-import { PROGRAM_KEYS, programLabel, punyaKlasifikasi, KLASIFIKASI, ringkasPendaftaran, normalizeUrl, formatTanggal, dokTA } from '../../utils/helpers.js';
+import { PROGRAM_KEYS, programLabel, punyaKlasifikasi, KLASIFIKASI, ringkasPendaftaran } from '../../utils/helpers.js';
 import { bidangUntukPilihan } from '../../utils/pilihan.js';
-import { cetakSuratPDF } from '../../utils/exportUtils.js';
-import { Field, Modal, FileDropZone } from '../../components/ui.jsx';
+import { Field, Modal } from '../../components/ui.jsx';
 import { LinkBerkasRow } from './LinkBerkasRow.jsx';
+import { PenutupanPengajuan, BannerDitutup } from './PenutupanPengajuan.jsx';
+import { BannerPerubahanData } from './BannerPerubahanData.jsx';
 import { RiwayatAktivitas } from './AktivitasCells.jsx';
 import { NomorSuratPanel } from './NomorSuratPanel.jsx';
-import { PersetujuanPerpanjangan } from './PersetujuanPerpanjangan.jsx';
 import { PengingatPesan } from './PengingatPesan.jsx';
 
 // Tata letak generik (non-KP) di dalam modal FormMahasiswa (lihat
-// FormMahasiswa.jsx) — dipakai untuk TA, Capstone Design, Magang, Tesis S2.
-// Semua state/handler dikelola di FormMahasiswa.jsx, komponen ini murni
-// presentasional (props saja).
+// FormMahasiswa.jsx) — dipakai untuk Capstone Design dan Tesis S2 (TA, KP, dan
+// Magang memakai FormMahasiswaKP.jsx). Semua state/handler dikelola di
+// FormMahasiswa.jsx, komponen ini murni presentasional (props saja).
 export function FormMahasiswaGeneric({
   m, setM, set, gantiProgram, periodeList, daftarAngkatan = [],
   roles, pembimbing1Label, penguji1Label, dosenOpts, bebanBlok, stages, events, jadwalBlok,
   alurTahapBlok, notifikasiBlok, peringatanBlok, p,
-  dosenByKode, ppBusy, ppErr, berikanSuratPerpanjangan,
-  verifAwal, nomorTerpakai, baru, onCancel, submit, navEntri, modalOpsi,
+  verifAwal, nomorTerpakai, baru, onCancel, submit, navEntri, modalOpsi, adaPengganti,
 }) {
   return (
     <Modal
@@ -33,6 +32,8 @@ export function FormMahasiswaGeneric({
         </>
       }
     >
+      <BannerDitutup m={m} setM={setM} adaPengganti={adaPengganti} />
+      <BannerPerubahanData m={m} setM={setM} />
       <div className="form-grid">
         <div className="sched field-full">
           <div className="sched-title">Verifikasi pendaftaran</div>
@@ -137,38 +138,9 @@ export function FormMahasiswaGeneric({
         {events.map((ev) => jadwalBlok(ev))}
 
         <Field label="Catatan / pesan untuk mahasiswa" full><textarea rows={2} value={m.catatan} onChange={(e) => set('catatan', e.target.value)} /></Field>
-        <label className="check field-full">
-          <input type="checkbox" checked={!!m.dibatalkan} onChange={(e) => set('dibatalkan', e.target.checked)} />
-          <span>Dibatalkan (tidak dihitung sebagai aktif &amp; beban dosen)</span>
-        </label>
-
-        {['TA', 'KP', 'MG'].includes(m.program) && (
-          <div className="sched field-full">
-            <div className="sched-title">Perpanjangan {programLabel(m.program)}</div>
-            {(m.perpanjangan && m.perpanjangan.diminta)
-              ? <div className="verif-info"><div>Alasan mahasiswa: <strong>{m.perpanjangan.alasan || '—'}</strong>{m.perpanjangan.tanggalDiminta ? ` · ${formatTanggal(m.perpanjangan.tanggalDiminta)}` : ''}</div></div>
-              : <div className="hint">Belum ada pengajuan perpanjangan dari mahasiswa.</div>}
-            <PersetujuanPerpanjangan m={m} setM={setM} />
-            {(m.perpanjangan || {}).suratAdmin
-              ? <div className="callout callout-green">Surat diberikan ke mahasiswa: <a href={m.perpanjangan.suratAdmin.url || m.perpanjangan.suratAdmin.dataUrl} target="_blank" rel="noreferrer">{m.perpanjangan.suratAdmin.fileName}</a></div>
-              : <div className="hint">Surat perpanjangan belum diberikan ke mahasiswa.</div>}
-            <div style={{ marginTop: 6 }}>
-              <FileDropZone accept=".pdf" busy={ppBusy} onFile={berikanSuratPerpanjangan} label={(m.perpanjangan || {}).suratAdmin ? 'Ganti berkas & berikan ulang' : 'Berikan surat ke mahasiswa'} />
-              {ppErr && <div className="login-err" style={{ marginTop: 4 }}>{ppErr}</div>}
-            </div>
-            {((m.perpanjangan || {}).suratFinal || (m.perpanjangan || {}).suratFinalLink)
-              ? <div className="callout callout-green">Surat final (ditandatangani) dari mahasiswa: <a href={m.perpanjangan.suratFinal ? (m.perpanjangan.suratFinal.url || m.perpanjangan.suratFinal.dataUrl) : normalizeUrl(m.perpanjangan.suratFinalLink)} target="_blank" rel="noreferrer">{m.perpanjangan.suratFinal ? m.perpanjangan.suratFinal.fileName : 'buka'}</a></div>
-              : <div className="hint">Surat final dari mahasiswa belum diunggah.</div>}
-            {m.program === 'TA' && (
-              <div className="notif-actions" style={{ marginTop: 8 }}>
-                <button type="button" className="btn" onClick={() => cetakSuratPDF(`Perpanjangan TA - ${m.nama}`, dokTA('perpanjangan', m, dosenByKode))}>Cetak surat perpanjangan (PDF)</button>
-              </div>
-            )}
-          </div>
-        )}
-
         {notifikasiBlok}
         {peringatanBlok}
+        <PenutupanPengajuan m={m} setM={setM} baru={baru} />
       </div>
     </Modal>
   );

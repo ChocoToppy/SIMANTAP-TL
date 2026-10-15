@@ -163,6 +163,8 @@ h1, h2, h3, h4, h5, h6, .brand-name {
 }
 .tab:hover { color: var(--text); }
 .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+/* Penanda tahap mahasiswa saat ini di tab tahap modal admin (amber = langkah aktif di stepper). */
+.tab-tahap-kini { display: inline-block; width: 7px; height: 7px; margin-right: 7px; vertical-align: 0.1em; background: var(--amber); border-radius: 1px; }
 
 /* Sub-tab per program (mis. daftar Mahasiswa: TA/KP/Capstone/Magang/Tesis S2)
    — sengaja dibuat beda gaya dari .tabs (nav utama Dashboard/Mahasiswa/Dosen):
@@ -453,11 +455,22 @@ html[data-theme="dark"] .kp-dok-toggle:hover { background: rgba(241, 241, 238, 0
 .kp-dok-item { display: flex; flex-direction: column; gap: 4px; padding: 12px 0; min-width: 0; }
 .kp-dok-item + .kp-dok-item, .ff-slot + .ff-slot .kp-dok-item { border-top: 1px solid var(--border); }
 .kp-dok-group > :first-child .kp-dok-item, .kp-dok-group > .kp-dok-item:first-child { padding-top: 4px; }
-.kp-dok-item-head { display: flex; align-items: baseline; justify-content: space-between; gap: 6px 10px; flex-wrap: wrap; }
+.kp-dok-item-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px 10px; }
+.kp-dok-item-head .kp-dok-item-nama { flex: 1; }
+/* Status dokumen sebagai ikon (warna = .badge-*), label di tooltip. */
+.status-ikon { flex: none; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radius-sm); }
 .kp-dok-item-nama { font-weight: 600; font-size: 0.92rem; line-height: 1.35; min-width: 0; }
-.kp-dok-berkas { font-size: 0.82rem; overflow-wrap: anywhere; }
-.kp-dok-berkas a { color: var(--green-text); }
-.kp-dok-tgl { color: var(--muted); }
+/* Berkas terunggah / tautan terkirim: satu kotak ringkas, nama satu baris
+   (terpotong ellipsis, nama lengkap di tooltip), tanggal kecil di bawahnya. */
+.kp-dok-file { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); text-decoration: none; min-width: 0; }
+.kp-dok-file:hover { border-color: var(--border-strong); }
+.kp-dok-file-ikon { flex: none; color: var(--green-text); }
+.kp-dok-file-teks { display: flex; flex-direction: column; min-width: 0; }
+.kp-dok-file-nama { font-size: 0.82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kp-dok-file:hover .kp-dok-file-nama { text-decoration: underline; }
+.kp-dok-file-tgl { font-size: 0.72rem; color: var(--muted); }
+.kp-dok-cetak { width: 26px; height: 26px; color: var(--text); }
+.kp-dok-cetak:disabled { opacity: 0.4; cursor: default; }
 .kp-dok-aksi { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
 .kp-dok-drop { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 6px; }
 .kp-dok-drop > :first-child { align-self: stretch; }
@@ -505,19 +518,94 @@ html[data-theme="dark"] .kp-dok-toggle:hover { background: rgba(241, 241, 238, 0
 .fill-green { background: var(--accent); }
 .bar-val { width: 26px; text-align: right; font-size: 0.8rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 
+/* Isian terkunci (mis. tautan dari mahasiswa di LinkBerkasRow sebelum ikon pensil
+   ditekan): abu-abu, kursor biasa (bukan kursor ketik), tanpa caret & sorotan fokus. */
+input.input-terkunci { background: var(--surface-2); color: var(--muted); cursor: default; caret-color: transparent; }
+input.input-terkunci:focus { outline: none; border-color: var(--border-strong); box-shadow: none; }
+
 /* Nomor surat manual: isian + tombol lampu (panduan format) sebaris */
 .nomor-surat-row { display: flex; gap: 8px; align-items: stretch; }
 .nomor-surat-row input { flex: 1; min-width: 0; }
-.nomor-surat-row .lampu-btn { height: auto; width: auto; aspect-ratio: 1; color: var(--muted); }
-.nomor-surat-row .lampu-btn:hover,
-.nomor-surat-row .lampu-btn.aktif { color: var(--amber); }
-.nomor-surat-row .lampu-btn.aktif { background: var(--amber-bg); border-color: var(--amber); }
+.nomor-surat-row .lampu-btn { height: auto; width: auto; aspect-ratio: 1; }
+/* Tombol lampu (buka/tutup panduan): abu-abu, kuning saat panduan terbuka. */
+.icon-btn-outline.lampu-btn { color: var(--muted); }
+.icon-btn-outline.lampu-btn:hover,
+.icon-btn-outline.lampu-btn.aktif { color: var(--amber); }
+.icon-btn-outline.lampu-btn.aktif,
+html[data-theme="dark"] .icon-btn-outline.lampu-btn.aktif { background: var(--amber-bg); border-color: var(--amber); }
+/* Judul panel + tombol di kanannya (mis. lampu di tab Pembukuan). */
+.sched-title-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+.sched-title-row .sched-title { margin-bottom: 0; }
 .nomor-surat-row .btn { white-space: nowrap; }
 @media (max-width: 640px) {
   .nomor-surat-row { flex-wrap: wrap; }
   .nomor-surat-row input { flex-basis: 100%; }
   .nomor-surat-row .btn { flex: 1; }
 }
+
+/* Tombol aksi berat (menutup pengajuan). Merah hanya di sini. */
+.btn.btn-danger-outline { color: var(--red); border-color: var(--red); background: none; }
+.btn.btn-danger-outline:hover { background: var(--red-bg); }
+.btn.btn-danger { background: var(--red); border-color: var(--red); color: #f5f5f2; }
+
+/* Tutup pengajuan (PenutupanPengajuan.jsx): bagian di dasar modal + banner di atas saat ditutup */
+.tutup-seksi { border: 1px solid var(--border-strong); border-radius: var(--radius); padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.tutup-seksi-isi { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.tutup-judul { margin: 0 0 4px; font-size: 0.9rem; font-weight: 600; font-family: var(--font-heading); }
+.tutup-teks { margin: 0; font-size: 0.85rem; color: var(--muted); max-width: 60ch; }
+.tutup-seksi-isi .btn { flex: none; }
+.tutup-form { display: flex; flex-direction: column; gap: 6px; padding-top: 12px; border-top: 1px solid var(--border); }
+.tutup-aksi { display: flex; gap: 8px; margin-top: 4px; }
+.banner-ditutup { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 14px 16px; margin-bottom: 16px; background: var(--red-bg); border: 1px solid var(--red); border-radius: var(--radius-sm); color: var(--red-text); }
+.banner-ditutup-teks { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; font-size: 0.875rem; }
+.banner-ditutup-teks strong { font-size: 0.95rem; }
+.banner-ditutup-teks .field-label { color: var(--red-text); }
+.banner-ditutup-sub { font-size: 0.8rem; opacity: 0.85; }
+.banner-ditutup .btn { flex: none; }
+@media (max-width: 640px) {
+  .tutup-seksi-isi, .banner-ditutup { flex-direction: column; align-items: stretch; }
+}
+
+/* Perubahan data oleh mahasiswa (BannerPerubahanData.jsx), di atas modal edit admin */
+.banner-perubahan { padding: 14px 16px; margin-bottom: 16px; background: var(--amber-bg); border: 1px solid var(--amber); border-radius: var(--radius-sm); color: var(--amber-text); font-size: 0.875rem; display: flex; flex-direction: column; gap: 8px; }
+.banner-perubahan-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.banner-perubahan-head strong { font-size: 0.95rem; }
+.banner-perubahan-tgl { font-size: 0.78rem; opacity: 0.85; }
+.banner-perubahan-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.banner-perubahan-list li { display: grid; grid-template-columns: minmax(110px, auto) 1fr; gap: 12px; overflow-wrap: anywhere; }
+.banner-perubahan-label { opacity: 0.85; }
+.banner-perubahan-list s { opacity: 0.75; }
+.banner-perubahan-berkas { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; padding-top: 8px; border-top: 1px solid var(--amber); }
+.banner-perubahan-berkas .check { color: var(--amber-text); }
+/* Pemberitahuan perubahan data di sisi mahasiswa: field yang diubah sebagai chip */
+.notice-perubahan { display: flex; flex-direction: column; gap: 8px; }
+.notice-perubahan-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.notice-perubahan-chip { font-size: 0.75rem; font-weight: 600; padding: 2px 8px; border: 1px solid var(--amber); border-radius: var(--radius-sm); }
+@media (max-width: 640px) { .banner-perubahan-list li { grid-template-columns: 1fr; gap: 0; } }
+
+/* Panel Perpanjangan (modal edit admin, PanelPerpanjangan.jsx) */
+.pp-panel { display: flex; flex-direction: column; gap: 10px; }
+.pp-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.pp-head .sched-title { margin-bottom: 0; }
+.pp-jatah { display: inline-flex; align-items: center; gap: 6px; flex: none; font-size: 0.75rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.pp-meter { display: inline-flex; gap: 3px; }
+.pp-meter span { width: 14px; height: 6px; background: var(--gray-bg); border: 1px solid var(--border-strong); }
+.pp-meter span.isi { background: var(--accent); border-color: var(--accent); }
+.pp-status { display: flex; }
+.pp-alasan { margin: 0; padding-left: 10px; border-left: 2px solid var(--border-strong); font-size: 0.85rem; color: var(--muted); }
+.pp-riwayat { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; }
+.pp-riwayat li { display: flex; gap: 10px; }
+.pp-ke { color: var(--muted); min-width: 34px; }
+.pp-file { font-size: 0.85rem; overflow-wrap: anywhere; }
+.pp-aksi { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+.pp-tanggal { display: flex; flex-direction: column; gap: 2px; font-size: 0.85rem; min-width: 0; }
+.pp-tanggal .muted { font-size: 0.75rem; }
+.pp-aksi-tombol { display: flex; gap: 8px; margin-left: auto; flex: none; }
+.pp-aksi-tombol .icon-btn-outline { color: var(--text); }
+.pp-aksi-tombol .icon-btn-outline:disabled { opacity: 0.4; cursor: not-allowed; }
+.pp-aksi-tombol .pp-setujui-btn.siap,
+html[data-theme="dark"] .pp-aksi-tombol .pp-setujui-btn.siap:hover,
+.pp-aksi-tombol .pp-setujui-btn.siap:hover { background: var(--accent); border-color: var(--accent); color: #f5f5f2; }
 
 /* Dashboard: grafik pembimbing dipecah per program */
 .beban-grup + .beban-grup { margin-top: 18px; }
@@ -527,8 +615,11 @@ html[data-theme="dark"] .kp-dok-toggle:hover { background: rgba(241, 241, 238, 0
 .beban-mini { margin-top: 14px; }
 .beban-mini-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; }
 .beban-mini-grid .beban-mini { margin-top: 0; }
-/* Beberapa kolom (dibaca kiri→kanan, baris demi baris) supaya daftar dosen yang panjang tidak perlu banyak scroll. */
-.beban-mini-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); column-gap: 28px; row-gap: 6px; }
+/* Beberapa kolom (CSS multi-column) supaya daftar dosen yang panjang tidak perlu
+   banyak scroll. Urutan alfabetis turun di kolom pertama dulu, baru lanjut ke
+   kolom berikutnya; jumlah kolom menyesuaikan lebar (min. 200px per kolom). */
+.beban-mini-list { display: block; columns: 200px; column-gap: 28px; }
+.beban-mini-list .bar-row { break-inside: avoid; margin-bottom: 6px; }
 .beban-mini .bar-key { width: 40px; }
 .beban-mini .bar-track { height: 8px; }
 .beban-mini .bar-row.dipilih .bar-key,
@@ -750,20 +841,14 @@ html[data-theme="dark"] .icon-btn-outline:hover { background: rgba(241, 241, 238
 
 /* ---------- Modal lebar dengan tab per-tahap + panel dokumen sticky (KP) ---------- */
 .modal-wide { max-width: 1100px; }
-/* align-items: stretch (bukan flex-start) supaya kolom kiri (tab tahap) &
-   kanan (dokumen + perpanjangan) sama tinggi — berakhir di baris yang sama,
-   bukan salah satu menggantung dengan ruang kosong di bawahnya. */
-.modal-kp-layout { display: flex; gap: 24px; align-items: stretch; }
+/* align-items: flex-start: tiap kolom setinggi isinya sendiri. Dulu stretch
+   (kedua kolom berakhir di baris yang sama), tapi panel tahap yang pendek jadi
+   berisi ruang kosong besar saat kolom dokumen lebih tinggi. */
+.modal-kp-layout { display: flex; gap: 24px; align-items: flex-start; }
 .modal-kp-main { flex: 1 1 60%; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
 .modal-kp-side { flex: 0 0 320px; position: sticky; top: 0; display: flex; flex-direction: column; gap: 16px; }
-/* Panel tahap yang lagi aktif (satu-satunya .sched yang dirender di kolom kiri)
-   diberi flex:1 supaya border-nya benar-benar memanjang mengisi kolom yang
-   di-stretch itu, bukan cuma area flex-nya doang yang tinggi. Begitu juga
-   panel Perpanjangan (terakhir di kolom kanan) untuk arah sebaliknya. */
-.modal-kp-main > .sched { flex: 1; }
-.modal-kp-side > .sched:last-child { flex: 1; }
 @media (max-width: 860px) {
-  .modal-kp-layout { flex-direction: column; }
+  .modal-kp-layout { flex-direction: column; align-items: stretch; }
   .modal-kp-side { position: static; flex-basis: auto; width: 100%; }
 }
 
@@ -1036,6 +1121,11 @@ html[data-theme="dark"] .icon-btn-outline:hover { background: rgba(241, 241, 238
   background: var(--green-bg); border: 1px solid var(--green-border); border-radius: var(--radius-sm); color: var(--green-text);
 }
 .dok-terunggah-ikon { display: inline-flex; flex: none; color: var(--green); }
+/* Berkas yang diminta admin untuk diunggah ulang (upload.perluUlang) */
+.dok-terunggah.dok-perlu-ulang { background: var(--amber-bg); border-color: var(--amber); color: var(--amber-text); }
+.dok-perlu-ulang .dok-terunggah-ikon { color: var(--amber); }
+.dok-terunggah.dok-perlu-ulang .dok-link:not(.danger) { color: var(--amber-text); }
+.dok-perlu-ulang .dok-terunggah-meta { font-weight: 600; }
 .dok-terunggah-file { color: var(--text); font-size: 0.95rem; overflow-wrap: anywhere; }
 .dok-terunggah-meta { font-size: 0.8rem; }
 .dok-terunggah-aksi { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex: none; }
@@ -1117,7 +1207,8 @@ html[data-theme="dark"] .icon-btn-outline:hover { background: rgba(241, 241, 238
 .mhs-edit-identity { display: flex; align-items: flex-start; gap: 16px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); margin-top: 20px; }
 .mhs-edit-identity-info { display: flex; flex-wrap: wrap; gap: 20px 24px; flex: 1 1 auto; min-width: 0; }
 .mhs-edit-identity-judul { flex: 1 1 240px; min-width: 0; }
-.mhs-edit-identity > .icon-btn { margin-left: auto; flex-shrink: 0; border: 1px solid var(--border-strong); font-size: 1rem; }
+.mhs-edit-identity-aksi { margin-left: auto; flex-shrink: 0; display: flex; align-items: center; gap: 8px; }
+.mhs-edit-identity-aksi .icon-btn { border: 1px solid var(--border-strong); font-size: 1rem; }
 
 /* ---------- Riwayat aktivitas (kartu berwarna, terbaru di atas) ---------- */
 /* Cap riwayat aktivitas ke tinggi ~3 kartu, scroll untuk sisanya — otherwise a
@@ -1263,6 +1354,19 @@ html[data-theme="dark"] .icon-btn-outline:hover { background: rgba(241, 241, 238
 .stepper-caption { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 0.9rem; }
 .stepper-count { font-size: 0.78rem; color: var(--muted); }
 
+/* Alur tahap di modal edit admin: stepper + status jadwal + tombol ringkas */
+.alur-tahap { display: flex; flex-direction: column; gap: 12px; }
+.alur-tahap .sched-title { margin-bottom: 0; }
+.alur-jadwal { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; font-size: 0.85rem; }
+.alur-tidak-lulus { margin-left: auto; }
+/* Panah mundur/lanjut di kanan baris "Tahap x dari n" (StageStepper `aksi`). */
+.stepper-aksi { margin-left: auto; display: inline-flex; gap: 8px; align-self: center; }
+.alur-panah { color: var(--text); }
+.alur-panah:disabled { opacity: 0.35; cursor: default; }
+.icon-btn-outline.alur-panah.lanjut:not(:disabled),
+html[data-theme="dark"] .icon-btn-outline.alur-panah.lanjut:not(:disabled):hover,
+.icon-btn-outline.alur-panah.lanjut:not(:disabled):hover { background: var(--accent); border-color: var(--accent); color: #f5f5f2; }
+
 @media (max-width: 640px) {
   html, body { overflow-x: hidden; }
 
@@ -1404,6 +1508,12 @@ html[data-theme="dark"] .icon-btn-outline:hover { background: rgba(241, 241, 238
 /* ---------- Editor Form Pendaftaran (Pengaturan → Form Pendaftaran) ---------- */
 /* Kiri: FormPendaftaran asli dalam mode pratinjau; kanan: panel ubah field. */
 .req { color: var(--red); font-weight: 700; }
+/* Isian yang dikunci (mis. tanggal KP setelah surat balasan): ikon gembok di
+   tepi kanan menggantikan ikon kalender bawaan. */
+.isian-terkunci { position: relative; }
+.isian-terkunci input { width: 100%; padding-right: 36px; cursor: not-allowed; }
+.isian-terkunci input::-webkit-calendar-picker-indicator { display: none; }
+.isian-terkunci-ikon { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
 .ff-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 24px; align-items: start; }
 .ff-canvas { min-width: 0; padding: 6px; }
 .ff-canvas .portal-form { margin: 0 auto; }

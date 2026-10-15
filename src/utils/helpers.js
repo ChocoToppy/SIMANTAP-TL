@@ -147,7 +147,7 @@ export function formatTanggal(s) {
 
 // ---------- Status / kondisi mahasiswa ----------
 export function kondisi(mhs) {
-  if (mhs.dibatalkan) return { key: 'batal', label: 'Dibatalkan', tone: 'gray', daysLeft: null };
+  if (mhs.dibatalkan) return { key: 'batal', label: 'Ditutup', tone: 'gray', daysLeft: null };
   if (mhs.tahap === 'Lulus') return { key: 'lulus', label: 'Lulus', tone: 'green', daysLeft: null };
   const daysLeft = daysBetween(todayISO(), mhs.batasAkhir);
   if (daysLeft === null) return { key: 'aman', label: 'Aktif', tone: 'blue', daysLeft: null };
@@ -234,6 +234,17 @@ export function buatId() {
 // persis dengan aturan create di firestore.rules.
 export function idPengajuan(nim, program) {
   return `${nim}_${program}`;
+}
+// Pengajuan yang ditutup admin (field lama `dibatalkan`) tetap tersimpan sebagai
+// arsip; mahasiswa boleh mendaftar ulang program yang sama dengan ID bernomor
+// ({nim}_{program}_2, _3, …) — satu pengajuan TERBUKA per program.
+export function ditutup(m) { return !!(m && m.dibatalkan); }
+export function idPengajuanBaru(nim, program, idAda = []) {
+  const dasar = idPengajuan(nim, program);
+  if (!idAda.includes(dasar)) return dasar;
+  let n = 2;
+  while (idAda.includes(`${dasar}_${n}`)) n++;
+  return `${dasar}_${n}`;
 }
 
 // ===================== Verifikasi pendaftaran =====================
@@ -904,16 +915,18 @@ export const KP_DOKUMEN = [
     // dari Bimbingan ke Pembukuan (uploadDokumenKP di Portal.jsx).
     key: 'lembarPengesahanKP', stage: 'Bimbingan', label: 'Lembar Pengesahan KP', docType: 'Lembar Pengesahan KP',
     syarat: 'Tersedia setelah tahap Bimbingan dimulai dan admin menetapkan dosen pembimbing.',
-    catatan: 'Unduh template Word, lengkapi, cetak dan tanda tangani, lalu unggah hasil pindaiannya dalam format PDF. Setelah terunggah, Anda masuk ke tahap Pembukuan.',
+    catatan: '',
     catatanAdminSaja: true, // tidak ditampilkan di halaman dokumen mahasiswa
     eligible: (m) => tahapIndex('KP', m.tahap) >= tahapIndex('KP', 'Bimbingan') && !!m.pembimbing1,
   },
   {
     // Menggantikan BA Seminar KP. Dinilai dosen pembimbing di kertas lalu
     // dikembalikan ke admin, jadi hanya admin yang mengunggah hasilnya.
-    key: 'penilaianKP', stage: 'Bimbingan', label: 'Berita Acara & Penilaian KP', docType: 'Penilaian KP',
+    // Nilai di tab Lulus diisi dari lembar ini, jadi di panel admin ikut tampil
+    // di tahap Lulus (adminJugaDiTahap, lihat dokumenPerTahap).
+    key: 'penilaianKP', stage: 'Bimbingan', adminJugaDiTahap: ['Lulus'], label: 'Berita Acara & Penilaian KP', docType: 'Penilaian KP',
     syarat: 'Tersedia setelah tahap Bimbingan dimulai dan admin menetapkan dosen pembimbing.',
-    catatan: 'Unduh, serahkan ke dosen pembimbing untuk dinilai, lalu kembalikan ke admin.',
+    catatan: '',
     catatanAdminSaja: true,
     eligible: (m) => tahapIndex('KP', m.tahap) >= tahapIndex('KP', 'Bimbingan') && !!m.pembimbing1,
     studentUpload: false, adminUpload: true,
@@ -937,6 +950,21 @@ export const KP_DOKUMEN = [
     studentUpload: false,
   },
 ];
+
+// Surat balasan perusahaan (KP & Magang/MKT) membuka tahap Bimbingan dan
+// mengunci data perusahaan di form pendaftaran (MEDAN_SURAT_BALASAN di
+// formPendaftaran.js). Mengunggah/mengganti lewat FormSuratBalasan (konfirmasi
+// data dulu); menghapusnya mengembalikan mahasiswa ke Pendaftaran dan membuka
+// kunci. Sejak tahap setelah Bimbingan, suratnya final (tidak bisa diganti/
+// dihapus mahasiswa). Sama dengan aturan sb* di firestore.rules.
+export const KUNCI_SURAT_BALASAN = ['suratBalasan', 'suratBalasanMagang', 'suratBalasanMkt'];
+export function adaSuratBalasan(m) {
+  const f = dokumenFieldFor(programOf(m));
+  return !!f && KUNCI_SURAT_BALASAN.some((k) => (m[f] || {})[k]);
+}
+export function suratBalasanFinal(m) {
+  return ['KP', 'MG'].includes(programOf(m)) && !['Pendaftaran', 'Bimbingan'].includes(m.tahap);
+}
 
 // Pembukuan KP disetujui admin: status Terverifikasi + centang "Sudah
 // diperiksa" pada tautan folder. Membuka Surat Keterangan Selesai Pembukuan.
@@ -1160,6 +1188,8 @@ export function dokumenStatus(program, m, konten = {}) {
       } : {}),
       eligible: d.eligible(m),
       upload: (m[field] || {})[d.key] || null,
+      // Berkas yang sudah tidak boleh diganti/dihapus mahasiswa.
+      final: KUNCI_SURAT_BALASAN.includes(d.key) && suratBalasanFinal(m),
       ...(d.linkInput ? {
         linkTerkirim: (m[d.linkField] || {}).berkasLink || '',
         linkDisetujui: (m[d.linkField] || {}).berkasDiperiksa === true && statusVerif(m).key === 'terverifikasi',
@@ -1169,10 +1199,13 @@ export function dokumenStatus(program, m, konten = {}) {
 }
 
 // Kelompokkan status dokumen per tahap, urutan sesuai PROGRAMS[program].stages.
-export function dokumenPerTahap(program, m, konten = {}) {
+// opts.admin: dokumen dengan `adminJugaDiTahap` ikut tampil di tahap-tahap itu
+// juga (dokumen yang sama, bukan salinan), hanya di panel admin.
+export function dokumenPerTahap(program, m, konten = {}, opts = {}) {
   const status = dokumenStatus(program, m, konten);
+  const diTahap = (d, stage) => d.stage === stage || (opts.admin && (d.adminJugaDiTahap || []).includes(stage));
   return stagesFor(program)
-    .map((stage) => ({ stage, dokumen: status.filter((d) => d.stage === stage) }))
+    .map((stage) => ({ stage, dokumen: status.filter((d) => diTahap(d, stage)) }))
     .filter((g) => g.dokumen.length > 0);
 }
 
@@ -1213,6 +1246,7 @@ export const AKTIVITAS_LABEL = {
   hapusBerkas: 'Menghapus dokumen',
   tahapBimbingan: 'Memasuki tahap Bimbingan (surat balasan perusahaan diterima)',
   tahapPembukuan: 'Memasuki tahap Pembukuan (lembar pengesahan diunggah)',
+  kembaliPendaftaran: 'Kembali ke tahap Pendaftaran (surat balasan dihapus)',
   pembukuan: 'Mengirim tautan folder berkas final KP',
   perpanjanganMinta: 'Mengajukan perpanjangan',
   perpanjanganFinal: 'Mengunggah surat perpanjangan final',
@@ -1228,6 +1262,7 @@ export const AKTIVITAS_WARNA = {
   hapusBerkas: 'red',
   tahapBimbingan: 'green',
   tahapPembukuan: 'green',
+  kembaliPendaftaran: 'amber',
   pembukuan: 'blue',
   perpanjanganMinta: 'amber',
   perpanjanganFinal: 'green',
@@ -1244,6 +1279,7 @@ export const AKTIVITAS_LABEL_SINGKAT = {
   hapusBerkas: 'Hapus',
   tahapBimbingan: 'Bimbingan',
   tahapPembukuan: 'Pembukuan',
+  kembaliPendaftaran: 'Mundur',
   pembukuan: 'Folder',
   perpanjanganMinta: 'Perpanjangan',
   perpanjanganFinal: 'Final',
@@ -1278,6 +1314,84 @@ export function ringkasPerubahanPendaftaran(lama, baru) {
     if ((pLama[key] ?? '') !== (pBaru[key] ?? '')) berubah.push(label);
   }
   return berubah;
+}
+
+// ---------- Perubahan data setelah diverifikasi (m.perubahanData) ----------
+// Mahasiswa yang sudah pernah diverifikasi lalu mengubah data pendaftaran (Edit
+// pendaftaran) atau data perusahaan (mengunggah ulang surat balasan): data yang
+// tercetak di dokumen berubah, jadi unduhan dokumen dikunci (bolehUnduhDokumen)
+// sampai admin menyimpan status Terverifikasi lagi (FormMahasiswa submit
+// mengosongkannya). Bentuk: { at, item: { [kunci]: { label, lama, baru } } }.
+// `lama` = nilai saat terakhir diverifikasi; beberapa kali edit sebelum admin
+// memeriksa digabung, dan field yang dikembalikan ke nilai lamanya dibuang.
+// Kontak & link berkas tidak tercetak di dokumen, jadi tidak dihitung.
+const TIDAK_TERCETAK = ['nomorWA', 'alamatWA', 'berkasLink'];
+
+function tampilNilai(v) {
+  if (v === true) return 'Ya';
+  if (v === false) return 'Tidak';
+  return v == null || v === '' ? '' : String(v);
+}
+
+export function hitungPerubahanData(lama, baru) {
+  if (!pernahDiverifikasi(lama)) return null; // belum pernah diverifikasi: belum ada yang perlu dikunci
+  const item = { ...((lama.perubahanData && lama.perubahanData.item) || {}) };
+  const cek = (kunci, label, a, b) => {
+    const asal = item[kunci] ? item[kunci].lama : tampilNilai(a);
+    const kini = tampilNilai(b);
+    if (kini === asal) delete item[kunci];
+    else if (item[kunci] || tampilNilai(a) !== kini) item[kunci] = { label, lama: asal, baru: kini };
+  };
+  cek('judul', judulLabelFor(baru), lama.judul, baru.judul);
+  for (const [k, label] of Object.entries(FIELD_LABEL_PENDAFTARAN)) cek(k, label, lama[k], baru[k]);
+  const pLama = lama.pendaftaran || {};
+  const pBaru = baru.pendaftaran || {};
+  for (const [k, label] of Object.entries(FIELD_LABEL_DETAIL_PENDAFTARAN)) {
+    if (!TIDAK_TERCETAK.includes(k)) cek(`p.${k}`, label, pLama[k], pBaru[k]);
+  }
+  if (!Object.keys(item).length) return null;
+  // `sejak` = edit pertama (tetap), dipakai memilih berkas yang diunggah sebelum
+  // data berubah; `at` = edit terakhir.
+  const sejak = (lama.perubahanData && lama.perubahanData.sejak) || nowStamp();
+  return { sejak, at: nowStamp(), item };
+}
+
+// Berkas bertanda tangan (versi isi template yang diunggah mahasiswa) yang
+// diunggah sebelum data berubah: calon "minta unggah ulang" di banner admin.
+// Surat balasan dikecualikan karena justru sumber datanya. Tanggal unggah hanya
+// berupa tanggal, jadi unggahan di hari yang sama ikut ditawarkan.
+export function berkasSebelumPerubahan(m) {
+  if (!adaPerubahanData(m)) return [];
+  const p = m.perubahanData;
+  const batas = String(p.sejak || p.at || '').slice(0, 10);
+  return dokumenStatus(programOf(m), m)
+    .filter((d) => d.docType && d.upload && d.studentUpload !== false && !KUNCI_SURAT_BALASAN.includes(d.key)
+      && (d.upload.uploadedAt || '') <= batas);
+}
+
+// Berkas yang diminta admin untuk diunggah ulang (upload.perluUlang). Tandanya
+// hilang sendiri saat mahasiswa mengunggah pengganti (objek berkas diganti).
+export function jumlahPerluUlang(m) {
+  const field = dokumenFieldFor(programOf(m));
+  return Object.values((field && m[field]) || {}).filter((u) => u && u.perluUlang).length;
+}
+
+export function adaPerubahanData(m) {
+  return !!(m && m.perubahanData && Object.keys(m.perubahanData.item || {}).length);
+}
+
+// Unduh dokumen hasil template (sisi mahasiswa): seperti bolehAksesBerkas, ditambah
+// terkunci selama ada perubahan data yang belum diverifikasi ulang. Unggah/kirim
+// tautan tetap memakai bolehAksesBerkas.
+export function bolehUnduhDokumen(m) {
+  return bolehAksesBerkas(m) && !adaPerubahanData(m);
+}
+
+// Alasan unduhan terkunci, untuk tooltip/keterangan di sisi mahasiswa.
+export function alasanUnduhTerkunci(m) {
+  if (statusVerif(m).key === 'perbaikan') return 'Dikunci: perbaiki data sesuai pesan admin.';
+  if (adaPerubahanData(m)) return 'Dikunci: menunggu verifikasi ulang data.';
+  return 'Belum tersedia.';
 }
 
 export function nowStamp() { return new Date().toISOString(); }
