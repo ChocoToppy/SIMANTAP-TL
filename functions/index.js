@@ -469,3 +469,9 @@ exports.jadwalRuangPublik = functions.https.onRequest(async (req, res) => {
     res.status(500).json({ error: 'Gagal memuat jadwal ruang.' });
   }
 });
+
+// ----- QR verifikasi surat (lihat verifikasiSurat.js) -----
+const verifikasiSurat = require('./verifikasiSurat');
+exports.terbitkanVerifikasi = verifikasiSurat.terbitkanVerifikasi;
+exports.verifikasiSuratPublik = verifikasiSurat.verifikasiSuratPublik;
+exports.catatPerubahanDataSurat = verifikasiSurat.catatPerubahanDataSurat;

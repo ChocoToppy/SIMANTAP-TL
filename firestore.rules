@@ -445,6 +445,18 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ----- QR verifikasi surat: hanya lewat Cloud Functions terbitkanVerifikasi &
+    // verifikasiSuratPublik (functions/verifikasiSurat.js). Klien tidak membaca (berisi
+    // id internal) apalagi menulis (isi halaman verifikasi tidak boleh dikarang). -----
+    match /verifikasiSurat/{token} {
+      allow read, write: if false;
+    }
+    // Kapan data yang tercetak di surat terakhir berubah; ditulis trigger
+    // catatPerubahanDataSurat, dibaca verifikasiSuratPublik. Klien tidak menyentuhnya.
+    match /dataSuratDiubah/{id} {
+      allow read, write: if false;
+    }
+
     // ----- Daftar angkatan yang bisa dipilih saat pendaftaran (arsip, bukan
     // hapus, spy data mahasiswa lama tetap konsisten — lihat SeksiAngkatan.jsx) -----
     match /angkatan/{id} {

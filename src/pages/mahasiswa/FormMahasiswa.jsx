@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { perpanjanganDocType, PROGRAMS, programOf, stagesFor, eventsFor, rolesFor, syaratLabel, SEMUA, buatId, todayISO, RUANG, jamTampil, cariBentrok, waMahasiswa, tahapBerikut, tahapSebelumnya, eventAktif, berkasSyarat, catatAktivitas, formatTanggal, normalizeUrl, dokumenFieldFor, dosenAktifUntuk } from '../../utils/helpers.js';
 import { opsiRuang, periksaUsulanRuang, teksBentrokRuang, milikProgram } from '../../modules/ruang';
 import { FITUR_RUANG } from '../../utils/config.js';
@@ -21,33 +21,62 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
   const daftarRuang = opsiRuang(jadwalRuang, RUANG);
   const baru = !awal;
   const [err, setErr] = useState('');
-  const [m, setM] = useState(() => {
-    const base = awal || {
-      id: buatId(),
-      program: defaultProgram,
-      nama: '', nim: '', judul: '',
-      periode: periode && periode !== SEMUA ? periode : (periodeList[periodeList.length - 1] || ''),
-      angkatan: '', klasifikasi: 'Penelitian', bidang: 'U',
-      pembimbing1: '', pembimbing2: '', penguji1: '', penguji2: '',
-      tahap: 'Pendaftaran',
-      tanggalMulai: todayISO(), batasAkhir: '',
-      dibatalkan: false, catatan: '',
-      jadwal: {}, verifikasi: 'terverifikasi', pendaftaran: {},
-    };
-    return { ...base, program: PROGRAMS[base.program] ? base.program : 'TA', jadwal: base.jadwal || {} };
-  });
+  const dariRecord = (r) => ({ ...r, program: PROGRAMS[r.program] ? r.program : 'TA', jadwal: r.jadwal || {} });
+  const [m, setM] = useState(() => dariRecord(awal || {
+    id: buatId(),
+    program: defaultProgram,
+    nama: '', nim: '', judul: '',
+    periode: periode && periode !== SEMUA ? periode : (periodeList[periodeList.length - 1] || ''),
+    angkatan: '', klasifikasi: 'Penelitian', bidang: 'U',
+    pembimbing1: '', pembimbing2: '', penguji1: '', penguji2: '',
+    tahap: 'Pendaftaran',
+    tanggalMulai: todayISO(), batasAkhir: '',
+    dibatalkan: false, catatan: '',
+    jadwal: {}, verifikasi: 'terverifikasi', pendaftaran: {},
+  }));
 
-  // Pindah ke entri sebelumnya/berikutnya sesuai urutan tabel (filter/sort aktif).
-  // Form di-remount per entri (key di Mahasiswa.jsx), jadi ubahan yang belum
-  // disimpan akan hilang — minta konfirmasi dulu kalau ada.
+  // Patokan "belum disimpan": isi form saat dibuka, atau saat terakhir disimpan.
   const mAwal = useRef(null);
   if (mAwal.current === null) mAwal.current = JSON.stringify(m);
+  const adaPerubahan = () => JSON.stringify(m) !== mAwal.current;
+
+  // Simpan tidak menutup modal (kecuali mahasiswa baru). Setelah tersimpan, `awal`
+  // dari Mahasiswa.jsx berganti ke record versi tersimpan (App bisa menambah field,
+  // mis. pernahTerverifikasi / riwayat jadwal): form & patokannya diselaraskan ke situ.
+  const [tersimpan, setTersimpan] = useState(false);
+  const menungguSimpan = useRef(false);
+  useEffect(() => {
+    if (!menungguSimpan.current || !awal) return;
+    menungguSimpan.current = false;
+    const r = dariRecord(awal);
+    mAwal.current = JSON.stringify(r);
+    setM(r);
+    setTersimpan(true);
+  }, [awal]);
+  useEffect(() => {
+    if (!tersimpan) return undefined;
+    const t = setTimeout(() => setTersimpan(false), 1500);
+    return () => clearTimeout(t);
+  }, [tersimpan]);
+
+  // Pindah ke entri sebelumnya/berikutnya sesuai urutan tabel (filter/sort aktif).
+  // Form di-remount per entri (key di Mahasiswa.jsx). Ada ubahan yang belum
+  // disimpan: tawarkan simpan dulu (lewat pemeriksaan submit yang sama); batal = tetap di sini.
   const posisi = onPindah ? urutan.indexOf(m.id) : -1;
-  function pindah(arah) {
+  async function pindah(arah) {
     const tujuan = urutan[posisi + arah];
     if (!tujuan) return;
-    if (JSON.stringify(m) !== mAwal.current && !window.confirm('Ada perubahan yang belum disimpan. Pindah entri akan membuangnya.\n\nTetap pindah?')) return;
+    if (adaPerubahan()) {
+      if (!window.confirm('Simpan perubahan lalu pindah?')) return;
+      if (!(await submit())) return;
+    }
     onPindah(tujuan);
+  }
+
+  // Tutup modal (✕, Tutup, klik di luar): minta konfirmasi bila ada yang belum disimpan.
+  function tutup() {
+    if (adaPerubahan() && !window.confirm('Ada perubahan yang belum disimpan. Tutup dan buang perubahan?')) return;
+    onCancel();
   }
   const navEntri = (!baru && posisi >= 0 && urutan.length > 1) ? (
     <div className="entry-nav">
@@ -116,7 +145,7 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
     if (!config) return;
     setDlBusyKP(true);
     try {
-      await generateDocument(config.template, config.filename, config.data);
+      await generateDocument(config.template, config.filename, config.data, config);
     } finally {
       setDlBusyKP(false);
     }
@@ -138,8 +167,8 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
   }
 
   async function submit() {
-    if (!m.nama.trim()) { setErr('Nama wajib diisi.'); return; }
-    if (m.dibatalkan && !((m.penutupan || {}).alasan || '').trim()) { setErr('Alasan penutupan wajib diisi.'); return; }
+    if (!m.nama.trim()) { setErr('Nama wajib diisi.'); return false; }
+    if (m.dibatalkan && !((m.penutupan || {}).alasan || '').trim()) { setErr('Alasan penutupan wajib diisi.'); return false; }
     let calon = { ...m, angkatan: Number(m.angkatan) || m.angkatan };
     const masalah = [];
     // Validasi tanggal jadwal: dalam rentang & berurutan sesuai tahapan.
@@ -155,9 +184,9 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
     });
     const cb = cariBentrok(allMahasiswa, calon);
     // Bentrok jadwal HANYA peringatan, tidak mengunci (boleh jadwal bersamaan).
-    if (masalah.length) { setErr('Tidak bisa menyimpan:\n• ' + masalah.join('\n• ')); return; }
+    if (masalah.length) { setErr('Tidak bisa menyimpan:\n• ' + masalah.join('\n• ')); return false; }
     const semuaBentrok = [...cb.bentrok, ...bentrokRuangLive.map((x) => 'Ruang: ' + x)];
-    if (semuaBentrok.length && !window.confirm('Ada bentrok jadwal:\n• ' + semuaBentrok.join('\n• ') + '\n\nTetap simpan?')) return;
+    if (semuaBentrok.length && !window.confirm('Ada bentrok jadwal:\n• ' + semuaBentrok.join('\n• ') + '\n\nTetap simpan?')) return false;
     // Nomor surat dicatat di registri dulu; kalau ditolak (format salah, bulan depan,
     // dipakai mahasiswa lain), record tidak disimpan dan pesannya tampil di form.
     // Nomor lama yang belum tercatat & tidak diubah dicatat dengan pemeriksaan longgar
@@ -168,16 +197,16 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
     const berubah = nomorSurat !== ((awal && awal.nomorSurat) || '').trim();
     if (berubah && nomorSurat) {
       const p = bacaNomor(nomorSurat);
-      if (!p) { setErr('Tidak bisa menyimpan: format nomor surat tidak sesuai. Lihat panduan format di samping isian Nomor Surat.'); return; }
+      if (!p) { setErr('Tidak bisa menyimpan: format nomor surat tidak sesuai. Lihat panduan format di samping isian Nomor Surat.'); return false; }
       const now = new Date();
       const bulanIni = `${NAMA_BULAN[now.getMonth()]} ${now.getFullYear()}`;
       const bulanNomor = `${NAMA_BULAN[p.bulan - 1]} ${p.tahun}`;
       const waktu = waktuNomor(p, now);
-      if (waktu === 'depan') { setErr(`Tidak bisa menyimpan: nomor surat bertanggal ${bulanNomor}, melewati bulan ini (${bulanIni}).`); return; }
+      if (waktu === 'depan') { setErr(`Tidak bisa menyimpan: nomor surat bertanggal ${bulanNomor}, melewati bulan ini (${bulanIni}).`); return false; }
       const lain = pemakaiNomorLain(allMahasiswa, p, calon.id);
-      if (lain) { setErr(`Tidak bisa menyimpan: nomor surat ini sudah dipakai ${lain.nama} (${lain.nim}).`); return; }
+      if (lain) { setErr(`Tidak bisa menyimpan: nomor surat ini sudah dipakai ${lain.nama} (${lain.nim}).`); return false; }
       if (waktu && !window.confirm(`Nomor surat ini bertanggal ${bulanNomor}, bukan bulan ini (${bulanIni}).`
-        + (waktu === 'tahun-lalu' ? `\n\nNomor ini masuk urutan tahun ${p.tahun}.` : '') + '\n\nTetap simpan?')) return;
+        + (waktu === 'tahun-lalu' ? `\n\nNomor ini masuk urutan tahun ${p.tahun}.` : '') + '\n\nTetap simpan?')) return false;
     }
     if (berubah || (nomorSurat && !calon.nomorSuratId && bacaNomor(nomorSurat, { longgar: true }))) {
       try {
@@ -186,14 +215,16 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
         calon = { ...calon, nomorSurat, nomorSuratId };
       } catch (e) {
         setErr('Tidak bisa menyimpan: ' + (e.message || 'gagal mencatat nomor surat.'));
-        return;
+        return false;
       }
     }
     // Disimpan sebagai Terverifikasi = perubahan data mahasiswa sudah diperiksa:
     // hapus penandanya supaya unduhan dokumen terbuka lagi (bolehUnduhDokumen).
     if (calon.verifikasi === 'terverifikasi' && calon.perubahanData) calon = { ...calon, perubahanData: null };
     setErr('');
+    menungguSimpan.current = !baru; // record lama: form tetap terbuka, diselaraskan di useEffect [awal]
     onSave(baru ? catatAktivitas(calon, 'dibuat') : calon);
+    return true;
   }
 
   // Pengajuan lain yang masih terbuka untuk mahasiswa & program yang sama: pengajuan
@@ -371,7 +402,7 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
         dosenByKode={dosenByKode} konten={konten} uploadAdminDokumenKP={uploadAdminDokumenKP} hapusAdminDokumenKP={hapusAdminDokumenKP}
         unduhPerpanjanganKP={unduhPerpanjanganKP} dlBusyKP={dlBusyKP}
         verifAwal={awal ? awal.verifikasi : null} nomorTerpakai={nomorTerpakai}
-        baru={baru} onCancel={onCancel} submit={submit} navEntri={navEntri} modalOpsi={modalOpsi} adaPengganti={adaPengganti}
+        baru={baru} onCancel={tutup} submit={submit} tersimpan={tersimpan} navEntri={navEntri} modalOpsi={modalOpsi} adaPengganti={adaPengganti}
       />
     );
   }
@@ -382,7 +413,7 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
       roles={roles} pembimbing1Label={pembimbing1Label} penguji1Label={penguji1Label} dosenOpts={dosenOpts} bebanBlok={bebanBlok} stages={stages} events={events} jadwalBlok={jadwalBlok}
       alurTahapBlok={alurTahapBlok} notifikasiBlok={notifikasiBlok} peringatanBlok={peringatanBlok} p={p}
       verifAwal={awal ? awal.verifikasi : null} nomorTerpakai={nomorTerpakai}
-      baru={baru} onCancel={onCancel} submit={submit} navEntri={navEntri} modalOpsi={modalOpsi} adaPengganti={adaPengganti}
+      baru={baru} onCancel={tutup} submit={submit} tersimpan={tersimpan} navEntri={navEntri} modalOpsi={modalOpsi} adaPengganti={adaPengganti}
     />
   );
 }

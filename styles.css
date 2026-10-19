@@ -1569,3 +1569,40 @@ html[data-theme="dark"] .icon-btn-outline.alur-panah.lanjut:not(:disabled):hover
 @media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
 .modal-title-status { display: inline-flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .modal-title-status .badge { font-size: 0.75rem; }
+
+/* ---------- Verifikasi surat (halaman publik dari QR, src/pages/VerifikasiSurat.jsx) ---------- */
+/* Dibuka dari ponsel setelah memindai surat: satu kolom sempit, putusan (berlaku / tidak)
+   jadi fokus lewat garis atas 3px yang sama dengan kartu login, lalu data untuk dicocokkan. */
+.vs-wrap { min-height: 100dvh; background: var(--bg); color: var(--text); padding: 40px 16px; display: flex; justify-content: center; align-items: flex-start; }
+.vs-kartu { width: 100%; max-width: 600px; }
+.vs-merek { display: flex; align-items: center; gap: 12px; padding-bottom: 20px; margin-bottom: 28px; border-bottom: 1px solid var(--border); }
+.vs-unit { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
+.vs-putusan { border-top: 3px solid var(--text); padding-top: 20px; }
+.vs-putusan h1 { font-size: clamp(1.6rem, 6vw, 2.1rem); font-weight: 600; letter-spacing: -0.02em; margin: 0 0 8px; }
+.vs-putusan p { margin: 0; line-height: 1.55; }
+.vs-sah { border-top-color: var(--accent); }
+.vs-sah h1 { color: var(--green); }
+.vs-tidak { border-top-color: var(--red); }
+.vs-tidak h1 { color: var(--red); }
+/* Versi lama: surat asli, tetapi data di SIMANTAP sudah berubah sejak dicetak. Kuning di
+   antara hijau (berlaku) dan merah (tidak berlaku); judulnya memakai --amber-text supaya
+   kontrasnya cukup di mode terang. */
+.vs-lama { border-top-color: var(--amber); }
+.vs-lama h1 { color: var(--amber-text); }
+.vs-data { display: grid; grid-template-columns: max-content minmax(0, 1fr); margin: 28px 0 0; border-top: 1px solid var(--border-strong); }
+.vs-data dt, .vs-data dd { padding: 12px 0; border-bottom: 1px solid var(--border); }
+.vs-data dt { color: var(--muted); font-size: 0.85rem; padding-right: 24px; }
+.vs-data dd { margin: 0; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+.vs-nomor { font-variant-numeric: tabular-nums; }
+.vs-sahkan { margin: 20px 0 0; line-height: 1.55; }
+.vs-cetak { margin: 16px 0 0; font-size: 0.8rem; color: var(--muted); }
+.vs-pesan { padding: 8px 0; color: var(--muted); margin: 0; }
+.vs-pesan p { margin: 0 0 12px; color: var(--text); line-height: 1.55; }
+.vs-pesan .btn { min-height: 44px; }
+.vs-pesan .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 480px) {
+  .vs-wrap { padding-top: 24px; }
+  .vs-data { grid-template-columns: minmax(0, 1fr); }
+  .vs-data dt { padding-bottom: 0; border-bottom: none; }
+  .vs-data dd { padding-top: 2px; }
+}

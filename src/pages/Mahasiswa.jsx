@@ -252,7 +252,12 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
 
   function tambah() { setSudahPindah(false); setEditing(null); setOpen(true); }
   function edit(m) { setSudahPindah(false); setEditing(m); setOpen(true); }
-  function simpan(m) { onSave(m); setOpen(false); }
+  // Simpan menutup modal hanya untuk mahasiswa baru; record lama tetap terbuka
+  // supaya admin bisa lanjut ke entri berikutnya dengan ‹ ›.
+  function simpan(m) { onSave(m); if (!editing) setOpen(false); }
+  // Versi terkini record yang sedang diedit (setelah disimpan, App mungkin
+  // menambah field), supaya FormMahasiswa bisa menyelaraskan isinya.
+  const editingTerkini = editing ? ((allMahasiswa || mahasiswa).find((x) => x.id === editing.id) || editing) : null;
   function hapus(m) { if (window.confirm(`Hapus data ${m.nama}?`)) onDelete(m.id); }
 
   // Nama lengkap dosen dipakai khusus saat ekspor (kolom tabel tetap pakai kode
@@ -503,7 +508,7 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
       {open && (
         <FormMahasiswa
           key={editing ? editing.id : 'baru'}
-          awal={editing}
+          awal={editingTerkini}
           urutan={urutanEdit}
           onPindah={pindahEdit}
           sudahPindah={sudahPindah}

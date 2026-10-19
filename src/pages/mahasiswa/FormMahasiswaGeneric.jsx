@@ -17,7 +17,7 @@ export function FormMahasiswaGeneric({
   m, setM, set, gantiProgram, periodeList, daftarAngkatan = [],
   roles, pembimbing1Label, penguji1Label, dosenOpts, bebanBlok, stages, events, jadwalBlok,
   alurTahapBlok, notifikasiBlok, peringatanBlok, p,
-  verifAwal, nomorTerpakai, baru, onCancel, submit, navEntri, modalOpsi, adaPengganti,
+  verifAwal, nomorTerpakai, baru, onCancel, submit, tersimpan, navEntri, modalOpsi, adaPengganti,
 }) {
   return (
     <Modal
@@ -27,8 +27,8 @@ export function FormMahasiswaGeneric({
       opsi={modalOpsi}
       footer={
         <>
-          <button className="btn" onClick={onCancel}>Batal</button>
-          <button className="btn btn-primary" onClick={submit}>Simpan</button>
+          <button className="btn" onClick={onCancel}>{baru ? 'Batal' : 'Tutup'}</button>
+          <button className="btn btn-primary" onClick={submit}>{tersimpan ? 'Tersimpan ✓' : 'Simpan'}</button>
         </>
       }
     >

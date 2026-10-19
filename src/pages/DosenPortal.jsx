@@ -188,7 +188,7 @@ function KpDosenActions({ m, dosenByKode }) {
     if (!config) return;
     setDlBusy(true);
     try {
-      await generateDocument(config.template, config.filename, config.data);
+      await generateDocument(config.template, config.filename, config.data, config);
     } finally {
       setDlBusy(false);
     }

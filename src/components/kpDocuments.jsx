@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { bolehAksesBerkas, bolehUnduhDokumen, dokumenPerTahap, eventsFor, formatTanggal, getJadwal, normalizeUrl, stagesFor } from '../utils/helpers.js';
+import { bolehAksesBerkas, bolehUnduhDokumen, alasanUnduhTerkunci, dokumenPerTahap, eventsFor, formatTanggal, getJadwal, normalizeUrl, stagesFor } from '../utils/helpers.js';
 import { generateDocument, getTemplateConfig, prefetchTemplate, warmConverter } from '../utils/documentGenerator.js';
 import { FileDropZone, PrintIcon } from './ui.jsx';
 
@@ -179,6 +179,13 @@ function KpDokumenItem({ d, m, jEv, dosenByKode, canUpload, ringkas = false, rol
     ? (d.upload ? { tone: 'green', label: 'Terunggah', ikon: 'centang' } : { tone: 'gray', label: 'Belum diunggah (unggah di tab Bimbingan)', ikon: 'unggah' })
     : tanpaTemplate ? { tone: 'gray', label: 'Template belum ada', ikon: 'kosong' } : statusDokumen(d, bolehUnggahDiSini);
   if (role === 'admin' && status && status.ikon === 'kunci' && d.syarat) status = { ...status, label: `${status.label}. ${d.syarat}` };
+  // Status di panel admin menggambarkan sisi mahasiswa: "Siap diunduh" berubah jadi
+  // gembok kuning saat unduhan mahasiswa dikunci (Perlu perbaikan / perubahan data
+  // belum diverifikasi ulang). Admin sendiri tetap bisa mengunduh lewat ikon printer.
+  if (role === 'admin' && status && status.ikon === 'unduh' && !bolehUnduhDokumen(m)) {
+    const alasan = alasanUnduhTerkunci(m).replace(/^Dikunci: /, '').replace(/\.$/, '');
+    status = { tone: 'amber', ikon: 'kunci', label: `Terkunci untuk mahasiswa (${alasan})` };
+  }
   // Mahasiswa berstatus "Perlu perbaikan" tidak bisa mengunduh/mengunggah; admin selalu bisa.
   const aksesMhs = role === 'admin' || bolehAksesBerkas(m);
   const bisaUnduh = !ringkas && d.docType && d.eligible && !!config && (role === 'admin' || bolehUnduhDokumen(m));
@@ -194,7 +201,7 @@ function KpDokumenItem({ d, m, jEv, dosenByKode, canUpload, ringkas = false, rol
     if (!config) return;
     setDlBusy(true);
     try {
-      await generateDocument(config.template, config.filename, config.data, { docx: config.docx });
+      await generateDocument(config.template, config.filename, config.data, config);
     } finally {
       setDlBusy(false);
     }

@@ -165,7 +165,7 @@ function BarisUnduh({ d, m, jEv, dosenByKode }) {
     setErr('');
     setBusy(true);
     try {
-      await generateDocument(config.template, config.filename, config.data, { docx: config.docx });
+      await generateDocument(config.template, config.filename, config.data, config);
     } catch (ex) {
       setErr(ex.message || 'Gagal menyiapkan PDF. Coba lagi.');
     } finally {

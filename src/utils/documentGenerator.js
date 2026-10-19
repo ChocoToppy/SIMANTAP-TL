@@ -3,6 +3,7 @@ import Docxtemplater from 'docxtemplater';
 import { saveAs } from 'file-saver';
 import { formatTanggal, todayISO, bidangLabel, jenisMagangOf, HARI } from './helpers.js';
 import { periodePerpanjangan, periodeSuratPerpanjangan } from './perpanjangan.js';
+import { siapkanQrVerifikasi, pasangQrVerifikasi } from './qrVerifikasi.js';
 
 /**
  * Generates and downloads a .docx file based on a template and JSON data.
@@ -35,7 +36,8 @@ async function convertDocxToPdf(docxBlob) {
   return res.blob();
 }
 
-async function buildDocxBlob(templatePath, data) {
+// qrPng: gambar QR verifikasi (lihat qrVerifikasi.js), untuk surat ber-config.verifikasi.
+async function buildDocxBlob(templatePath, data, qrPng = null) {
   const response = await fetch(`/doc-templates/${templatePath}`);
   if (!response.ok) throw new Error(`Template not found at /doc-templates/${templatePath}`);
 
@@ -50,6 +52,7 @@ async function buildDocxBlob(templatePath, data) {
 
   // Inject the data into the template
   doc.render(data);
+  if (qrPng) pasangQrVerifikasi(doc.getZip(), qrPng);
 
   return doc.getZip().generate({
     type: "blob",
@@ -60,8 +63,8 @@ async function buildDocxBlob(templatePath, data) {
 // Render + convert a template into its final downloadable blob. {tgl_cetak}
 // must reflect the real moment the letter is printed, so this always runs
 // fresh at click time — it is never cached/reused across time.
-async function buildDocument(templatePath, data) {
-  const docxBlob = await buildDocxBlob(templatePath, data);
+async function buildDocument(templatePath, data, qrPng) {
+  const docxBlob = await buildDocxBlob(templatePath, data, qrPng);
   try {
     const pdfBlob = await convertDocxToPdf(docxBlob);
     return { blob: pdfBlob, isPdf: true };
@@ -94,18 +97,30 @@ export function warmConverter() {
 }
 
 // opts.docx = true: unduh sebagai .docx yang bisa diedit (mis. Lembar
-// Pengesahan KP), tanpa konversi PDF. Ikuti `docx` dari getTemplateConfig.
+// Pengesahan KP), tanpa konversi PDF. opts.verifikasi: surat ber-QR verifikasi.
+// Pemanggil cukup meneruskan config dari getTemplateConfig sebagai opts.
 export const generateDocument = async (templatePath, outputName, data, opts = {}) => {
   try {
+    const qrPng = opts.verifikasi ? await siapkanQrVerifikasi(opts.verifikasi) : null;
     const { blob, isPdf } = opts.docx
-      ? { blob: await buildDocxBlob(templatePath, data), isPdf: false }
-      : await buildDocument(templatePath, data);
+      ? { blob: await buildDocxBlob(templatePath, data, qrPng), isPdf: false }
+      : await buildDocument(templatePath, data, qrPng);
     saveAs(blob, isPdf ? outputName.replace(/\.docx$/i, '.pdf') : outputName);
   } catch (error) {
     console.error("Error generating document:", error);
-    alert("Gagal mencetak dokumen. Periksa konsol untuk detail error.");
+    alert(error.pesanPengguna || "Gagal mencetak dokumen. Periksa konsol untuk detail error.");
   }
 };
+
+// config.verifikasi untuk surat ber-QR: jenis surat (kunci JENIS_SURAT di
+// functions/verifikasiSurat.js) dan isi yang tercetak, untuk dicocokkan dengan catatan server.
+function verifikasiSurat(jenis, m, jEv, dari, sampai) {
+  return {
+    jenis,
+    mahasiswaId: m.id,
+    cetak: { nomor: m.nomorSurat || jEv.nomorST || '', nama: m.nama || '', nim: m.nim || '', judul: m.judul || '', dari: dari || '', sampai: sampai || '' },
+  };
+}
 
 export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
   const d1 = dosenByKode[m.pembimbing1] || {};
@@ -263,6 +278,20 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
 
     // Tetap .docx (docx: true) supaya mahasiswa bisa melengkapinya sebelum
     // dicetak & ditandatangani.
+    case 'Lembar Pengesahan Proposal KP':
+      return {
+        template: 'KP/lempeng-proposal-kp.docx',
+        filename: `Lembar_Pengesahan_Proposal_KP_${m.nama}.docx`,
+        docx: true,
+        data: {
+          nama_mhs: m.nama,
+          nim: m.nim,
+          judul_kp: m.judul,
+          tgl_cetak,
+          ...wali,
+        }
+      };
+
     case 'Lembar Pengesahan KP':
       return {
         template: 'KP/lempeng_kp.docx',
@@ -285,6 +314,7 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
       return {
         template: 'KP/penilaian-kp.docx',
         filename: `Penilaian_KP_${m.nama}.docx`,
+        verifikasi: verifikasiSurat('penilaian-kp', m, jEv, m.tanggalMulai, m.batasAkhir),
         data: {
           no_surat: m.nomorSurat || jEv.nomorST || "___/UN7.../2026",
           nama_mhs: m.nama,
@@ -302,6 +332,7 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
       return {
         template: 'KP/pembimbing-kp-st.docx',
         filename: `ST_Pembimbing_KP_${m.nama}.docx`,
+        verifikasi: verifikasiSurat('st-pembimbing-kp', m, jEv, m.tanggalMulai, m.batasAkhir),
         data: {
           no_surat: m.nomorSurat || jEv.nomorST || "___/UN7.../2026",
           nama_pembimbing: d1.nama || m.pembimbing1,
@@ -321,6 +352,7 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
       return {
         template: 'KP/perpanjangan-kp.docx',
         filename: `Perpanjangan_KP_${m.nama}.docx`,
+        verifikasi: verifikasiSurat('perpanjangan-kp', m, jEv, pp.dari, pp.sampai),
         data: {
           no_surat: m.nomorSurat || jEv.nomorST || "___/UN7.../2026",
           nama_mhs: m.nama,

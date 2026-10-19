@@ -28,6 +28,14 @@ printed". See documentGenerator.js: templates + the Cloud Run PDF converter are 
 ahead of time (on page load) purely to cut latency, but the render itself (and thus
 {tgl_cetak}) always happens at click time.
 
+QR VERIFIKASI (2026-10-16): not a {tag}. Letters with a pre-printed signature carry a QR to
+the public /verifikasi/{token} page. In the template it is a placeholder IMAGE whose alt
+text is exactly "qr-verifikasi" (Word: right-click > View Alt Text). documentGenerator.js
+swaps every such image for the real QR; a template on the QR list with no such image
+refuses to generate. Placeholder may appear several times (both copies of a letter).
+Currently on the list (config.verifikasi in documentGenerator.js):
+  pembimbing-kp-st (2 copies), penilaian-kp, perpanjangan-kp
+
 permohonan-kp — REMOVED from the app. Filling this form now happens on an external
 website; the student portal only has an upload zone for the resulting file (see
 KP_DOKUMEN.permohonan in src/utils/helpers.js). No tags are rendered by the app for this
@@ -191,6 +199,14 @@ kelayakan-proposal-kp
 {tema_kp} NEW tags
 {judul_kp}
 {tgl_cetak}
+
+lempeng-proposal-kp (Lembar Pengesahan Proposal KP, tahap Pendaftaran) - downloaded
+as an editable Word .docx (no PDF conversion); the student uploads the signed scan as PDF.
+
+{nama_mhs}
+{nim}
+{judul_kp} - was typed as (judul_kp) with round brackets; fixed to a real tag 2026-10-16
+Also sent but not in the template: {tgl_cetak}, {nama_dosen_wali}, {nip_dosen_wali}.
 
 persetujuan-smkp — REMOVED from the app (2026-10-12). The Seminar KP stage no
 longer exists; the .docx stays in public/doc-templates/KP/ but nothing renders it.

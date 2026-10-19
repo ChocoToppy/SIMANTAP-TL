@@ -27,7 +27,7 @@ export function FormMahasiswaKP({
   tahapTab, setTahapTab, p, events, jadwalBlok,
   dosenByKode, konten, uploadAdminDokumenKP, hapusAdminDokumenKP,
   unduhPerpanjanganKP, dlBusyKP,
-  verifAwal, nomorTerpakai, baru, onCancel, submit, navEntri, modalOpsi, adaPengganti,
+  verifAwal, nomorTerpakai, baru, onCancel, submit, tersimpan, navEntri, modalOpsi, adaPengganti,
 }) {
   // "Halaman" di dalam modal — 'utama' (tab tahap, dokumen, dst) atau 'data'
   // (form identitas/penugasan Program..Batas akhir, dibuka lewat tombol "Edit
@@ -64,8 +64,8 @@ export function FormMahasiswaKP({
       wide
       footer={
         <>
-          <button className="btn" onClick={kembaliAtauBatal}>{page === 'data' ? 'Kembali' : 'Batal'}</button>
-          <button className="btn btn-primary" onClick={submit}>Simpan</button>
+          <button className="btn" onClick={kembaliAtauBatal}>{page === 'data' ? 'Kembali' : (baru ? 'Batal' : 'Tutup')}</button>
+          <button className="btn btn-primary" onClick={submit}>{tersimpan ? 'Tersimpan ✓' : 'Simpan'}</button>
         </>
       }
     >
