@@ -1,5 +1,24 @@
 # Changelog
 
+## 19-10-2026 (3) — Cache lokal & data contoh dihapus
+- Aplikasi tidak lagi menyimpan salinan data (mahasiswa, dosen, akun) di `localStorage` browser. Sebelumnya salinan ini tertinggal setelah logout, termasuk NIM, nomor WA, alamat, dan tautan berkas, dan bisa sekilas menampilkan data pengguna sebelumnya. Sisa cache lama (`sistem-ta-v2`) dihapus otomatis saat aplikasi dibuka. Yang masih disimpan di browser hanya preferensi tampilan (tema, ukuran teks, sidebar, kolom tabel).
+- Data contoh dihapus dari `src/data/seed.js` (mahasiswa fiktif, daftar dosen lama, pengumuman contoh). Project Firebase yang masih kosong kini hanya dibuatkan `config/global` kosong; dosen ditambahkan lewat Pengaturan → Staf atau tab Dosen.
+- Periode awal di halaman admin tetap periode terbaru, dipilih begitu data dari Firestore tersedia.
+- Skrip lama `update_dosen.mjs` (menulis dosen dari seed ke dokumen `sistem_ta/global_state` yang sudah tidak dipakai) dihapus.
+- Realtime Database (`simantap-tl-default-rtdb`) berisi salinan data contoh lama dengan aturan publik dan tidak dipakai aplikasi; dihapus lewat Firebase Console.
+
+## 19-10-2026 (2) — Dropdown form pendaftaran mulai kosong
+- Form pendaftaran mahasiswa (pengajuan baru): Periode, Jenis (Magang/MKT), Klasifikasi, Tema/Bidang, dan Status Kerja Praktik kini mulai kosong dengan teks "— pilih … —" dan wajib dipilih (ditandai *, divalidasi saat kirim; di Pengaturan → Form Pendaftaran tombol wajibnya terkunci menyala lewat `wajibTetap`). Sebelumnya terisi otomatis (periode terbuka pertama, Magang, Penelitian, tema/bidang pertama, Telah) sehingga mahasiswa melewatinya tanpa memilih. Program tetap terpilih karena isi form bergantung padanya.
+- Mengganti program kini mengosongkan Tema/Bidang yang tidak berlaku untuk program baru (tidak lagi diganti otomatis ke pilihan pertama).
+- Pengajuan lama dan modal admin tidak berubah.
+
+## 19-10-2026 — Perbaikan Tema KP tercetak "Udara"
+- Penyebab: form pendaftaran mahasiswa (dan modal tambah admin) selalu mulai dengan `bidang: 'U'` (kode Bidang TA "Udara"). Untuk KP/Magang kode itu tidak ada di daftar Tema KP, jadi dropdown menampilkan tema pertama ("Perencanaan Bangunan Pengolahan Air Minum") sementara yang tersimpan tetap 'U'; mahasiswa yang tidak menyentuh dropdown mendapat `{tema_kp}` = "Udara" di surat.
+- Nilai awal kini diambil dari daftar program itu sendiri (Tema KP pertama untuk KP/Magang, Bidang pertama untuk TA/Capstone/S2) di `FormPendaftaran.jsx` dan `FormMahasiswa.jsx`; modal admin juga menyesuaikan kode saat program diganti.
+- Modal admin bertab (`FormMahasiswaKP.jsx`, dipakai juga untuk TA) menampilkan daftar Bidang untuk TA, bukan Tema KP.
+- Dropdown tema/bidang (`untukPilihan` di `pilihan.js`) menampilkan nilai tersimpan yang bukan milik daftarnya sebagai "… (tidak valid, pilih ulang)", tidak lagi diam-diam menampilkan opsi pertama.
+- Data lama tidak diubah otomatis. `functions/laporan-tema-bidang.js` (laporan saja) mendaftar pengajuan yang kodenya tidak cocok dengan programnya, untuk diperbaiki lewat modal edit admin.
+
 ## 16-10-2026 (3) — QR verifikasi surat KP
 - Surat KP yang sudah bertanda tangan (`pembimbing-kp-st`, `penilaian-kp`, `perpanjangan-kp`) kini memuat QR ke halaman publik `/verifikasi/{token}`. Halaman itu menampilkan apakah surat masih berlaku, lalu nomor surat, keperluan, nama, NIM, program, judul, periode, dan waktu terakhir dicetak. Tanpa login.
 - Token acak per (mahasiswa, jenis surat, nomor surat), bukan nomor surat (nomor urut bisa ditebak). Diterbitkan Cloud Function `terbitkanVerifikasi` (`functions/verifikasiSurat.js`) saat surat diunduh, dengan aturan siapa yang boleh mengunduh sama seperti di aplikasi: admin, mahasiswa pemilik (unduhan tidak terkunci), dosen yang ditugaskan (Surat Tugas saja). Data di halaman dihitung server dari record yang tersimpan. Satu token per versi isi surat: mengunduh ulang dengan data tercetak yang sama memakai token lamanya, data yang berubah (atau nomor yang diganti) menghasilkan token baru. Kertas versi lama tetap menampilkan datanya sendiri dan tetap dianggap asli (isinya benar saat dicetak), lihat "Surat versi lama" di bawah.

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { buatId, idPengajuanBaru, todayISO, tambahHari, catatAktivitas, ringkasPerubahanPendaftaran, hitungPerubahanData, KLASIFIKASI, programLabel, dosenAktifUntuk, adaSuratBalasan } from '../../utils/helpers.js';
-import { kpTemaUntukPilihan, bidangUntukPilihan, kodeKpTemaPertama, kodeBidangPertama, adalahKodeKpTema } from '../../utils/pilihan.js';
+import { kpTemaUntukPilihan, bidangUntukPilihan, adalahKodeKpTema } from '../../utils/pilihan.js';
 import { Field, KepalaForm } from '../../components/ui.jsx';
 import { META, BUTIR_SYARAT, MEDAN_SURAT_BALASAN, kunciProgram, gayaKP, urutanForm, medanForm, galatWajib } from '../../utils/formPendaftaran.js';
 import { PROGRAM_KEYS_PENDAFTARAN } from './shared.js';
@@ -14,16 +14,19 @@ export function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], a
   // Satu pengajuan per program: program yang sudah punya pengajuan tetap tampil di
   // pilihan tapi tidak bisa dipilih (hapus dulu pengajuan lamanya).
   const programBebas = PROGRAM_KEYS_PENDAFTARAN.find((k) => !programTerpakai.includes(k));
+  const programAwal = pratinjau ? pratinjau.program : (programBebas || PROGRAM_KEYS_PENDAFTARAN[0] || 'TA');
   const [m, setM] = useState(() =>
     awal || {
-      id: buatId(), program: pratinjau ? pratinjau.program : (programBebas || PROGRAM_KEYS_PENDAFTARAN[0] || 'TA'), nama, nim, owner: nim,
+      id: buatId(), program: programAwal, nama, nim, owner: nim,
       ...(pratinjau && pratinjau.jenisMagang ? { jenisMagang: pratinjau.jenisMagang } : {}),
-      judul: '', periode: periodeBuka[0] || '', angkatan: '', klasifikasi: 'Penelitian',
-      bidang: pratinjau && (pratinjau.program === 'KP' || pratinjau.program === 'MG') ? kodeKpTemaPertama() : 'U',
+      // Semua dropdown (kecuali program) mulai kosong & wajib dipilih: nilai awal
+      // yang tampak sudah terisi membuat mahasiswa melewatinya (dulu bidang 'U'
+      // tersimpan sebagai "Udara" walau layar menampilkan tema KP pertama).
+      judul: '', periode: '', angkatan: '', klasifikasi: '', bidang: '',
       pembimbing1: '', pembimbing2: '', penguji1: '', penguji2: '',
       tahap: 'Pendaftaran', tanggalMulai: todayISO(), batasAkhir: tambahHari(todayISO(), 180),
       dibatalkan: false, catatan: '', jadwal: {}, verifikasi: 'baru',
-      pendaftaran: { syaratSKS: false, ipk: '', statusKP: 'Telah', terdaftarKRS: false, sudahUGB: false, namaPersetujuanDosen: '', berkasLink: '', nomorWA: '' },
+      pendaftaran: { syaratSKS: false, ipk: '', statusKP: '', terdaftarKRS: false, sudahUGB: false, namaPersetujuanDosen: '', berkasLink: '', nomorWA: '' },
     }
   );
   const set = (k, v) => setM((p) => ({ ...p, [k]: v }));
@@ -52,10 +55,10 @@ export function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], a
     setM((prev) => {
       const next = { ...prev, program: prog };
       const kpStyle = prog === 'KP' || prog === 'MG';
+      // Tema KP (KP/Magang) dan Bidang (TA/Capstone/S2) memakai daftar kode
+      // berbeda: pilihan yang tidak berlaku lagi dikosongkan, bukan diganti otomatis.
       const kpKode = adalahKodeKpTema(prev.bidang);
-      if (kpStyle && !kpKode) next.bidang = kodeKpTemaPertama();
-      if (!kpStyle && kpKode) next.bidang = kodeBidangPertama();
-      if (prog === 'MG' && !next.jenisMagang) next.jenisMagang = 'Magang';
+      if (prev.bidang && kpStyle !== kpKode) next.bidang = '';
       return next;
     });
   }
@@ -64,6 +67,15 @@ export function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], a
     if (!(m.nama || '').trim()) { setErr('Nama wajib diisi.'); return; }
     if (!m.judul.trim()) { setErr(`${medan('judul').label} wajib diisi.`); return; }
     if (!m.periode) { setErr('Pilih periode pendaftaran terlebih dahulu.'); return; }
+    // Dropdown tanpa nilai awal (lihat state awal) — wajib dipilih bila tampil di form.
+    const tampil = (id) => urutan.includes(id);
+    const belumDipilih = [
+      tampil('jenis') && m.program === 'MG' && !m.jenisMagang && 'jenis',
+      tampil('klasifikasi') && !m.klasifikasi && 'klasifikasi',
+      tampil('bidang') && !m.bidang && 'bidang',
+      tampil('syarat') && !p.statusKP && 'statusKP',
+    ].find(Boolean);
+    if (belumDipilih) { setErr(`Pilih ${medan(belumDipilih).label} terlebih dahulu.`); return; }
     const galat = galatWajib(kunci, m, konten);
     if (galat) { setErr(galat); return; }
     if (baru && programTerpakai.includes(m.program)) { setErr(`Kamu sudah punya pengajuan ${programLabel(m.program)}. Hapus pengajuan lama dulu untuk membuat yang baru.`); return; }
@@ -121,7 +133,8 @@ export function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], a
         ));
       case 'jenis':
         return bungkus(id, () => (
-          <select value={m.jenisMagang || 'Magang'} onChange={(e) => set('jenisMagang', e.target.value)}>
+          <select value={m.jenisMagang || ''} onChange={(e) => set('jenisMagang', e.target.value)}>
+            <option value="" disabled>— pilih jenis —</option>
             <option value="Magang">Magang</option>
             <option value="MKT">Mata Kuliah Terapan</option>
           </select>
@@ -158,13 +171,15 @@ export function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], a
         ));
       case 'klasifikasi':
         return bungkus(id, () => (
-          <select value={m.klasifikasi} onChange={(e) => set('klasifikasi', e.target.value)}>
+          <select value={m.klasifikasi || ''} onChange={(e) => set('klasifikasi', e.target.value)}>
+            <option value="" disabled>— pilih klasifikasi —</option>
             {KLASIFIKASI.map((k) => <option key={k} value={k}>{k}</option>)}
           </select>
         ));
       case 'bidang':
         return bungkus(id, () => (
-          <select value={m.bidang} onChange={(e) => set('bidang', e.target.value)}>
+          <select value={m.bidang || ''} onChange={(e) => set('bidang', e.target.value)}>
+            <option value="" disabled>— pilih {gayaKP(kunci) ? 'tema' : 'bidang'} —</option>
             {(gayaKP(kunci) ? kpTemaUntukPilihan(m.bidang) : bidangUntukPilihan(m.bidang)).map((t) => <option key={t.kode} value={t.kode}>{t.label}</option>)}
           </select>
         ));
@@ -206,8 +221,9 @@ export function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], a
         <label className="check"><input type="checkbox" checked={!!p.syaratSKS} onChange={(e) => setP('syaratSKS', e.target.checked)} /><span>{sks.label}</span></label>
         <div className="sched-grid" style={{ marginTop: 10 }}>
           <Field label={ipk.label}><input value={p.ipk || ''} onChange={(e) => setP('ipk', e.target.value)} placeholder={ipk.placeholder} /></Field>
-          <Field label={statusKP.label}>
-            <select value={p.statusKP || 'Telah'} onChange={(e) => setP('statusKP', e.target.value)}>
+          <Field label={<>{statusKP.label}{statusKP.wajib && <span className="req"> *</span>}</>}>
+            <select value={p.statusKP || ''} onChange={(e) => setP('statusKP', e.target.value)}>
+              <option value="" disabled>— pilih status —</option>
               <option value="Telah">Telah</option>
               <option value="Sedang">Sedang</option>
             </select>

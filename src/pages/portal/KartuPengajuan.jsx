@@ -155,7 +155,7 @@ function StatusTahap({ v, aktif, lulus, tanggalLulus, evA, jEv, sidang, disetuju
   if (aktif && langkahKP && !lulus) {
     let teks;
     if (langkahKP.tahap === 'Pendaftaran') {
-      teks = <div className="callout">Unggah <strong>surat balasan perusahaan</strong> untuk masuk ke tahap Bimbingan.</div>;
+      teks = <div className="callout">Unggah <strong>Surat Balasan Perusahaan</strong> untuk masuk ke tahap Bimbingan.</div>;
     } else if (langkahKP.tahap === 'Bimbingan') {
       teks = <div className="callout">Unduh dan tanda tangani <strong>Lembar Pengesahan KP</strong>, lalu unggah pindaiannya untuk masuk ke tahap Pembukuan.</div>;
     } else if (langkahKP.disetujui) {

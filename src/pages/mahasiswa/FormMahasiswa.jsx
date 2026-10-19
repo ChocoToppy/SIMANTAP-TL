@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { perpanjanganDocType, PROGRAMS, programOf, stagesFor, eventsFor, rolesFor, syaratLabel, SEMUA, buatId, todayISO, RUANG, jamTampil, cariBentrok, waMahasiswa, tahapBerikut, tahapSebelumnya, eventAktif, berkasSyarat, catatAktivitas, formatTanggal, normalizeUrl, dokumenFieldFor, dosenAktifUntuk } from '../../utils/helpers.js';
 import { opsiRuang, periksaUsulanRuang, teksBentrokRuang, milikProgram } from '../../modules/ruang';
 import { FITUR_RUANG } from '../../utils/config.js';
+import { kodeKpTemaPertama, kodeBidangPertama, adalahKodeKpTema } from '../../utils/pilihan.js';
 import { catatNomorManual } from '../../utils/nomorSuratDb.js';
 import { bacaNomor, waktuNomor, pemakaiNomorLain, urutTerpakaiDiRecord, NAMA_BULAN } from '../../utils/nomorSurat.js';
 import { Field, Badge, StageStepper, ArrowIcon } from '../../components/ui.jsx';
@@ -27,7 +28,9 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
     program: defaultProgram,
     nama: '', nim: '', judul: '',
     periode: periode && periode !== SEMUA ? periode : (periodeList[periodeList.length - 1] || ''),
-    angkatan: '', klasifikasi: 'Penelitian', bidang: 'U',
+    angkatan: '', klasifikasi: 'Penelitian',
+    // Kode awal dari daftar program itu sendiri (Tema KP vs Bidang TA), lihat gantiProgram.
+    bidang: defaultProgram === 'KP' || defaultProgram === 'MG' ? kodeKpTemaPertama() : kodeBidangPertama(),
     pembimbing1: '', pembimbing2: '', penguji1: '', penguji2: '',
     tahap: 'Pendaftaran',
     tanggalMulai: todayISO(), batasAkhir: '',
@@ -162,6 +165,10 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
       if (r.penguji < 1) next.penguji1 = '';
       if (r.penguji < 2) next.penguji2 = '';
       if (p === 'MG' && !next.jenisMagang) next.jenisMagang = 'Magang';
+      // Tema KP (KP/Magang) dan Bidang (TA/Capstone/S2) memakai daftar kode berbeda.
+      const gayaKP = p === 'KP' || p === 'MG';
+      if (gayaKP && !adalahKodeKpTema(next.bidang)) next.bidang = kodeKpTemaPertama();
+      if (!gayaKP && adalahKodeKpTema(next.bidang)) next.bidang = kodeBidangPertama();
       return next;
     });
   }

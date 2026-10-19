@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Dashboard } from './pages/Dashboard.jsx';
 import { Mahasiswa } from './pages/Mahasiswa.jsx';
 import { Dosen } from './pages/Dosen.jsx';
@@ -10,7 +10,7 @@ import { PanduanPage } from './pages/PanduanPage.jsx';
 import { PenggunaanRuangPortal } from './modules/ruang';
 import { arsipkanJadwal, idPengajuan, PROGRAMS, PROGRAM_KEYS, programOf, programLabel, stagesFor, eventsFor, punyaKlasifikasi, punyaSyarat, rolesFor, syaratLabel, getJadwal, STAGES, KLASIFIKASI, BIDANG, KP_TEMA, HARI, bidangLabel, todayISO, parseISO, daysBetween, BULAN, formatTanggal, kondisi, isAktif, indexTahap, hitungBeban, hitungBebanProgram, hitungBebanRinci, SEMUA, filterByPeriode, daftarPeriode, PERIODE_AKTIF, TOPIK, VERIFIKASI, statusVerif, tambahHari, LABEL_PENDAFTARAN, ringkasPendaftaran, RUANG, menitJam, rentangJadwal, jamTampil, beririsan, dosenTerlibat, kumpulkanEvent, cariBentrok, pesanNotifikasi, waLink, mailtoLink, waMahasiswa, DURASI_EVENT, JAM_KERJA, durasiEvent, jamTambah, dalamJamKerja, tahapBerikut, eventAktif, BERKAS_SYARAT, berkasSyarat, bolehAjukanJadwal, orphanedUploadPaths } from './utils/helpers.js';
 import { deleteUploadedFile, deleteUploadedFolder } from './utils/fileUpload.js';
-import { DOSEN_AWAL, plusHari, RAW_MAHASISWA, MAHASISWA_AWAL, AKUN_AWAL, PERIODE_BUKA_AWAL, PENGUMUMAN_AWAL, PERIODE_AKTIF_AWAL, PANDUAN_AWAL } from './data/seed.js';
+import { PERIODE_BUKA_AWAL, PENGUMUMAN_AWAL, PERIODE_AKTIF_AWAL, PANDUAN_AWAL } from './data/seed.js';
 import { Badge, StageBar, ExportMenu, TextSizeToggle, ThemeToggle, RolePill, TabIcon, LogoutIcon, Dropdown, Muat, PasswordField, HamburgerIcon } from './components/ui.jsx';
 import { db, auth } from './utils/firebase.js';
 import { setPilihan } from './utils/pilihan.js';
@@ -39,18 +39,10 @@ function DomainDitolak({ onLogout }) {
 // ===================== App.js =====================
 // App.js — akar: sesi login (Firebase Auth + custom claims), render Login / Portal / Admin
 
-const KEY = 'sistem-ta-v2';
-
-function load() {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (raw) {
-      const p = JSON.parse(raw);
-      if (p && p.dosen && p.mahasiswa) return { akun: AKUN_AWAL, periodeBuka: PERIODE_BUKA_AWAL, pengumuman: PENGUMUMAN_AWAL, periodeAktif: PERIODE_AKTIF_AWAL, panduan: PANDUAN_AWAL, ...p };
-    }
-  } catch (e) { /* abaikan */ }
-  return { dosen: DOSEN_AWAL, mahasiswa: MAHASISWA_AWAL, akun: AKUN_AWAL, periodeBuka: PERIODE_BUKA_AWAL, pengumuman: PENGUMUMAN_AWAL, periodeAktif: PERIODE_AKTIF_AWAL, panduan: PANDUAN_AWAL };
-}
+// Dulu seluruh data (mahasiswa, dosen, dst.) di-cache di localStorage dengan kunci
+// ini dan tetap tertinggal di browser setelah logout. Tidak dipakai lagi — semua
+// data dimuat langsung dari Firestore; sisa cache lama di browser dibersihkan.
+try { localStorage.removeItem('sistem-ta-v2'); } catch (e) { /* abaikan */ }
 
 // Setiap mahasiswa/dosen/akun kini disimpan sebagai dokumen Firestore sendiri
 // (bukan satu dokumen raksasa untuk seluruh aplikasi seperti sebelumnya), supaya
@@ -88,17 +80,13 @@ function hapusDoc(collectionName, id) {
   });
 }
 
-// Isi Firestore pertama kali (koleksi mahasiswa/dosen/akun kosong & belum ada
-// config/global) dengan data contoh, ditulis sekaligus lewat batch.
+// Project Firebase yang masih kosong (belum ada config/global): buat dokumen
+// config/global dengan isi kosong. Dosen & mahasiswa tidak diisi data contoh.
 async function seedFirestore() {
-  const batch = writeBatch(db);
-  batch.set(doc(db, 'config', 'global'), {
+  await setDoc(doc(db, 'config', 'global'), {
     periodeBuka: PERIODE_BUKA_AWAL, pengumuman: PENGUMUMAN_AWAL,
     periodeAktif: PERIODE_AKTIF_AWAL, panduan: PANDUAN_AWAL,
   });
-  DOSEN_AWAL.forEach((d) => batch.set(doc(db, 'dosen', d.kode), d));
-  MAHASISWA_AWAL.forEach((m) => batch.set(doc(db, 'mahasiswa', m.id), m));
-  await batch.commit();
 }
 
 // ----- Layar wajib ganti password (akun baru dibuat admin / hasil reset) -----
@@ -149,14 +137,13 @@ function GantiPasswordWajib({ onSelesai, onLogout }) {
 }
 
 export default function App() {
-  const [mahasiswaList, setMahasiswaList] = useState(() => load().mahasiswa);
-  const [dosenList, setDosenList] = useState(() => load().dosen);
-  const [akunList, setAkunList] = useState(() => load().akun);
+  const [mahasiswaList, setMahasiswaList] = useState([]);
+  const [dosenList, setDosenList] = useState([]);
+  const [akunList, setAkunList] = useState([]);
   const [adminList, setAdminList] = useState([]);
   const [angkatanList, setAngkatanList] = useState([]);
-  const [config, setConfig] = useState(() => {
-    const l = load();
-    return { periodeBuka: l.periodeBuka, pengumuman: l.pengumuman, periodeAktif: l.periodeAktif, panduan: l.panduan };
+  const [config, setConfig] = useState({
+    periodeBuka: PERIODE_BUKA_AWAL, pengumuman: PENGUMUMAN_AWAL, periodeAktif: PERIODE_AKTIF_AWAL, panduan: PANDUAN_AWAL,
   });
 
   // ----- Sesi: Firebase Auth + custom claims (role/kode), bukan localStorage -----
@@ -233,7 +220,6 @@ export default function App() {
     mahasiswa: mahasiswaList, dosen: dosenList, akun: akunList, angkatan: angkatanList, ...config,
   }), [mahasiswaList, dosenList, akunList, angkatanList, config]);
 
-  useEffect(() => { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {} }, [data]);
 
   // Setiap mahasiswa (satu program yang diikuti = satu dokumen), dosen, dan akun
   // disimpan sebagai dokumen Firestore sendiri-sendiri dalam koleksi masing-
@@ -346,10 +332,15 @@ export default function App() {
   const daftarAngkatan = useMemo(() => (data.angkatan || []).map((a) => a.label).sort(), [data.angkatan]);
   // Daftar Tema KP/Bidang TA hasil edit admin — harus terpasang sebelum anak-anak dirender (lihat pilihan.js).
   setPilihan(data.konten);
-  const [periode, setPeriode] = useState(() => {
-    const list = daftarPeriode(load().mahasiswa);
-    return list.length ? list[list.length - 1] : SEMUA;
-  });
+  // Periode awal = periode terbaru, dipilih sekali begitu daftar periode dari
+  // Firestore tersedia; setelah itu mengikuti pilihan admin.
+  const [periode, setPeriode] = useState(SEMUA);
+  const periodeAwalDipilih = useRef(false);
+  useEffect(() => {
+    if (periodeAwalDipilih.current || !periodeList.length) return;
+    periodeAwalDipilih.current = true;
+    setPeriode(periodeList[periodeList.length - 1]);
+  }, [periodeList]);
   useEffect(() => {
     if (periode !== SEMUA && !periodeList.includes(periode)) {
       setPeriode(periodeList.length ? periodeList[periodeList.length - 1] : SEMUA);

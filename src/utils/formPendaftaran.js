@@ -30,7 +30,7 @@ const NAMA_KP = (k) => (k === 'KP' ? 'KP' : 'Magang');
 // wajibTetap: sudah divalidasi di kode, tombol wajib dikunci menyala
 export const META = {
   program: { nama: 'Program', tipe: 'select', di: 'm', kolom: 'program', label: () => 'Program', kunciPosisi: true },
-  jenis: { nama: 'Jenis (Magang/MKT)', tipe: 'select', di: 'm', kolom: 'jenisMagang', label: () => 'Jenis', kunciPosisi: true },
+  jenis: { nama: 'Jenis (Magang/MKT)', tipe: 'select', di: 'm', kolom: 'jenisMagang', label: () => 'Jenis', kunciPosisi: true, wajibTetap: true },
   periode: { nama: 'Periode', tipe: 'select', di: 'm', kolom: 'periode', label: () => 'Periode', wajibTetap: true },
   nama: { nama: 'Nama', tipe: 'text', di: 'm', kolom: 'nama', label: () => 'Nama', wajibTetap: true },
   angkatan: { nama: 'Angkatan', tipe: 'select', di: 'm', kolom: 'angkatan', label: () => 'Angkatan' },
@@ -40,9 +40,9 @@ export const META = {
     hint: 'Huruf kapital hanya di awal kata, bukan semua huruf kapital. Contoh: "Analisis Pengelolaan Limbah Cair", bukan "ANALISIS PENGELOLAAN LIMBAH CAIR".',
   },
   dosenWali: { nama: 'Dosen Wali', tipe: 'select', di: 'm', kolom: 'dosenWali', label: () => 'Dosen Wali' },
-  klasifikasi: { nama: 'Klasifikasi', tipe: 'select', di: 'm', kolom: 'klasifikasi', label: () => 'Klasifikasi' },
+  klasifikasi: { nama: 'Klasifikasi', tipe: 'select', di: 'm', kolom: 'klasifikasi', label: () => 'Klasifikasi', wajibTetap: true },
   // Dropdown ini isinya dikelola dari kartu field-nya di editor (Tema KP/Bidang TA).
-  bidang: { nama: 'Tema / Bidang', tipe: 'select', di: 'm', kolom: 'bidang', label: (k) => (k === 'KP' ? 'Tema Kerja Praktik' : gayaKP(k) ? 'Tema Magang' : 'Topik / bidang') },
+  bidang: { nama: 'Tema / Bidang', tipe: 'select', di: 'm', kolom: 'bidang', wajibTetap: true, label: (k) => (k === 'KP' ? 'Tema Kerja Praktik' : gayaKP(k) ? 'Tema Magang' : 'Topik / bidang') },
   semester: { nama: 'Semester', tipe: 'select', di: 'p', kolom: 'semester', label: () => 'Semester' },
   sksIpk: { nama: 'SKS / IPK', tipe: 'text', di: 'p', kolom: 'sksIpk', label: () => 'Jumlah SKS / IPK', placeholder: 'mis. 110 SKS / 3,20' },
   tempatKP: { nama: 'Tempat', tipe: 'text', di: 'p', kolom: 'tempatKP', label: (k) => `Tempat / Perusahaan ${NAMA_KP(k)}` },
@@ -71,7 +71,7 @@ export const BUTIR_SYARAT = ['syaratSKS', 'ipk', 'statusKP', 'terdaftarKRS', 'su
 export const META_SYARAT = {
   syaratSKS: { nama: 'Syarat SKS & IPK', tipe: 'centang', label: () => 'Sudah lulus 120 SKS dengan IPK ≥ 2,00' },
   ipk: { nama: 'IPK', tipe: 'text', label: () => 'IPK', placeholder: 'mis. 3,20' },
-  statusKP: { nama: 'Status Kerja Praktik', tipe: 'select', label: () => 'Status Kerja Praktik' },
+  statusKP: { nama: 'Status Kerja Praktik', tipe: 'select', label: () => 'Status Kerja Praktik', wajibTetap: true },
   terdaftarKRS: { nama: 'Terdaftar KRS', tipe: 'centang', label: (k) => `Terdaftar pada KRS mengambil mata kuliah ${k === 'CAP' ? 'Capstone Design' : 'TA'}` },
   sudahUGB: { nama: 'Sudah menyusun UGB', tipe: 'centang', label: (k) => `Telah menyusun Usulan Garis Besar (UGB) / proposal${k === 'CAP' ? ' Capstone Design' : ''}` },
 };

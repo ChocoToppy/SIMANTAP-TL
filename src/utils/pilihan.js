@@ -65,9 +65,14 @@ export function semuaBidang() { return gabung(BIDANG, tersimpan.bidang); }
 
 // Untuk <select>: hanya yang aktif, ditambah nilai yang sedang tersimpan di
 // mahasiswa itu walau sudah diarsipkan (supaya form edit tidak menimpanya diam-diam).
+// Nilai tersimpan yang bukan milik daftar ini (mis. kode bidang TA "U" pada KP)
+// ditampilkan apa adanya di atas — tanpa ini <select> diam-diam menampilkan opsi
+// pertama padahal yang tersimpan (dan tercetak di surat) kode lain.
 function untukPilihan(semua, saatIni) {
-  return semua.filter((x) => x.isActive || x.kode === saatIni)
+  const daftar = semua.filter((x) => x.isActive || x.kode === saatIni)
     .map((x) => (x.isActive ? x : { ...x, label: x.label + ' (nonaktif)' }));
+  if (!saatIni || semua.some((x) => x.kode === saatIni)) return daftar;
+  return [{ kode: saatIni, label: `${labelPilihan(saatIni) || saatIni} (tidak valid, pilih ulang)` }, ...daftar];
 }
 export function kpTemaUntukPilihan(saatIni) { return untukPilihan(semuaKpTema(), saatIni); }
 export function bidangUntukPilihan(saatIni) { return untukPilihan(semuaBidang(), saatIni); }

@@ -34,12 +34,11 @@ Its changelog entry says it is being deployed, but I cannot confirm from the rep
 
 **Setting.** SIMANTAP-TL is a web system for the undergraduate Environmental Engineering
 study program (Program Studi S1 Teknik Lingkungan) at Universitas Diponegoro (UNDIP),
-Indonesia. Seed data names the department's real lecturers (`src/data/seed.js:6-25`); the
-public verification page names the issuer as "Program Studi S1 Teknik Lingkungan Undip"
-(`src/pages/VerifikasiSurat.jsx:50,65`). A sample announcement in seed data expands the name
-as "Sistem Informasi Manajemen Tugas Akhir dan Praktik" (`src/data/seed.js:118`); the HTML
-title reads "Sistem SKP Terintegrasi — UNDIP" (`index.html:6`). The official expansion should
-be confirmed with the authors.
+Indonesia. The public verification page names the issuer as "Program Studi S1 Teknik
+Lingkungan Undip" (`src/pages/VerifikasiSurat.jsx:50,65`). The HTML title reads "Sistem SKP
+Terintegrasi — UNDIP" (`index.html:6`). An earlier sample announcement expanded the name as
+"Sistem Informasi Manajemen Tugas Akhir dan Praktik" [INFERRED: sample data since removed from
+`src/data/seed.js`]; the official expansion should be confirmed with the authors.
 
 **What it manages.** The administrative lifecycle of supervised academic programs. Two are
 in production; three more are modeled in code but **not ready** (see "Maturity" below). Each
@@ -149,7 +148,7 @@ other three programs are future work **[INFERRED framing, confirm with the autho
 |---|---|---|
 | SPA | React 18.3, Vite 5, no router library, no state library | `package.json`, `main.jsx`, `src/App.jsx` |
 | Auth | Firebase Auth + custom claims `{role, nim | kode, super}` | `src/utils/auth.js`, `functions/index.js` |
-| Database | Cloud Firestore, real-time listeners (`onSnapshot`) | `src/App.jsx:238-327` |
+| Database | Cloud Firestore, real-time listeners (`onSnapshot`) | `src/App.jsx:237-313` |
 | Authorization / validation | Firestore & Storage Security Rules | `firestore.rules` (467 lines), `storage.rules` |
 | Server logic | Cloud Functions v1, Node 20 | `functions/index.js`, `functions/verifikasiSurat.js` |
 | File storage | Firebase Storage, PDF only, ≤25 MB | `src/utils/fileUpload.js`, `storage.rules` |
@@ -188,14 +187,18 @@ holds only `{fileName, size, url, path, uploadedAt}` (`src/utils/fileUpload.js:1
 **Reads.** Each role subscribes with queries that match the rules exactly: admins listen to
 whole collections; students to `where('owner','==', nim)`; lecturers to four queries
 (`pembimbing1|pembimbing2|penguji1|penguji2 == kode`) merged client-side
-(`src/App.jsx:251-283`).
+(`src/App.jsx:237-270`). The client keeps no copy of application data in browser storage:
+state starts empty and fills from these listeners, and a leftover cache from earlier versions
+is deleted at startup (`src/App.jsx:42-45`). Browser storage holds only UI preferences (theme,
+text size, sidebar, hidden table columns). A fresh project is initialised with an empty
+`config/global` only; there is no sample data (`src/App.jsx:83-90`, `src/data/seed.js`).
 
 **Writes.** The client computes the full next state of an application (workflow logic in
 `src/utils/helpers.js`) and writes the whole document with `setDoc`, after a 900 KB size guard
-(`src/App.jsx:60-70`). Firestore Security Rules then re-validate the *diff* between old and new
+(`src/App.jsx:54-63`). Firestore Security Rules then re-validate the *diff* between old and new
 document for non-admins (`firestore.rules:278-296`). Side effects on save: archive replaced
 schedules (`arsipkanJadwal`, `helpers.js:373`), delete orphaned Storage files
-(`orphanedUploadPaths`, `helpers.js:956`), maintain `slotPengajuan` (`App.jsx:361-385`).
+(`orphanedUploadPaths`, `helpers.js:956`), maintain `slotPengajuan` (`App.jsx:352-377`).
 
 **Letter generation.** Click "Unduh" → `getTemplateConfig(docType, record, lecturers)` picks a
 template and builds the tag payload (`documentGenerator.js:125`) → for QR letters, call
@@ -215,13 +218,13 @@ renders `VerifikasiSurat` outside the authenticated app → fetches
 | Choice | Rationale | Source |
 |---|---|---|
 | Firebase (BaaS) | Inherited from the predecessor; no dedicated backend server **[INFERRED]** that a small department team can avoid running servers | `migrate_firebase.mjs` |
-| Firestore per-entity collections | Single 1 MiB document caused data loss; per-doc writes only touch what changed | `CHANGELOG.md:336-340`, `App.jsx:53-58` |
+| Firestore per-entity collections | Single 1 MiB document caused data loss; per-doc writes only touch what changed | `CHANGELOG.md:336-340`, `App.jsx:46-51` |
 | Firebase Auth + custom claims | Replace plaintext/shared passwords; roles in token so the client cannot set its own role; `nim`/`kode` in token so rules for list queries need no per-document `get()` | `functions/index.js:88-92`, `firestore.rules:5-13` |
 | Security Rules as the validation layer | No API server; "what the UI cannot do, the database must reject" | `firestore.rules:38-50`, `CHANGELOG.md:176-178` |
 | Firebase Storage | Remove base64 files from documents | `CHANGELOG.md:342-346` |
 | Word templates + docxtemplater | Staff edit letter layouts in Word themselves; templates are the single source of truth; tags are the only coupling to code | `public/List of Tags.txt`, `documentGenerator.js:8-13` |
 | LibreOffice on Cloud Run | Convert the same `.docx` to PDF rather than maintain a second PDF layout; `libreoffice-writer` only to shrink image/cold start | `converter-service/Dockerfile:3-10` |
-| React without router/state libs | Small app; path-based routing by hand, Hosting rewrites all paths to `index.html` | `App.jsx:206-223` |
+| React without router/state libs | Small app; path-based routing by hand, Hosting rewrites all paths to `index.html` | `App.jsx:194-210` |
 | SheetJS from CDN, lazily | Only needed for import/export **[INFERRED]** to keep bundle small | `exportUtils.js:71-80` |
 | Two static hosts | Production on the department's cPanel domain; Firebase Hosting for experimental build and Hosting-only features (rewrites) | `DEPLOY.md:1-7`, `DEPLOY.md:92-112` |
 
@@ -233,7 +236,7 @@ Each item lists the alternative that was tried or considered and why it lost.
 
 1. **Per-entity documents instead of one global document.** Alternative (the predecessor's
    design) hit the 1 MiB limit and lost data. Trade-off: one application = one document; a
-   student in two programs has two documents linked by `owner` (`App.jsx:238-243`). The old
+   student in two programs has two documents linked by `owner` (`App.jsx:224-228`). The old
    global document is left orphaned, not deleted (`CHANGELOG.md:340`).
 
 2. **Client-side business logic + declarative server-side re-validation.** The client builds
@@ -354,14 +357,14 @@ Each item lists the alternative that was tried or considered and why it lost.
 
 | Challenge | Solution | Where |
 |---|---|---|
-| Uploads vanished: global doc > 1 MiB, write failed, real-time sync reverted the optimistic update | Per-entity collections, files to Storage, 900 KB pre-write guard | `CHANGELOG.md:330-346`, `App.jsx:60-70` |
-| Firestore rules for list queries cannot depend on per-document lookups | Put `nim`/`kode` into custom claims; every client query mirrors a rule (`where(owner == nim)`) | `firestore.rules:5-13`, `functions/index.js:88-92`, `App.jsx:238-283` |
-| No OR query across 4 lecturer fields under rules | Four listeners merged and de-duplicated client-side | `App.jsx:265-283` |
+| Uploads vanished: global doc > 1 MiB, write failed, real-time sync reverted the optimistic update | Per-entity collections, files to Storage, 900 KB pre-write guard | `CHANGELOG.md:330-346`, `App.jsx:54-63` |
+| Firestore rules for list queries cannot depend on per-document lookups | Put `nim`/`kode` into custom claims; every client query mirrors a rule (`where(owner == nim)`) | `firestore.rules:5-13`, `functions/index.js:88-92`, `App.jsx:237-270` |
+| No OR query across 4 lecturer fields under rules | Four listeners merged and de-duplicated client-side | `App.jsx:251-270` |
 | Auth `onCreate` trigger fires late and overwrote admin/lecturer claims with `student` | Trigger skips users that already have a role claim | `functions/index.js:40-59` |
 | Failed profile creation left orphan Auth accounts | Delete the just-created Auth user on failure | `src/utils/auth.js:35-47` |
 | Bootstrap of first super admin (chicken-and-egg) | Any admin may claim it while none exists; path then locks | `functions/index.js:225-250` |
 | NIM change must keep ownership, claims and uniqueness consistent | Batch: move account doc, rewrite `owner/nim` on applications, rebuild `slotPengajuan`, then reset claims | `functions/index.js:347-437` |
-| Rule ordering on deletion (Storage rules read the Firestore doc; marker deletion requires doc already gone) | Delete Storage folder before the doc; delete marker after, checked with `existsAfter` | `App.jsx:387-410`, `firestore.rules:359-366` |
+| Rule ordering on deletion (Storage rules read the Firestore doc; marker deletion requires doc already gone) | Delete Storage folder before the doc; delete marker after, checked with `existsAfter` | `App.jsx:378-401`, `firestore.rules:359-366` |
 | Append-only activity logs in a rules language without loops | Compare prefix slice: new list longer and `new[0:old.size()] == old` | `firestore.rules:107-113` |
 | LibreOffice substituted fonts with different metrics, breaking letterhead tables | Install metric-compatible fonts (Liberation, Carlito, Caladea) in the image | `converter-service/Dockerfile:6-19` |
 | Cloud Run cold start delayed downloads | Ping converter and prefetch templates on page load; the print date is still computed at click time | `documentGenerator.js:77-97` |
@@ -497,7 +500,7 @@ exports.
 **Consistency / concurrency**
 - Application documents are written whole with `setDoc`; there is no version check, so two
   admins (or admin + student) editing one record concurrently is last-writer-wins
-  **[INFERRED from `App.jsx:61-70`]**. Only the number registry uses a transaction.
+  **[INFERRED from `App.jsx:54-63`]**. Only the number registry uses a transaction.
 - Workflow logic is duplicated between `helpers.js` and `firestore.rules` and kept in sync by
   hand.
 - Some time checks rely on the client clock: number month validation uses the admin's device
@@ -605,8 +608,8 @@ exports.
 | `scripts/deploy-cpanel.mjs`, `DEPLOY.md` | cPanel deploy with permission fix; deploy guide |
 | `CHANGELOG.md` | Dated design history (Indonesian), primary source for §3–4 |
 | `src/pages/Pengaturan.jsx`, `src/pages/pengaturan/*` | Admin settings: periods, cohorts, form/content editors with draft-and-publish, announcements, guides |
-| `src/data/seed.js` | Sample data and real lecturer list for first boot |
-| `migrate_firebase.mjs`, `update_dosen.mjs`, `test_firebase.mjs` | One-off legacy scripts |
+| `src/data/seed.js` | Empty defaults for `config/global` on a fresh project |
+| `migrate_firebase.mjs`, `test_firebase.mjs` | One-off legacy scripts |
 
 ---
 
@@ -633,3 +636,17 @@ always describe the current system; this list is the only place for history.
 - **Why:** The first version described all five programs as if equally operational.
 - **Affects:** §1, §3.14, §5.1, §5.6, §6, §7; the paper's scope and evaluation claims should
   cover KP and Magang/MKT only.
+
+### 2026-10-19 (3)
+- **What:** Removed the client-side data cache and all sample data. The app no longer mirrors
+  application data (students, lecturers, accounts) into `localStorage`; it starts empty, loads
+  from Firestore listeners, and deletes the old cache key at startup. `src/data/seed.js` now
+  holds only empty `config/global` defaults; first-boot seeding no longer writes sample students
+  or the (outdated) lecturer list. The obsolete `update_dosen.mjs` script was deleted. A public,
+  unused Realtime Database instance holding a copy of the old sample data was flagged for
+  deletion in the Firebase console.
+- **Why:** The cache persisted personal data and tokenised file URLs on shared computers after
+  logout and could briefly show a previous user's data; sample data could reappear if
+  `config/global` were ever deleted.
+- **Affects:** §1 (setting; seed citations removed), §2.3 (reads), §8 (file map); possibly §7 if
+  the paper discusses privacy of client-side data.

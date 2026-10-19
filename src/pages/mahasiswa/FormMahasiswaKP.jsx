@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { PROGRAM_KEYS, programLabel, programDisplayLabel, ringkasPendaftaran, normalizeUrl, formatTanggal, judulLabelFor, statusVerif, pembukuanDisetujui } from '../../utils/helpers.js';
-import { kpTemaUntukPilihan } from '../../utils/pilihan.js';
+import { kpTemaUntukPilihan, bidangUntukPilihan } from '../../utils/pilihan.js';
 import { Field, Modal, MessageIcon, Badge, LampIcon, PencilIcon } from '../../components/ui.jsx';
 import { KpDocumentPanel } from '../../components/kpDocuments.jsx';
 import { LinkBerkasRow } from './LinkBerkasRow.jsx';
@@ -112,7 +112,8 @@ export function FormMahasiswaKP({
           <Field label={judulLabelFor(m)} full><textarea rows={2} value={m.judul} onChange={(e) => set('judul', e.target.value)} /></Field>
           <Field label="Bidang">
             <select value={m.bidang} onChange={(e) => set('bidang', e.target.value)}>
-              {kpTemaUntukPilihan(m.bidang).map((b) => <option key={b.kode} value={b.kode}>{b.label}</option>)}
+              {/* Modal ini juga dipakai TA, yang memakai daftar Bidang, bukan Tema KP. */}
+              {(m.program === 'TA' ? bidangUntukPilihan(m.bidang) : kpTemaUntukPilihan(m.bidang)).map((b) => <option key={b.kode} value={b.kode}>{b.label}</option>)}
             </select>
           </Field>
 
