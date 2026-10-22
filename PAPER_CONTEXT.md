@@ -91,7 +91,7 @@ other three programs are future work **[INFERRED framing, confirm with the autho
 - Students: self-register, submit applications, download generated letters, upload signed
   scans, propose schedules, request extensions (`src/pages/Portal.jsx`, `src/pages/portal/`).
 - Lecturers: read-only view of students they supervise/examine (`src/pages/DosenPortal.jsx`;
-  rules comment `firestore.rules:337`).
+  rules comment `firestore.rules:342`).
 - Admin staff: verify, assign lecturers, issue letter numbers, approve extensions, manage
   rooms, accounts, content (`src/pages/Mahasiswa.jsx`, `src/pages/pengaturan/`).
 - Super admin: the only role that can create/delete admins (`functions/index.js:26-34`).
@@ -148,7 +148,7 @@ other three programs are future work **[INFERRED framing, confirm with the autho
 |---|---|---|
 | SPA | React 18.3, Vite 5, no router library, no state library | `package.json`, `main.jsx`, `src/App.jsx` |
 | Auth | Firebase Auth + custom claims `{role, nim | kode, super}` | `src/utils/auth.js`, `functions/index.js` |
-| Database | Cloud Firestore, real-time listeners (`onSnapshot`) | `src/App.jsx:278-350`, `src/utils/useMahasiswaAdmin.js` |
+| Database | Cloud Firestore, real-time listeners (`onSnapshot`) | `src/App.jsx:285-357`, `src/utils/useMahasiswaAdmin.js` |
 | Authorization / validation | Firestore & Storage Security Rules | `firestore.rules` (467 lines), `storage.rules` |
 | Server logic | Cloud Functions v1, Node 20 | `functions/index.js`, `functions/verifikasiSurat.js` |
 | File storage | Firebase Storage, PDF only, ≤25 MB | `src/utils/fileUpload.js`, `storage.rules` |
@@ -189,39 +189,39 @@ holds only `{fileName, size, url, path, uploadedAt}` (`src/utils/fileUpload.js:1
 **Reads.** Each role subscribes with queries that match the rules exactly: students to
 `where('owner','==', nim)`; lecturers to four queries
 (`pembimbing1|pembimbing2|penguji1|penguji2 == kode`) merged client-side
-(`src/App.jsx:278-306`). Admins do not listen to the whole `mahasiswa` collection. By default
+(`src/App.jsx:285-313`). Admins do not listen to the whole `mahasiswa` collection. By default
 they load every application not yet at Lulus, from any period (`where('tahap','!=','Lulus')`),
 plus every application in the two most recent periods (`where('periode','==', p)`), "recent" by chronological order of names like "Gasal 2026/2027" (`src/utils/helpers.js:258-269`); all
 listeners are merged by document id (`src/utils/useMahasiswaAdmin.js:10-20`, `:24-106`). Choosing
 an older period in the period selector adds a listener for that period, which stays until
-logout (`src/App.jsx:372-411`). "Semua periode" does not load the history: its student table
+logout (`src/App.jsx:379-418`). "Semua periode" does not load the history: its student table
 is an archive read one page at a time from `indeksMahasiswa` (`limit` + `startAfter` cursor,
 `count()` for the total), after which only that page's application documents are fetched by id
 (`src/pages/mahasiswa/useArsipMahasiswa.js`). Its default order is entry date, oldest first, and
 No. is the row's position in the current result; search is a name/NIM prefix and sorting is
 limited to No./name/stage/deadline. Dashboard and lecturer workload under "Semua periode" count
 the loaded non-graduated applications and add graduated totals from `statistik/lulus`
-(`src/utils/ringkasLulus.js`, `src/App.jsx:392-407`). Both `indeksMahasiswa` and
+(`src/utils/ringkasLulus.js`, `src/App.jsx:399-414`). Both `indeksMahasiswa` and
 `statistik/lulus` are maintained by an `onWrite` trigger on `mahasiswa/{id}`
 (`functions/indeksArsip.js`). The default load therefore grows with active students plus about
 a year of intake, not with the full history. Grouping the student table by cohort still loads
 everything, because cohort numbering spans periods (`src/pages/Mahasiswa.jsx:102-107`). The list of periods for the selector is kept
 in `config/global.daftarPeriode`, filled once from existing data the first time an admin opens
 the app and extended when a period is opened or a record is saved with a new period
-(`useMahasiswaAdmin.js:110-123`, `src/App.jsx:196-201`). The letter-number registry view loads
+(`useMahasiswaAdmin.js:110-123`, `src/App.jsx:203-208`). The letter-number registry view loads
 one calendar year at a time, the current year by default
 (`src/pages/pengaturan/SeksiNomorSurat.jsx:22-37`). Other admin collections (`akun`, `dosen`,
 `angkatan`) are still listened to in full. The client keeps no copy of application data in
 browser storage: state starts empty and fills from these listeners, and a leftover cache from
-earlier versions is deleted at startup (`src/App.jsx:52-55`). Browser storage holds only UI
+earlier versions is deleted at startup (`src/App.jsx:54-57`). Browser storage holds only UI
 preferences (theme, text size, sidebar, hidden table columns). A fresh project is initialised
-with an empty `config/global` only; there is no sample data (`src/App.jsx:93-100`,
+with an empty `config/global` only; there is no sample data (`src/App.jsx:95-102`,
 `src/data/seed.js`).
 
 **Navigation state.** Admin view state lives in the URL, not in component state: the tab is the
 path (`/dashboard`, `/mahasiswa`, `/dosen`, `/ruang`, `/pengaturan/{section}`), and periode,
 program and the student table's search, filters, sort, grouping and page are query parameters
-(`src/utils/rute.js`, `src/App.jsx:214-251`, `src/pages/mahasiswa/useFilterMahasiswa.js`).
+(`src/utils/rute.js`, `src/App.jsx:221-258`, `src/pages/mahasiswa/useFilterMahasiswa.js`).
 Changing page, periode or program adds a browser history entry; typing, filtering, sorting and
 paging replace the current one. Periode and program are always written so a link keeps
 pointing at the same view after a newer period opens or the default program changes (all five
@@ -234,10 +234,10 @@ student edit form is not addressable by URL.
 
 **Writes.** The client computes the full next state of an application (workflow logic in
 `src/utils/helpers.js`) and writes the whole document with `setDoc`, after a 900 KB size guard
-(`src/App.jsx:64-74`). Firestore Security Rules then re-validate the *diff* between old and new
-document for non-admins (`firestore.rules:278-296`). Side effects on save: archive replaced
+(`src/App.jsx:66-76`). Firestore Security Rules then re-validate the *diff* between old and new
+document for non-admins (`firestore.rules:283-301`). Side effects on save: archive replaced
 schedules (`arsipkanJadwal`, `helpers.js:373`), delete orphaned Storage files
-(`orphanedUploadPaths`, `helpers.js:956`), maintain `slotPengajuan` (`App.jsx:413-442`).
+(`orphanedUploadPaths`, `helpers.js:956`), maintain `slotPengajuan` (`App.jsx:420-449`).
 
 **Letter generation.** Click "Unduh" → `getTemplateConfig(docType, record, lecturers)` picks a
 template and builds the tag payload (`documentGenerator.js:125`) → for QR letters, call
@@ -257,13 +257,13 @@ renders `VerifikasiSurat` outside the authenticated app → fetches
 | Choice | Rationale | Source |
 |---|---|---|
 | Firebase (BaaS) | Inherited from the predecessor; no dedicated backend server **[INFERRED]** that a small department team can avoid running servers | `migrate_firebase.mjs` |
-| Firestore per-entity collections | Single 1 MiB document caused data loss; per-doc writes only touch what changed | `CHANGELOG.md:336-340`, `App.jsx:57-62` |
+| Firestore per-entity collections | Single 1 MiB document caused data loss; per-doc writes only touch what changed | `CHANGELOG.md:336-340`, `App.jsx:59-64` |
 | Firebase Auth + custom claims | Replace plaintext/shared passwords; roles in token so the client cannot set its own role; `nim`/`kode` in token so rules for list queries need no per-document `get()` | `functions/index.js:88-92`, `firestore.rules:5-13` |
-| Security Rules as the validation layer | No API server; "what the UI cannot do, the database must reject" | `firestore.rules:38-50`, `CHANGELOG.md:176-178` |
+| Security Rules as the validation layer | No API server; "what the UI cannot do, the database must reject" | `firestore.rules:43-55`, `CHANGELOG.md:176-178` |
 | Firebase Storage | Remove base64 files from documents | `CHANGELOG.md:342-346` |
 | Word templates + docxtemplater | Staff edit letter layouts in Word themselves; templates are the single source of truth; tags are the only coupling to code | `public/List of Tags.txt`, `documentGenerator.js:8-13` |
 | LibreOffice on Cloud Run | Convert the same `.docx` to PDF rather than maintain a second PDF layout; `libreoffice-writer` only to shrink image/cold start | `converter-service/Dockerfile:3-10` |
-| React without router/state libs | Small app (about five admin pages); a ~70-line hand-written router: path = page, query = view options, history entries only for page/periode/program changes. Firebase Hosting and `public/.htaccess` (cPanel) rewrite all paths to `index.html` | `src/utils/rute.js`, `App.jsx:214-251`, `firebase.json`, `public/.htaccess` |
+| React without router/state libs | Small app (about five admin pages); a ~70-line hand-written router: path = page, query = view options, history entries only for page/periode/program changes. Firebase Hosting and `public/.htaccess` (cPanel) rewrite all paths to `index.html` | `src/utils/rute.js`, `App.jsx:221-258`, `firebase.json`, `public/.htaccess` |
 | SheetJS from CDN, lazily | Only needed for import/export **[INFERRED]** to keep bundle small | `exportUtils.js:71-80` |
 | Two static hosts | Production on the department's cPanel domain; Firebase Hosting for experimental build and Hosting-only features (rewrites) | `DEPLOY.md:1-7`, `DEPLOY.md:92-112` |
 
@@ -275,31 +275,31 @@ Each item lists the alternative that was tried or considered and why it lost.
 
 1. **Per-entity documents instead of one global document.** Alternative (the predecessor's
    design) hit the 1 MiB limit and lost data. Trade-off: one application = one document; a
-   student in two programs has two documents linked by `owner` (`App.jsx:265-269`). The old
+   student in two programs has two documents linked by `owner` (`App.jsx:272-276`). The old
    global document is left orphaned, not deleted (`CHANGELOG.md:340`).
 
 2. **Client-side business logic + declarative server-side re-validation.** The client builds
    the next state; rules check field whitelists, allowed transitions and preconditions
-   (`firestore.rules:278-296`). Alternative: a Cloud Function per user action. Not chosen
+   (`firestore.rules:283-301`). Alternative: a Cloud Function per user action. Not chosen
    **[INFERRED]**: would duplicate the client logic anyway and add latency/cold starts. Cost:
    the same rule is written twice (JS in `helpers.js`, rules language in `firestore.rules`) and
    comments in both files cross-reference each other to keep them in sync (e.g.
-   `helpers.js:281-287` ↔ `firestore.rules:259-271`).
+   `helpers.js:281-287` ↔ `firestore.rules:264-276`).
 
 3. **Roles and identifiers in token claims, not looked up per document.** Firestore evaluates
    list queries against the query, not each document, so rules for collection listeners may
    only use request-constant values (`firestore.rules:5-13`). Claims are set only by Admin SDK
    in functions (`functions/index.js:1-4`). Active/deactivated status is still checked with one
-   `get()` per request so deactivation takes effect immediately (`firestore.rules:20-31`).
+   `get()` per request so deactivation takes effect immediately (`firestore.rules:25-36`).
 
 4. **Login by NIM/NIP while Auth is email-based.** A public, get-only `loginIndex` maps
-   identifier → email before sign-in (`src/utils/auth.js:15-33`, `firestore.rules:404-408`).
+   identifier → email before sign-in (`src/utils/auth.js:15-33`, `firestore.rules:426-429`).
    Trade-off: anyone who knows a NIM/NIP can learn the associated email (no listing).
 
 5. **One open application per (student, program), enforced by the database.** Deterministic
    ID `{nim}_{program}`; legacy/admin-created/renamed documents are covered by marker docs in
    `slotPengajuan`; a closed application allows a re-application with ID `_2`, `_3`, … only if
-   the previous one exists and is closed (`firestore.rules:298-312`, `helpers.js:241-251`).
+   the previous one exists and is closed (`firestore.rules:303-317`, `helpers.js:241-251`).
    Alternative "Akhiri & daftar ulang" (reset the same document) was removed because it
    destroyed history; closing keeps an immutable archive (`CHANGELOG.md:54, 68-73`). Document
    IDs are not renamed on NIM change because Storage paths use the ID
@@ -307,7 +307,7 @@ Each item lists the alternative that was tried or considered and why it lost.
 
 6. **Verification status as the admin's work queue.** Only submissions that need staff action
    reset status to "awaiting verification" (`tandaiMenungguVerifikasi`, `helpers.js:271-294`;
-   enforced by `ditandaiMenunggu`, `firestore.rules:247-258`). Feature access depends on
+   enforced by `ditandaiMenunggu`, `firestore.rules:252-263`). Feature access depends on
    "ever verified" (`pernahTerverifikasi`), not the current status, so students are not
    blocked while waiting. An earlier version flagged every upload and was corrected
    (`CHANGELOG.md:96-97`).
@@ -324,7 +324,7 @@ Each item lists the alternative that was tried or considered and why it lost.
 8. **Letter-number registry: hybrid manual + suggested, transactional, never deleted.** One
    sequence per calendar year across programs (`src/utils/nomorSurat.js:7-13`); registry docs
    `nomorSurat/{year-seq}` are never deleted so ended numbers are never reused
-   (`firestore.rules:438-446`). Recording happens in a transaction that rejects a number held
+   (`firestore.rules:459-467`). Recording happens in a transaction that rejects a number held
    by another student or already ended (`src/utils/nomorSuratDb.js:37-69`). History of
    alternatives in `CHANGELOG.md:112-124, 201-206`: (a) fully automatic read-only issuing —
    replaced so staff can still type numbers; (b) a counter collection — dropped in favour of
@@ -349,7 +349,7 @@ Each item lists the alternative that was tried or considered and why it lost.
     if Cloud Run fails the user still receives the `.docx` (`documentGenerator.js:23-27, 63-75`).
     Uploaded files were deliberately *not* routed through the converter; uploads are PDF-only
     instead, checked by MIME type and extension in the client and in Storage rules
-    (`fileUpload.js:15-22`, `storage.rules:36-40`).
+    (`fileUpload.js:15-22`, `storage.rules:40-44`).
 
 12. **Admin-editable form text, code-defined fields.** Admins can change labels, hints,
     placeholders, required flags and order of registration fields per program, stored in
@@ -399,7 +399,7 @@ Each item lists the alternative that was tried or considered and why it lost.
     mini-charts in the edit form) is already scoped to one period, and admin views open on the
     latest period. Trade-off: cohort numbering spans all periods and still needs the full
     load, and cross-record checks that assumed everything was in memory
-    now query Firestore directly (`src/pages/mahasiswa/usePengajuanMilik.js`, `src/App.jsx:475-486`).
+    now query Firestore directly (`src/pages/mahasiswa/usePengajuanMilik.js`, `src/App.jsx:482-493`).
     The one view that would grow without bound, "Semua periode", is paged on the server instead:
     a trigger-maintained mirror collection (`indeksMahasiswa`) is queried with cursors, and
     graduated totals come from a trigger-maintained summary doc (`statistik/lulus`). The mirror is
@@ -409,6 +409,19 @@ Each item lists the alternative that was tried or considered and why it lost.
     the active set as well was rejected: Firestore has no substring search, every filter/sort
     combination needs a composite index, and the active set is bounded by intake
     **[INFERRED: no load measurements yet]**.
+19. **Bounded login sessions instead of Firebase's indefinite persistence.** Firebase Auth keeps a
+    browser signed in until explicit sign-out (refresh tokens never expire by themselves), and the
+    old "remember me" choice only switched between per-tab and indefinite storage. Sessions now use
+    one login shared by all tabs and end when (a) the last app tab is closed, detected when a tab
+    opens by asking other tabs over `BroadcastChannel` while a per-tab `sessionStorage` marker
+    tells a reload apart from a fresh tab; (b) no activity in any tab for a role-specific limit
+    (admin 30 min, lecturer 60, student 120; admins use shared office PCs), tracked as one
+    `localStorage` timestamp so every tab times out together; (c) 12 hours after sign-in
+    (`auth_time`), active or not (`src/utils/sesi.js:14-16`, `main.jsx`). (c) is also enforced
+    server-side in `isSignedIn()` of both rules files (`firestore.rules:15-20`,
+    `storage.rules:5-9`), so a client that skips the timer still loses data access; (a) and (b)
+    are client-only because the server sees no tab or activity state. A one-minute warning precedes
+    (b) and (c); unsaved form edits are lost when the timer runs out.
 
 ---
 
@@ -416,15 +429,15 @@ Each item lists the alternative that was tried or considered and why it lost.
 
 | Challenge | Solution | Where |
 |---|---|---|
-| Uploads vanished: global doc > 1 MiB, write failed, real-time sync reverted the optimistic update | Per-entity collections, files to Storage, 900 KB pre-write guard | `CHANGELOG.md:330-346`, `App.jsx:64-74` |
-| Firestore rules for list queries cannot depend on per-document lookups | Put `nim`/`kode` into custom claims; every client query mirrors a rule (`where(owner == nim)`) | `firestore.rules:5-13`, `functions/index.js:88-92`, `App.jsx:278-306` |
-| No OR query across 4 lecturer fields under rules | Four listeners merged and de-duplicated client-side | `App.jsx:287-306` |
+| Uploads vanished: global doc > 1 MiB, write failed, real-time sync reverted the optimistic update | Per-entity collections, files to Storage, 900 KB pre-write guard | `CHANGELOG.md:330-346`, `App.jsx:66-76` |
+| Firestore rules for list queries cannot depend on per-document lookups | Put `nim`/`kode` into custom claims; every client query mirrors a rule (`where(owner == nim)`) | `firestore.rules:5-13`, `functions/index.js:88-92`, `App.jsx:285-313` |
+| No OR query across 4 lecturer fields under rules | Four listeners merged and de-duplicated client-side | `App.jsx:294-313` |
 | Auth `onCreate` trigger fires late and overwrote admin/lecturer claims with `student` | Trigger skips users that already have a role claim | `functions/index.js:40-59` |
 | Failed profile creation left orphan Auth accounts | Delete the just-created Auth user on failure | `src/utils/auth.js:35-47` |
 | Bootstrap of first super admin (chicken-and-egg) | Any admin may claim it while none exists; path then locks | `functions/index.js:225-250` |
 | NIM change must keep ownership, claims and uniqueness consistent | Batch: move account doc, rewrite `owner/nim` on applications, rebuild `slotPengajuan`, then reset claims | `functions/index.js:347-437` |
-| Rule ordering on deletion (Storage rules read the Firestore doc; marker deletion requires doc already gone) | Delete Storage folder before the doc; delete marker after, checked with `existsAfter` | `App.jsx:443-467`, `firestore.rules:359-366` |
-| Append-only activity logs in a rules language without loops | Compare prefix slice: new list longer and `new[0:old.size()] == old` | `firestore.rules:107-113` |
+| Rule ordering on deletion (Storage rules read the Firestore doc; marker deletion requires doc already gone) | Delete Storage folder before the doc; delete marker after, checked with `existsAfter` | `App.jsx:450-474`, `firestore.rules:364-371` |
+| Append-only activity logs in a rules language without loops | Compare prefix slice: new list longer and `new[0:old.size()] == old` | `firestore.rules:112-118` |
 | LibreOffice substituted fonts with different metrics, breaking letterhead tables | Install metric-compatible fonts (Liberation, Carlito, Caladea) in the image | `converter-service/Dockerfile:6-19` |
 | Cloud Run cold start delayed downloads | Ping converter and prefetch templates on page load; the print date is still computed at click time | `documentGenerator.js:77-97` |
 | Injecting a QR into an arbitrary Word template | Template author inserts a placeholder image with alt text `qr-verifikasi`; code rewrites the image relationship in document/header/footer parts and registers PNG content type; fails closed if no placeholder, because the placeholder is a real QR to the homepage | `src/utils/qrVerifikasi.js:50-82` |
@@ -448,7 +461,7 @@ established here; that needs a related-work search.
 ### 5.1 A workflow state machine enforced in Firestore Security Rules
 For non-admin writers, the rules check *transitions*, not just ownership: field whitelists,
 stage moves allowed only as a consequence of specific uploads (`tahapMhsAman`,
-`firestore.rules:165-180`), schedule proposals only for the currently active event and never
+`firestore.rules:170-185`), schedule proposals only for the currently active event and never
 after staff lock it (`:191-219`), extension requests once and only before the admin letter
 exists (`:232-246`), a "needs correction" state that blocks submissions (`:259-271`),
 append-only logs (`:107-113`), and creation constraints that check open periods, active
@@ -461,7 +474,7 @@ the Magang/MKT Expo, since the seminar/defence events belong to programs not yet
 
 ### 5.2 Database-enforced uniqueness and archival re-application without a server
 Deterministic IDs + marker collection + numbered successor IDs validated by rules
-(`firestore.rules:298-312`, `:354-366`) give "one *open* application per program" while
+(`firestore.rules:303-317`, `:354-366`) give "one *open* application per program" while
 keeping closed applications as immutable archives (`:342-349`).
 
 ### 5.3 Version-aware QR verification of printed letters
@@ -549,12 +562,19 @@ exports.
 
 **Security / privacy**
 - `loginIndex` is publicly readable by ID, so a known NIM/NIP reveals the account's email
-  (`firestore.rules:404-408`).
+  (`firestore.rules:426-429`).
 - Temporary passwords use `Math.random`, not a cryptographic RNG (`functions/index.js:13-18`).
+- Session limits (§3.19): the idle timeout and "all tabs closed" are enforced only in the browser;
+  only the 12-hour maximum is also in the rules. Cloud Functions callables do not check
+  `auth_time`, so an older token could still call them until it expires (at most one hour after
+  its last refresh) **[INFERRED]**. A browser that restores tabs on restart keeps the session,
+  since restored tabs carry their `sessionStorage`. When the rules are first deployed, sessions
+  older than 12 hours lose access immediately, and every user is signed out once when first
+  opening the new app version.
 - The PDF converter is unauthenticated; CORS restricts browsers, not other clients
   (`converter-service/server.js:16-22`). Abuse/cost exposure **[INFERRED]**.
 - Storage rules' `isAdmin()` checks only the role claim, not the `isActive` flag that
-  Firestore rules check (`storage.rules:13` vs `firestore.rules:20-23`), so a deactivated
+  Firestore rules check (`storage.rules:17` vs `firestore.rules:25-28`), so a deactivated
   admin keeps Storage access while the claim persists **[INFERRED consequence]**.
 - The restriction of the Firebase domains to super admin/test accounts is client-side only,
   as the code states (`src/utils/domainAccess.js:1-4`).
@@ -563,7 +583,7 @@ exports.
 **Consistency / concurrency**
 - Application documents are written whole with `setDoc`; there is no version check, so two
   admins (or admin + student) editing one record concurrently is last-writer-wins
-  **[INFERRED from `App.jsx:64-74`]**. Only the number registry uses a transaction.
+  **[INFERRED from `App.jsx:66-76`]**. Only the number registry uses a transaction.
 - Workflow logic is duplicated between `helpers.js` and `firestore.rules` and kept in sync by
   hand.
 - Some time checks rely on the client clock: number month validation uses the admin's device
@@ -645,6 +665,7 @@ exports.
 | File | Implements |
 |---|---|
 | `src/utils/auth.js` | NIM/NIP login via `loginIndex`, registration with rollback, password change, callable wrappers |
+| `src/utils/sesi.js`, `src/components/PeringatanSesi.jsx` | Session limits: last-tab check, shared idle timer per role, 12-hour maximum, one-minute warning |
 | `functions/index.js:40-437` | Claims, registration, admin/lecturer creation, resets, super admin, deletes, NIM change, audit log |
 | `functions/migrate.js` | One-off migration to Firebase Auth |
 | `src/pages/Login.jsx`, `src/pages/portal/AkunForm.jsx`, `src/pages/pengaturan/SeksiAkun.jsx`, `SeksiStaf.jsx` | Account UIs |
@@ -806,3 +827,14 @@ always describe the current system; this list is the only place for history.
   limitations, trigger lag/drift, deploy prerequisites), §8 (file map). Deployed and checked live
   the same day: 125 KP records paged correctly, in the same entry order as the per-period views;
   the graduate summary is deployed but untested with non-zero data (no graduated records yet).
+
+### 2026-10-22 (2)
+- **What:** Login sessions are now bounded. One login is shared by all tabs and ends when the
+  last app tab closes, after a role-specific idle period (admin 30 min, lecturer 60, student
+  120), or 12 hours after sign-in; a one-minute warning precedes the timed endings and the login
+  page states the reason. The "Ingat saya" option was removed. `isSignedIn()` in
+  `firestore.rules` and `storage.rules` now rejects tokens older than 12 hours.
+- **Why:** Sessions previously never expired (users stayed signed in into the next day), which
+  matters on shared office computers holding all students' data.
+- **Affects:** §3.19 (new decision), §7 (security limitations), §8 (file map). Verified in the
+  browser with shortened limits; the rules change is not yet deployed.

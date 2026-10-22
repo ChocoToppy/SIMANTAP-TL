@@ -2,7 +2,11 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
-    function isSignedIn() { return request.auth != null; }
+    // Sama dengan isSignedIn() di firestore.rules: login berlaku 12 jam sejak masuk.
+    function isSignedIn() {
+      return request.auth != null
+        && request.time.toMillis() < (request.auth.token.auth_time + 43200) * 1000;
+    }
     function role() { return request.auth.token.role; }
     function mhsDoc(mahasiswaId) {
       return firestore.get(/databases/(default)/documents/mahasiswa/$(mahasiswaId)).data;

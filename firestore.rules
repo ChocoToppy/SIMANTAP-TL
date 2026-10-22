@@ -12,7 +12,12 @@ service cloud.firestore {
     // yang dibaca (mis. get(akun/$(resource.data.owner)) DILARANG di sini).
     // Query dari klien WAJIB disertai where() yang cocok (lihat App.jsx).
 
-    function isSignedIn() { return request.auth != null; }
+    // Login berlaku 12 jam sejak masuk (auth_time, detik); sama dengan BATAS_SESI di
+    // src/utils/sesi.js, yang mengeluarkan pengguna di sisi aplikasi sebelum batas ini.
+    function isSignedIn() {
+      return request.auth != null
+        && request.time.toMillis() < (request.auth.token.auth_time + 43200) * 1000;
+    }
     function role() { return request.auth.token.role; }
     function lecturerKode() { return request.auth.token.kode; }
     function studentNim() { return request.auth.token.nim; }

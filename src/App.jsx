@@ -26,6 +26,8 @@ import { akhiriNomorTerhapus } from './utils/nomorSuratDb.js';
 import { useJadwalRuang, useSinkronProgram } from './modules/ruang';
 import { useMahasiswaAdmin, catatPeriode, isiDaftarPeriode } from './utils/useMahasiswaAdmin.js';
 import { useRute, pindah, ganti, ubahParam } from './utils/rute.js';
+import { useBatasSesi, hapusAlasanKeluar } from './utils/sesi.js';
+import { PeringatanSesi } from './components/PeringatanSesi.jsx';
 
 // Program yang terbuka saat tabel Mahasiswa dibuka tanpa ?program= (atau dengan kode tak dikenal).
 const PROGRAM_AWAL_MAHASISWA = 'KP';
@@ -163,6 +165,7 @@ export default function App() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
       setAuthUser(user || null);
+      if (user) hapusAlasanKeluar();
       if (!user) { setClaims(null); return; }
       try {
         setClaims(await readClaims(user));
@@ -173,6 +176,10 @@ export default function App() {
     });
     return () => unsub();
   }, []);
+  // Keluar otomatis karena diam / batas 12 jam (utils/sesi.js); peringatannya ikut di setiap layar login.
+  const peringatanSesi = useBatasSesi(authUser || null, claims?.role);
+  const dgnSesi = (layar) => <>{layar}<PeringatanSesi peringatan={peringatanSesi} role={claims?.role} /></>;
+
   // Dipanggil setelah aksi yang mengubah custom claim milik akun sendiri
   // (mis. NIM berubah lewat studentUpdateProfile) supaya UI langsung memakai
   // NIM baru tanpa perlu logout/login ulang.
@@ -565,7 +572,7 @@ export default function App() {
   const profilRefPath = profilAkun ? ['akun', profilAkun.nim] : profilDosen ? ['dosen', profilDosen.kode] : profilAdmin ? ['admin', profilAdmin.uid] : null;
 
   if (profil && profilRefPath && profil.mustChangePassword) {
-    return (
+    return dgnSesi(
       <GantiPasswordWajib
         onLogout={keluar}
         onSelesai={(passwordBaru) => changeOwnPassword(passwordBaru, doc(db, ...profilRefPath))}
@@ -577,7 +584,7 @@ export default function App() {
   if (claims.role === 'lecturer') {
     const ds = profilDosen;
     if (!ds) return <Muat onLogout={keluar}>Memuat profil dosen…</Muat>;
-    return (
+    return dgnSesi(
       <DosenPortal
         dosen={ds}
         allDosen={data.dosen}
@@ -597,7 +604,7 @@ export default function App() {
     // Alamat sendiri (/panduan), sama pola dengan /pengaturan di bawah —
     // supaya bisa dibuka langsung/dibagikan, bukan cuma dropdown di header.
     if (route === '/panduan') {
-      return (
+      return dgnSesi(
         <PanduanPage
           nama={namaMhs}
           nim={nim}
@@ -607,7 +614,7 @@ export default function App() {
         />
       );
     }
-    return (
+    return dgnSesi(
       <Portal
         nim={nim}
         nama={namaMhs}
@@ -640,7 +647,7 @@ export default function App() {
 
   // ----- Halaman Pengaturan (admin) — alamat terpisah (/pengaturan), bukan tab -----
   if (route === '/pengaturan' || route.startsWith('/pengaturan/')) {
-    return (
+    return dgnSesi(
       <div className="app">
         <header className="topbar">
           <div className="topbar-left">
@@ -707,7 +714,7 @@ export default function App() {
     ...(FITUR_RUANG ? [{ key: 'ruang', label: 'Penggunaan Ruang' }] : []),
   ];
 
-  return (
+  return dgnSesi(
     <div className="app-root">
       <div className="mobile-bar">
         <div className="mobile-bar-left">

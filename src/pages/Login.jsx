@@ -3,6 +3,12 @@ import { ThemeToggle, TextSizeToggle, PasswordField } from '../components/ui.jsx
 import { loginWithIdentifier, registerStudent, sendReset } from '../utils/auth.js';
 import logoTl from '../assets/logo-tl.png';
 import { diDomainTerbatas, URL_DOMAIN_UTAMA, KUNCI_DITOLAK } from '../utils/domainAccess.js';
+import { alasanKeluar } from '../utils/sesi.js';
+
+const PESAN_KELUAR = {
+  diam: 'Anda keluar otomatis karena tidak ada aktivitas. Silakan masuk lagi.',
+  batas: 'Sesi login dibatasi 12 jam, jadi Anda keluar otomatis. Silakan masuk lagi.',
+};
 
 // ===================== Login.jsx =====================
 // Login.jsx — layar masuk: pilih peran, lalu masuk/daftar. Sejak migrasi ke
@@ -44,6 +50,9 @@ export function Login({ pengumuman = [], periodeAktif = '' }) {
             ? <>Akun Anda tidak dapat masuk lewat alamat ini. Silakan masuk melalui <a href={URL_DOMAIN_UTAMA}>simantaptlundip.com</a>.</>
             : <>Alamat ini dikhususkan untuk administrator. Mahasiswa dan dosen, silakan masuk melalui <a href={URL_DOMAIN_UTAMA}>simantaptlundip.com</a>.</>}
         </div>
+      )}
+      {PESAN_KELUAR[alasanKeluar()] && (
+        <div className="callout callout-amber" role="status" style={{ marginBottom: 16 }}>{PESAN_KELUAR[alasanKeluar()]}</div>
       )}
       {periodeAktif && (
         <div className="periode-aktif-banner">Periode saat ini: <strong>{periodeAktif}</strong></div>
@@ -137,7 +146,6 @@ function FormMahasiswaLogin({ onBack }) {
   const [nama, setNama] = useState('');
   const [email, setEmail] = useState('');
   const [konfirmasi, setKonfirmasi] = useState('');
-  const [ingat, setIngat] = useState(false);
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -146,7 +154,7 @@ function FormMahasiswaLogin({ onBack }) {
     if (!nim.trim() || !password) { setErr('NIM dan password wajib diisi.'); return; }
     setLoading(true);
     try {
-      await loginWithIdentifier('mahasiswa', nim, password, ingat);
+      await loginWithIdentifier('mahasiswa', nim, password);
     } catch (e) {
       setErr(pesanErrorAuth(e));
     } finally {
@@ -193,10 +201,6 @@ function FormMahasiswaLogin({ onBack }) {
         <label className="field"><span className="field-label">Konfirmasi password</span>
           <PasswordField value={konfirmasi} onChange={(e) => setKonfirmasi(e.target.value)} /></label>
       )}
-      {sub === 'masuk' && (
-        <label className="check"><input type="checkbox" checked={ingat} onChange={(e) => setIngat(e.target.checked)} /><span>Ingat saya</span></label>
-      )}
-
       {err && <div className="login-err">{err}</div>}
 
       {sub === 'masuk'
@@ -211,7 +215,6 @@ function FormMahasiswaLogin({ onBack }) {
 function FormDosenLogin({ onBack }) {
   const [nip, setNip] = useState('');
   const [password, setPassword] = useState('');
-  const [ingat, setIngat] = useState(false);
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -221,7 +224,7 @@ function FormDosenLogin({ onBack }) {
     if (!target || !password) { setErr('NIP dan password wajib diisi.'); return; }
     setLoading(true);
     try {
-      await loginWithIdentifier('dosen', target, password, ingat);
+      await loginWithIdentifier('dosen', target, password);
     } catch (e) {
       setErr(pesanErrorAuth(e));
     } finally {
@@ -236,7 +239,6 @@ function FormDosenLogin({ onBack }) {
       <label className="field"><span className="field-label">Password</span>
         <PasswordField value={password} onChange={(e) => setPassword(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') masuk(); }} /></label>
-      <label className="check"><input type="checkbox" checked={ingat} onChange={(e) => setIngat(e.target.checked)} /><span>Ingat saya</span></label>
       {err && <div className="login-err">{err}</div>}
       <button className="btn btn-primary block" onClick={masuk} disabled={loading}>{loading ? 'Memproses…' : 'Masuk sebagai dosen'}</button>
       <LupaPassword tipe="dosen" />
@@ -248,7 +250,6 @@ function FormDosenLogin({ onBack }) {
 function FormAdminLogin({ onBack }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [ingat, setIngat] = useState(false);
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -257,7 +258,7 @@ function FormAdminLogin({ onBack }) {
     if (!email.trim() || !password) { setErr('Email dan password wajib diisi.'); return; }
     setLoading(true);
     try {
-      await loginWithIdentifier('admin', email, password, ingat);
+      await loginWithIdentifier('admin', email, password);
     } catch (e) {
       setErr(pesanErrorAuth(e));
     } finally {
@@ -272,7 +273,6 @@ function FormAdminLogin({ onBack }) {
       <label className="field"><span className="field-label">Password admin</span>
         <PasswordField value={password} onChange={(e) => setPassword(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') masuk(); }} /></label>
-      <label className="check"><input type="checkbox" checked={ingat} onChange={(e) => setIngat(e.target.checked)} /><span>Ingat saya</span></label>
       {err && <div className="login-err">{err}</div>}
       <button className="btn btn-primary block" onClick={masuk} disabled={loading}>{loading ? 'Memproses…' : 'Masuk sebagai admin'}</button>
       <button className="btn ghost block" onClick={onBack}>Kembali</button>

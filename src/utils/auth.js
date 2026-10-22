@@ -6,7 +6,7 @@
 import {
   signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut,
   sendPasswordResetEmail, updatePassword, getIdTokenResult,
-  setPersistence, browserLocalPersistence, browserSessionPersistence,
+  setPersistence, browserLocalPersistence,
   reauthenticateWithCredential, EmailAuthProvider,
 } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
@@ -23,12 +23,12 @@ async function resolveEmail(identifier) {
 }
 
 // tipe: 'mahasiswa' (NIM) | 'dosen' (NIP) | 'admin' (email langsung)
-// remember: true → sesi login bertahan lintas restart browser (localStorage);
-// false (default) → sesi hilang begitu tab/browser ditutup (sessionStorage).
-export async function loginWithIdentifier(tipe, identifier, password, remember = false) {
+// Login selalu disimpan di localStorage (satu login untuk semua tab); kapan sesi berakhir
+// diatur utils/sesi.js (semua tab ditutup, batas diam per peran, 12 jam).
+export async function loginWithIdentifier(tipe, identifier, password) {
   const email = tipe === 'admin' ? identifier.trim() : await resolveEmail(identifier);
   if (!email) throw new Error('NOT_FOUND');
-  await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
+  await setPersistence(auth, browserLocalPersistence);
   await signInWithEmailAndPassword(auth, email, password);
 }
 

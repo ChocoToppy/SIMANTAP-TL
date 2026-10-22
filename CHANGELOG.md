@@ -1,5 +1,12 @@
 # Changelog
 
+## 22-10-2026 (2) — Batas sesi login
+- Satu login berlaku untuk semua tab, dan berakhir bila: semua tab SIMANTAP ditutup (dicek saat tab baru dibuka; reload dan tab yang dipulihkan browser tidak dihitung), tidak ada aktivitas di tab mana pun selama 30 menit (admin), 60 menit (dosen) atau 2 jam (mahasiswa), atau 12 jam sejak login (`utils/sesi.js`).
+- Satu menit sebelum keluar otomatis muncul peringatan dengan hitung mundur: "Tetap masuk" atau aktivitas apa pun memperpanjang batas diam; batas 12 jam tidak bisa diperpanjang. Halaman login menyebut alasannya. Perubahan yang belum disimpan hilang bila waktu habis.
+- Pilihan "Ingat saya" dihapus dari ketiga form login.
+- `firestore.rules` & `storage.rules`: `isSignedIn()` menolak login yang lebih dari 12 jam (`auth_time`), jadi batas ini tidak bisa dilewati dari klien. Batas diam dan "semua tab ditutup" hanya di aplikasi.
+- Setelah versi ini dibuka pertama kali, semua pengguna perlu login sekali lagi.
+
 ## 22-10-2026 — "Semua periode" sebagai arsip per halaman
 - "Semua periode" tidak lagi memuat seluruh data mahasiswa. Tabel Mahasiswa-nya diambil per halaman dari Firestore (`useArsipMahasiswa.js`): urutan bawaan = urut masuk, terlama dulu; kolom No. = posisi baris di hasil saat ini (lanjut antar halaman); tombol « ‹ › dan "x–y dari N"; refresh kembali ke halaman 1.
 - Di arsip: cari = awalan nama atau NIM (cari di tengah kata tetap ada di tampilan per periode), urutan hanya No., Mahasiswa, Tahap & jadwal, Deadline. Filter deadline (mendekati/lewat) tidak bisa digabung dengan pencarian. Ekspor dari arsip mengambil semua baris yang cocok saat tombol ditekan.
