@@ -56,9 +56,13 @@ service cloud.firestore {
     }
     // Isi m.pendaftaran yang ada di form (lihat META di utils/formPendaftaran.js).
     function fieldPendaftaran() {
-      return ['syaratSKS', 'ipk', 'statusKP', 'terdaftarKRS', 'sudahUGB', 'namaPersetujuanDosen',
-              'berkasLink', 'nomorWA', 'semester', 'sksIpk', 'tempatKP', 'instansi', 'alamatWA'];
+      // syaratSKS sengaja tidak ada: dicentang admin (modal admin, tab Pendaftaran).
+      return ['ipk', 'statusKP', 'terdaftarKRS', 'sudahUGB', 'namaPersetujuanDosen',
+              'berkasLink', 'nomorWA', 'semester', 'sksIpk', 'tempatKP', 'instansi', 'alamatWA',
+              'jenisTA', 'totalSks', 'toefl'];
     }
+    // Jenis TA: '' (belum/bukan TA), 'reguler', atau 'proyek'.
+    function jenisTASah(pend) { return pend.get('jenisTA', '') in ['', 'reguler', 'proyek']; }
     // Semua field yang boleh disentuh mahasiswa pada dokumen yang sudah ada.
     // owner/nim/program sengaja tidak ada (tidak boleh berubah).
     function fieldMahasiswa() {
@@ -145,9 +149,10 @@ service cloud.firestore {
         && sbFinalAman(a, b)
         && (!k.hasAny(['jenisMagang']) || a.jenisMagang in ['Magang', 'MKT'])
         && (!k.hasAny(['periode']) || periodeBuka(a.periode))
-        && (!k.hasAny(['angkatan']) || angkatanAktif(a.angkatan))
+        && (!k.hasAny(['angkatan']) || (a.get('angkatan', '') != '' && angkatanAktif(a.angkatan)))
         && (!k.hasAny(['dosenWali']) || dosenAktif(a.dosenWali))
         && kp.hasOnly(fieldPendaftaran())
+        && (!kp.hasAny(['jenisTA']) || jenisTASah(a.pendaftaran))
         && (!kp.hasAny(['namaPersetujuanDosen']) || dosenAktif(a.pendaftaran.namaPersetujuanDosen));
     }
     // Verifikasi: mahasiswa hanya bisa mengembalikan ke 'baru' (edit pendaftaran),
@@ -164,7 +169,8 @@ service cloud.firestore {
     }
     // Tahap hanya bisa digeser mahasiswa lewat unggahan (uploadDokumenKP di
     // Portal.jsx): Pendaftaran → Bimbingan saat KP/Magang mengunggah surat
-    // balasan, KP Bimbingan → Pembukuan saat mengunggah lembar pengesahan, dan
+    // balasan, TA Pendaftaran → Bimbingan saat berkas Pendaftaran terakhir
+    // terunggah, KP Bimbingan → Pembukuan saat mengunggah lembar pengesahan, dan
     // Bimbingan → Pendaftaran saat menghapus surat balasan (hapusDokumenKP).
     function tahapMhsAman(a, b) {
       let kKP = a.get('dokumenKP', {}).diff(b.get('dokumenKP', {})).affectedKeys();
@@ -176,7 +182,16 @@ service cloud.firestore {
         || (b.program == 'KP' && b.get('tahap', '') == 'Bimbingan' && a.get('tahap', '') == 'Pembukuan'
             && kKP.hasAny(['lembarPengesahanKP']) && 'lembarPengesahanKP' in a.get('dokumenKP', {}))
         || (b.get('tahap', '') == 'Bimbingan' && a.get('tahap', '') == 'Pendaftaran'
-            && sbDihapus(a, b) && !adaSB(a));
+            && sbDihapus(a, b) && !adaSB(a))
+        || (b.program == 'TA' && b.get('tahap', '') == 'Pendaftaran' && a.get('tahap', '') == 'Bimbingan'
+            && a.get('dokumenTA', {}).diff(b.get('dokumenTA', {})).affectedKeys().hasAny(unggahanPendaftaranTA(a))
+            && a.get('dokumenTA', {}).keys().hasAll(unggahanPendaftaranTA(a)));
+    }
+    // = unggahanPendaftaranTA di helpers.js: Persetujuan Proyek Dosen untuk TA
+    // jenis proyek dosen, Persetujuan UGB untuk reguler.
+    function unggahanPendaftaranTA(m) {
+      return ['kelayakanTA', 'lembarPengesahanProposalTA',
+        m.get('pendaftaran', {}).get('jenisTA', '') == 'proyek' ? 'persetujuanProyekDosenTA' : 'persetujuanUgbTA'];
     }
     // Berkas: hanya ke field program ini, bukan berkas admin, dan menambah/mengganti
     // hanya setelah pengajuan diverifikasi (syarat eligible di helpers.js).
@@ -326,9 +341,10 @@ service cloud.firestore {
         && d.get('jadwal', {}).size() == 0
         && d.get('aktivitas', []).size() == 1
         && d.get('pendaftaran', {}).keys().hasOnly(fieldPendaftaran())
+        && jenisTASah(d.get('pendaftaran', {}))
         && d.get('jenisMagang', 'Magang') in ['Magang', 'MKT']
         && periodeBuka(d.periode)
-        && angkatanAktif(d.get('angkatan', ''))
+        && d.get('angkatan', '') != '' && angkatanAktif(d.get('angkatan', ''))
         && dosenAktif(d.get('dosenWali', ''))
         && dosenAktif(d.get('pendaftaran', {}).get('namaPersetujuanDosen', ''))
         && (d.program in ['KP', 'MG'] || tanggalOtomatis(d));
@@ -455,6 +471,17 @@ service cloud.firestore {
     // catatPerubahanDataSurat, dibaca verifikasiSuratPublik. Klien tidak menyentuhnya.
     match /dataSuratDiubah/{id} {
       allow read, write: if false;
+    }
+
+    // ----- Tabel arsip "Semua periode" & angka lulus untuk Dashboard/Dosen: ditulis trigger
+    // jagaIndeksArsip (functions/indeksArsip.js), hanya dibaca admin. -----
+    match /indeksMahasiswa/{id} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    match /statistik/{id} {
+      allow read: if isAdmin();
+      allow write: if false;
     }
 
     // ----- Daftar angkatan yang bisa dipilih saat pendaftaran (arsip, bukan

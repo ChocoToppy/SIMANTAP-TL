@@ -3,8 +3,8 @@ import { semuaKpTema, semuaBidang } from '../../utils/pilihan.js';
 import { TeksLive } from './TeksLive.jsx';
 
 // ===================== OpsiTemaEditor.jsx =====================
-// Editor pilihan dropdown Tema KP/Magang (jenis 'kpTema') atau Bidang
-// TA/Capstone/S2 (jenis 'bidang'), dipakai di dalam kartu field "Tema / Bidang"
+// Editor pilihan dropdown Tema KP/Magang/TA (jenis 'kpTema') atau Bidang
+// Capstone/S2 (jenis 'bidang'; lihat pakaiTemaKP di utils/pilihan.js), dipakai di dalam kartu field "Tema / Bidang"
 // pada Pengaturan → Form Pendaftaran. Disimpan di config/global →
 // konten.pilihan (aturan bawaan, arsip & kode: lihat utils/pilihan.js).
 

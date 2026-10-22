@@ -475,3 +475,6 @@ const verifikasiSurat = require('./verifikasiSurat');
 exports.terbitkanVerifikasi = verifikasiSurat.terbitkanVerifikasi;
 exports.verifikasiSuratPublik = verifikasiSurat.verifikasiSuratPublik;
 exports.catatPerubahanDataSurat = verifikasiSurat.catatPerubahanDataSurat;
+
+// ----- Indeks tabel arsip & statistik lulus (lihat indeksArsip.js) -----
+exports.jagaIndeksArsip = require('./indeksArsip').jagaIndeksArsip;

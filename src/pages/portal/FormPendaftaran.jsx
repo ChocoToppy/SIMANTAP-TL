@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { buatId, idPengajuanBaru, todayISO, tambahHari, catatAktivitas, ringkasPerubahanPendaftaran, hitungPerubahanData, KLASIFIKASI, programLabel, dosenAktifUntuk, adaSuratBalasan } from '../../utils/helpers.js';
-import { kpTemaUntukPilihan, bidangUntukPilihan, adalahKodeKpTema } from '../../utils/pilihan.js';
+import { pilihanTemaBidang, pakaiTemaKP, adalahKodeKpTema } from '../../utils/pilihan.js';
 import { Field, KepalaForm } from '../../components/ui.jsx';
 import { META, BUTIR_SYARAT, MEDAN_SURAT_BALASAN, kunciProgram, gayaKP, urutanForm, medanForm, galatWajib } from '../../utils/formPendaftaran.js';
 import { PROGRAM_KEYS_PENDAFTARAN } from './shared.js';
@@ -26,7 +26,7 @@ export function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], a
       pembimbing1: '', pembimbing2: '', penguji1: '', penguji2: '',
       tahap: 'Pendaftaran', tanggalMulai: todayISO(), batasAkhir: tambahHari(todayISO(), 180),
       dibatalkan: false, catatan: '', jadwal: {}, verifikasi: 'baru',
-      pendaftaran: { syaratSKS: false, ipk: '', statusKP: '', terdaftarKRS: false, sudahUGB: false, namaPersetujuanDosen: '', berkasLink: '', nomorWA: '' },
+      pendaftaran: { ipk: '', statusKP: '', terdaftarKRS: false, sudahUGB: false, namaPersetujuanDosen: '', berkasLink: '', nomorWA: '' },
     }
   );
   const set = (k, v) => setM((p) => ({ ...p, [k]: v }));
@@ -54,7 +54,7 @@ export function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], a
   function gantiProgram(prog) {
     setM((prev) => {
       const next = { ...prev, program: prog };
-      const kpStyle = prog === 'KP' || prog === 'MG';
+      const kpStyle = pakaiTemaKP(prog);
       // Tema KP (KP/Magang) dan Bidang (TA/Capstone/S2) memakai daftar kode
       // berbeda: pilihan yang tidak berlaku lagi dikosongkan, bukan diganti otomatis.
       const kpKode = adalahKodeKpTema(prev.bidang);
@@ -70,10 +70,14 @@ export function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], a
     // Dropdown tanpa nilai awal (lihat state awal) — wajib dipilih bila tampil di form.
     const tampil = (id) => urutan.includes(id);
     const belumDipilih = [
+      tampil('angkatan') && !m.angkatan && 'angkatan',
       tampil('jenis') && m.program === 'MG' && !m.jenisMagang && 'jenis',
       tampil('klasifikasi') && !m.klasifikasi && 'klasifikasi',
       tampil('bidang') && !m.bidang && 'bidang',
       tampil('syarat') && !p.statusKP && 'statusKP',
+      tampil('jenisTA') && !p.jenisTA && 'jenisTA',
+      // TA proyek dosen: dosen pengusulnya wajib (dicetak di Persetujuan Proyek Dosen).
+      tampil('jenisTA') && p.jenisTA === 'proyek' && !p.namaPersetujuanDosen && 'namaPersetujuanDosen',
     ].find(Boolean);
     if (belumDipilih) { setErr(`Pilih ${medan(belumDipilih).label} terlebih dahulu.`); return; }
     const galat = galatWajib(kunci, m, konten);
@@ -93,8 +97,14 @@ export function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], a
   function bungkus(id, kontrol) {
     const f = medan(id);
     return (
-      <Field key={id} label={<>{f.label}{f.wajib && <span className="req"> *</span>}</>} full={f.full}>
+      <Field key={id} label={<>{f.label}{(f.wajib || (id === 'namaPersetujuanDosen' && m.program === 'TA')) && <span className="req"> *</span>}</>} full={f.full}>
         {kontrol(f)}
+        {f.isi && (
+          <div className="hint" style={{ marginTop: 6 }}>
+            Berisi:
+            <ol style={{ margin: '4px 0 0', paddingLeft: 20 }}>{f.isi.map((x) => <li key={x}>{x}</li>)}</ol>
+          </div>
+        )}
         {f.hint && <div className="hint" style={{ marginTop: 6 }}>{f.hint}</div>}
       </Field>
     );
@@ -180,10 +190,24 @@ export function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], a
         return bungkus(id, () => (
           <select value={m.bidang || ''} onChange={(e) => set('bidang', e.target.value)}>
             <option value="" disabled>— pilih {gayaKP(kunci) ? 'tema' : 'bidang'} —</option>
-            {(gayaKP(kunci) ? kpTemaUntukPilihan(m.bidang) : bidangUntukPilihan(m.bidang)).map((t) => <option key={t.kode} value={t.kode}>{t.label}</option>)}
+            {pilihanTemaBidang(m.program, m.bidang).map((t) => <option key={t.kode} value={t.kode}>{t.label}</option>)}
+          </select>
+        ));
+      case 'jenisTA':
+        return bungkus(id, () => (
+          <select value={p.jenisTA || ''} onChange={(e) => setM((prev) => ({
+            ...prev,
+            // Reguler tidak memakai dosen pengusul proyek.
+            pendaftaran: { ...(prev.pendaftaran || {}), jenisTA: e.target.value, ...(e.target.value === 'proyek' ? {} : { namaPersetujuanDosen: '' }) },
+          }))}>
+            <option value="" disabled>— pilih jenis —</option>
+            <option value="reguler">Reguler (penelitian/skripsi)</option>
+            <option value="proyek">Proyek dosen</option>
           </select>
         ));
       case 'namaPersetujuanDosen':
+        // TA: hanya untuk jenis Proyek dosen, dan wajib (lihat submit).
+        if (m.program === 'TA' && p.jenisTA !== 'proyek' && !pratinjau) return null;
         return bungkus(id, () => (
           <select value={p.namaPersetujuanDosen || ''} onChange={(e) => setP('namaPersetujuanDosen', e.target.value)}>
             {opsiKosong}
@@ -213,13 +237,12 @@ export function FormPendaftaran({ awal, nim, nama, allDosen, periodeBuka = [], a
 
   function renderSyarat() {
     const t = medan('syarat');
-    const [sks, ipk, , krs, ugb] = BUTIR_SYARAT.map(medan);
+    const [ipk, , krs, ugb] = BUTIR_SYARAT.map(medan);
     const statusKP = medan('statusKP');
     return (
       <div key="syarat" className="sched field-full">
         <div className="sched-title">{t.label}</div>
-        <label className="check"><input type="checkbox" checked={!!p.syaratSKS} onChange={(e) => setP('syaratSKS', e.target.checked)} /><span>{sks.label}</span></label>
-        <div className="sched-grid" style={{ marginTop: 10 }}>
+        <div className="sched-grid">
           <Field label={ipk.label}><input value={p.ipk || ''} onChange={(e) => setP('ipk', e.target.value)} placeholder={ipk.placeholder} /></Field>
           <Field label={<>{statusKP.label}{statusKP.wajib && <span className="req"> *</span>}</>}>
             <select value={p.statusKP || ''} onChange={(e) => setP('statusKP', e.target.value)}>

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { SEMUA, filterByPeriode, hitungBebanRinci, aktivitasTerakhir, tanggalDibuat, kondisi, bidangLabel, programOf, programLabel, AKTIVITAS_LABEL, formatWaktu, jenisMagangOf } from '../utils/helpers.js';
+import { rolesFor, SEMUA, filterByPeriode, hitungBebanRinci, aktivitasTerakhir, tanggalDibuat, kondisi, bidangLabel, programOf, programLabel, AKTIVITAS_LABEL, formatWaktu, jenisMagangOf } from '../utils/helpers.js';
 import { Badge, StageBar, Empty, ColResizeHandle, TextSizeToggle, ThemeToggle, RolePill } from '../components/ui.jsx';
 import { generateDocument, getTemplateConfig } from '../utils/documentGenerator.js';
 import { useColumnWidths } from '../utils/useColumnWidths.js';
@@ -12,7 +12,12 @@ import logoTl from '../assets/logo-tl.png';
 function peranDosen(m, kode) {
   const r = [];
   if (m.pembimbing1 === kode || m.pembimbing2 === kode) r.push('Pembimbing');
-  if (m.penguji1 === kode || m.penguji2 === kode) r.push('Penguji');
+  // TA: Ketua (penguji 1) & Anggota (penguji 2) Penguji.
+  const roles = rolesFor(programOf(m));
+  const uji = [];
+  if (m.penguji1 === kode) uji.push(roles.penguji1Label || 'Penguji');
+  if (m.penguji2 === kode) uji.push(roles.penguji2Label || 'Penguji');
+  r.push(...new Set(uji));
   return r.join(' & ');
 }
 

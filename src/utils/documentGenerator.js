@@ -372,6 +372,25 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
 
     // Tugas Akhir — tata letak dulu; tag mengikuti "List of Tags.txt", isinya
     // belum dicocokkan ke tiap template.
+    case 'ST Pembimbing TA':
+      return {
+        template: 'TA/st-pembimbing-ta.docx',
+        filename: `ST_Pembimbing_TA_${m.nama}.docx`,
+        data: {
+          no_surat: m.nomorSurat || jEv.nomorST || "___/UN7.../2026",
+          nama_mhs: m.nama,
+          nim: m.nim,
+          judul_ta: m.judul,
+          tema_ta: bidangLabel(m.bidang),
+          mulai_ta: formatTanggal(m.tanggalMulai) || "-",
+          akhir_ta: formatTanggal(m.batasAkhir) || "-",
+          tgl_cetak,
+          nama_pembimbing: d1.nama || m.pembimbing1 || "-",
+          nip_pembimbing: d1.nip || "-",
+          ...wali,
+        }
+      };
+
     case 'Persetujuan UGB TA':
       return {
         template: 'TA/persetujuan-ugb.docx',
@@ -388,18 +407,39 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
         }
       };
 
-    case 'Persetujuan Dosbing TA': {
+    // TA jenis proyek dosen (pengganti Persetujuan UGB): ditandatangani dosen
+    // pengusul proyek yang dipilih mahasiswa di form pendaftaran.
+    case 'Persetujuan Proyek Dosen TA': {
+      const dp = dosenByKode[(m.pendaftaran || {}).namaPersetujuanDosen] || {};
       return {
-        template: 'TA/persetujuan-dosbing.docx',
-        filename: `Persetujuan_Dosbing_${m.nama}.docx`,
+        template: 'TA/persetujuan-proyek-dosen.docx',
+        filename: `Persetujuan_Proyek_Dosen_${m.nama}.docx`,
         data: {
           nama_mhs: m.nama,
           nim: m.nim,
           judul_ta: m.judul,
           tema_ta: bidangLabel(m.bidang),
           tgl_cetak,
-          nama_pembimbing: d1.nama || m.pembimbing1,
-          nip_pembimbing: d1.nip || "-",
+          nama_dosen_proyek: dp.nama || (m.pendaftaran || {}).namaPersetujuanDosen || "-",
+          nip_dosen_proyek: dp.nip || "-",
+          ...wali,
+        }
+      };
+    }
+
+    case 'Kelayakan TA': {
+      const pd = m.pendaftaran || {};
+      return {
+        template: 'TA/kelayakan-ta.docx',
+        filename: `Kelayakan_TA_${m.nama}.docx`,
+        data: {
+          nama_mhs: m.nama,
+          nim: m.nim,
+          judul_ta: m.judul,
+          ipk: pd.ipk || "-",
+          total_sks: pd.totalSks || "-",
+          hasil_toefl: pd.toefl || "-",
+          tgl_cetak,
           ...wali,
         }
       };

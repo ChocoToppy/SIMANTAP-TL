@@ -42,13 +42,13 @@ Terintegrasi — UNDIP" (`index.html:6`). An earlier sample announcement expande
 
 **What it manages.** The administrative lifecycle of supervised academic programs. Two are
 in production; three more are modeled in code but **not ready** (see "Maturity" below). Each
-program has its own stage sequence (`src/utils/helpers.js:11-63`):
+program has its own stage sequence (`src/utils/helpers.js:11-67`):
 
 - In production:
   - KP: Pendaftaran → Bimbingan → Pembukuan → Lulus
   - MG (Magang and its variant MKT): Pendaftaran → Bimbingan → Expo → Lulus
 - In development, not ready:
-  - TA: Pendaftaran → Seminar Proposal → Seminar Hasil → Sidang → Lulus
+  - TA: Pendaftaran → Bimbingan → Seminar Proposal → Seminar Hasil → Sidang → Lulus
   - CAP: Pendaftaran → Seminar Proposal → Expo → Lulus
   - S2: Pendaftaran → Penentuan Pembimbing → Seminar Proposal → Seminar Hasil → Sidang → Lulus
 
@@ -83,7 +83,7 @@ Signs in the code that TA, Capstone and S2 are unfinished:
 
 Caveat: the build scope only limits which programs a student can *register* for. Admin
 screens in the production build still show tabs and program options for all five programs
-(`src/pages/Mahasiswa.jsx:274`, `src/pages/mahasiswa/FormMahasiswaKP.jsx:86`), as the scope
+(`src/pages/Mahasiswa.jsx:309`, `src/pages/mahasiswa/FormMahasiswaKP.jsx:86`), as the scope
 comment says (`config.js:9-11`). For the paper, the evaluated system is KP + Magang/MKT; the
 other three programs are future work **[INFERRED framing, confirm with the authors]**.
 
@@ -148,7 +148,7 @@ other three programs are future work **[INFERRED framing, confirm with the autho
 |---|---|---|
 | SPA | React 18.3, Vite 5, no router library, no state library | `package.json`, `main.jsx`, `src/App.jsx` |
 | Auth | Firebase Auth + custom claims `{role, nim | kode, super}` | `src/utils/auth.js`, `functions/index.js` |
-| Database | Cloud Firestore, real-time listeners (`onSnapshot`) | `src/App.jsx:237-313` |
+| Database | Cloud Firestore, real-time listeners (`onSnapshot`) | `src/App.jsx:278-350`, `src/utils/useMahasiswaAdmin.js` |
 | Authorization / validation | Firestore & Storage Security Rules | `firestore.rules` (467 lines), `storage.rules` |
 | Server logic | Cloud Functions v1, Node 20 | `functions/index.js`, `functions/verifikasiSurat.js` |
 | File storage | Firebase Storage, PDF only, ≤25 MB | `src/utils/fileUpload.js`, `storage.rules` |
@@ -172,11 +172,13 @@ From `firestore.rules` and `src/App.jsx`:
 | `admin/{uid}` | admin profile | | functions only |
 | `loginIndex/{nim|nip|email}` | identifier → email | | functions only; public `get` |
 | `auditLog/*` | account actions | | functions only |
-| `config/global` | open periods, announcements, guides, admin-editable content/form text | | admin; public read |
+| `config/global` | open periods, every period ever used (`daftarPeriode`), announcements, guides, admin-editable content/form text | | admin; public read |
 | `angkatan/*` | cohort years (archived, never deleted) | | admin |
 | `nomorSurat/{year-seq}` | letter-number registry | never deleted | admin |
 | `verifikasiSurat/{token}` | QR verification records | | functions only, no client access |
 | `dataSuratDiubah/{applicationId}` | timestamp of last change to printed fields | | trigger only |
+| `indeksMahasiswa/{applicationId}` | queryable mirror of one application for the "Semua periode" archive table (program, periode, angkatan, bidang, tahap, deadline, NIM, lower-case name, entry date, status, verification, lecturer codes) | | trigger only; admin read |
+| `statistik/lulus` | counts of graduated, non-closed applications per program, per cohort, per lecturer × role field × program | | trigger + repair script; admin read |
 | `ruang`, `semesterRuang`, `booking` | room module | | admin; non-admins read only published |
 
 Uploads live at `uploads/{applicationId}/{docKey}/{timestamp}-{name}` in Storage; Firestore
@@ -184,21 +186,58 @@ holds only `{fileName, size, url, path, uploadedAt}` (`src/utils/fileUpload.js:1
 
 ### 2.3 Data flows
 
-**Reads.** Each role subscribes with queries that match the rules exactly: admins listen to
-whole collections; students to `where('owner','==', nim)`; lecturers to four queries
+**Reads.** Each role subscribes with queries that match the rules exactly: students to
+`where('owner','==', nim)`; lecturers to four queries
 (`pembimbing1|pembimbing2|penguji1|penguji2 == kode`) merged client-side
-(`src/App.jsx:237-270`). The client keeps no copy of application data in browser storage:
-state starts empty and fills from these listeners, and a leftover cache from earlier versions
-is deleted at startup (`src/App.jsx:42-45`). Browser storage holds only UI preferences (theme,
-text size, sidebar, hidden table columns). A fresh project is initialised with an empty
-`config/global` only; there is no sample data (`src/App.jsx:83-90`, `src/data/seed.js`).
+(`src/App.jsx:278-306`). Admins do not listen to the whole `mahasiswa` collection. By default
+they load every application not yet at Lulus, from any period (`where('tahap','!=','Lulus')`),
+plus every application in the two most recent periods (`where('periode','==', p)`), "recent" by chronological order of names like "Gasal 2026/2027" (`src/utils/helpers.js:258-269`); all
+listeners are merged by document id (`src/utils/useMahasiswaAdmin.js:10-20`, `:24-106`). Choosing
+an older period in the period selector adds a listener for that period, which stays until
+logout (`src/App.jsx:372-411`). "Semua periode" does not load the history: its student table
+is an archive read one page at a time from `indeksMahasiswa` (`limit` + `startAfter` cursor,
+`count()` for the total), after which only that page's application documents are fetched by id
+(`src/pages/mahasiswa/useArsipMahasiswa.js`). Its default order is entry date, oldest first, and
+No. is the row's position in the current result; search is a name/NIM prefix and sorting is
+limited to No./name/stage/deadline. Dashboard and lecturer workload under "Semua periode" count
+the loaded non-graduated applications and add graduated totals from `statistik/lulus`
+(`src/utils/ringkasLulus.js`, `src/App.jsx:392-407`). Both `indeksMahasiswa` and
+`statistik/lulus` are maintained by an `onWrite` trigger on `mahasiswa/{id}`
+(`functions/indeksArsip.js`). The default load therefore grows with active students plus about
+a year of intake, not with the full history. Grouping the student table by cohort still loads
+everything, because cohort numbering spans periods (`src/pages/Mahasiswa.jsx:102-107`). The list of periods for the selector is kept
+in `config/global.daftarPeriode`, filled once from existing data the first time an admin opens
+the app and extended when a period is opened or a record is saved with a new period
+(`useMahasiswaAdmin.js:110-123`, `src/App.jsx:196-201`). The letter-number registry view loads
+one calendar year at a time, the current year by default
+(`src/pages/pengaturan/SeksiNomorSurat.jsx:22-37`). Other admin collections (`akun`, `dosen`,
+`angkatan`) are still listened to in full. The client keeps no copy of application data in
+browser storage: state starts empty and fills from these listeners, and a leftover cache from
+earlier versions is deleted at startup (`src/App.jsx:52-55`). Browser storage holds only UI
+preferences (theme, text size, sidebar, hidden table columns). A fresh project is initialised
+with an empty `config/global` only; there is no sample data (`src/App.jsx:93-100`,
+`src/data/seed.js`).
+
+**Navigation state.** Admin view state lives in the URL, not in component state: the tab is the
+path (`/dashboard`, `/mahasiswa`, `/dosen`, `/ruang`, `/pengaturan/{section}`), and periode,
+program and the student table's search, filters, sort, grouping and page are query parameters
+(`src/utils/rute.js`, `src/App.jsx:214-251`, `src/pages/mahasiswa/useFilterMahasiswa.js`).
+Changing page, periode or program adds a browser history entry; typing, filtering, sorting and
+paging replace the current one. Periode and program are always written so a link keeps
+pointing at the same view after a newer period opens or the default program changes (all five
+program codes are valid in every build; unknown or lower-case codes are normalised); a link to
+an older period loads it like the selector does.
+Refresh and pasted links therefore restore the view. Leaving a settings editor with unsaved
+drafts through Back/Forward asks for confirmation and restores the URL if cancelled
+(`rute.js:44-70`). Student and lecturer portals keep their own component state, and the
+student edit form is not addressable by URL.
 
 **Writes.** The client computes the full next state of an application (workflow logic in
 `src/utils/helpers.js`) and writes the whole document with `setDoc`, after a 900 KB size guard
-(`src/App.jsx:54-63`). Firestore Security Rules then re-validate the *diff* between old and new
+(`src/App.jsx:64-74`). Firestore Security Rules then re-validate the *diff* between old and new
 document for non-admins (`firestore.rules:278-296`). Side effects on save: archive replaced
 schedules (`arsipkanJadwal`, `helpers.js:373`), delete orphaned Storage files
-(`orphanedUploadPaths`, `helpers.js:956`), maintain `slotPengajuan` (`App.jsx:352-377`).
+(`orphanedUploadPaths`, `helpers.js:956`), maintain `slotPengajuan` (`App.jsx:413-442`).
 
 **Letter generation.** Click "Unduh" → `getTemplateConfig(docType, record, lecturers)` picks a
 template and builds the tag payload (`documentGenerator.js:125`) → for QR letters, call
@@ -218,13 +257,13 @@ renders `VerifikasiSurat` outside the authenticated app → fetches
 | Choice | Rationale | Source |
 |---|---|---|
 | Firebase (BaaS) | Inherited from the predecessor; no dedicated backend server **[INFERRED]** that a small department team can avoid running servers | `migrate_firebase.mjs` |
-| Firestore per-entity collections | Single 1 MiB document caused data loss; per-doc writes only touch what changed | `CHANGELOG.md:336-340`, `App.jsx:46-51` |
+| Firestore per-entity collections | Single 1 MiB document caused data loss; per-doc writes only touch what changed | `CHANGELOG.md:336-340`, `App.jsx:57-62` |
 | Firebase Auth + custom claims | Replace plaintext/shared passwords; roles in token so the client cannot set its own role; `nim`/`kode` in token so rules for list queries need no per-document `get()` | `functions/index.js:88-92`, `firestore.rules:5-13` |
 | Security Rules as the validation layer | No API server; "what the UI cannot do, the database must reject" | `firestore.rules:38-50`, `CHANGELOG.md:176-178` |
 | Firebase Storage | Remove base64 files from documents | `CHANGELOG.md:342-346` |
 | Word templates + docxtemplater | Staff edit letter layouts in Word themselves; templates are the single source of truth; tags are the only coupling to code | `public/List of Tags.txt`, `documentGenerator.js:8-13` |
 | LibreOffice on Cloud Run | Convert the same `.docx` to PDF rather than maintain a second PDF layout; `libreoffice-writer` only to shrink image/cold start | `converter-service/Dockerfile:3-10` |
-| React without router/state libs | Small app; path-based routing by hand, Hosting rewrites all paths to `index.html` | `App.jsx:194-210` |
+| React without router/state libs | Small app (about five admin pages); a ~70-line hand-written router: path = page, query = view options, history entries only for page/periode/program changes. Firebase Hosting and `public/.htaccess` (cPanel) rewrite all paths to `index.html` | `src/utils/rute.js`, `App.jsx:214-251`, `firebase.json`, `public/.htaccess` |
 | SheetJS from CDN, lazily | Only needed for import/export **[INFERRED]** to keep bundle small | `exportUtils.js:71-80` |
 | Two static hosts | Production on the department's cPanel domain; Firebase Hosting for experimental build and Hosting-only features (rewrites) | `DEPLOY.md:1-7`, `DEPLOY.md:92-112` |
 
@@ -236,7 +275,7 @@ Each item lists the alternative that was tried or considered and why it lost.
 
 1. **Per-entity documents instead of one global document.** Alternative (the predecessor's
    design) hit the 1 MiB limit and lost data. Trade-off: one application = one document; a
-   student in two programs has two documents linked by `owner` (`App.jsx:224-228`). The old
+   student in two programs has two documents linked by `owner` (`App.jsx:265-269`). The old
    global document is left orphaned, not deleted (`CHANGELOG.md:340`).
 
 2. **Client-side business logic + declarative server-side re-validation.** The client builds
@@ -350,6 +389,26 @@ Each item lists the alternative that was tried or considered and why it lost.
 
 17. **Deployment via `scp` + `chmod`, not `rsync`.** Shared host has no rsync and no root
     (`DEPLOY.md:219-223`).
+18. **Windowed admin loading, with a server-paged archive only for "all periods".** Admin views compute every
+    statistic, filter and search in the browser over loaded records. Cursor pagination
+    (`limit`/`startAfter`) would have required server-side aggregates for the dashboard and
+    workload charts. Instead the default load is bounded by status and period: everything not
+    yet Lulus, plus the two latest periods in full, with older periods loaded on request
+    (`src/utils/useMahasiswaAdmin.js:6-10`). It works because nearly every view that needs
+    graduated records (workload "including graduates", graduates per cohort, the workload
+    mini-charts in the edit form) is already scoped to one period, and admin views open on the
+    latest period. Trade-off: cohort numbering spans all periods and still needs the full
+    load, and cross-record checks that assumed everything was in memory
+    now query Firestore directly (`src/pages/mahasiswa/usePengajuanMilik.js`, `src/App.jsx:475-486`).
+    The one view that would grow without bound, "Semua periode", is paged on the server instead:
+    a trigger-maintained mirror collection (`indeksMahasiswa`) is queried with cursors, and
+    graduated totals come from a trigger-maintained summary doc (`statistik/lulus`). The mirror is
+    a separate collection, not extra fields on the application, because clients write
+    applications whole and the rules check each changed field; a trigger write between a
+    student's read and save would make that save fail (`functions/indeksArsip.js:1-12`). Paging
+    the active set as well was rejected: Firestore has no substring search, every filter/sort
+    combination needs a composite index, and the active set is bounded by intake
+    **[INFERRED: no load measurements yet]**.
 
 ---
 
@@ -357,14 +416,14 @@ Each item lists the alternative that was tried or considered and why it lost.
 
 | Challenge | Solution | Where |
 |---|---|---|
-| Uploads vanished: global doc > 1 MiB, write failed, real-time sync reverted the optimistic update | Per-entity collections, files to Storage, 900 KB pre-write guard | `CHANGELOG.md:330-346`, `App.jsx:54-63` |
-| Firestore rules for list queries cannot depend on per-document lookups | Put `nim`/`kode` into custom claims; every client query mirrors a rule (`where(owner == nim)`) | `firestore.rules:5-13`, `functions/index.js:88-92`, `App.jsx:237-270` |
-| No OR query across 4 lecturer fields under rules | Four listeners merged and de-duplicated client-side | `App.jsx:251-270` |
+| Uploads vanished: global doc > 1 MiB, write failed, real-time sync reverted the optimistic update | Per-entity collections, files to Storage, 900 KB pre-write guard | `CHANGELOG.md:330-346`, `App.jsx:64-74` |
+| Firestore rules for list queries cannot depend on per-document lookups | Put `nim`/`kode` into custom claims; every client query mirrors a rule (`where(owner == nim)`) | `firestore.rules:5-13`, `functions/index.js:88-92`, `App.jsx:278-306` |
+| No OR query across 4 lecturer fields under rules | Four listeners merged and de-duplicated client-side | `App.jsx:287-306` |
 | Auth `onCreate` trigger fires late and overwrote admin/lecturer claims with `student` | Trigger skips users that already have a role claim | `functions/index.js:40-59` |
 | Failed profile creation left orphan Auth accounts | Delete the just-created Auth user on failure | `src/utils/auth.js:35-47` |
 | Bootstrap of first super admin (chicken-and-egg) | Any admin may claim it while none exists; path then locks | `functions/index.js:225-250` |
 | NIM change must keep ownership, claims and uniqueness consistent | Batch: move account doc, rewrite `owner/nim` on applications, rebuild `slotPengajuan`, then reset claims | `functions/index.js:347-437` |
-| Rule ordering on deletion (Storage rules read the Firestore doc; marker deletion requires doc already gone) | Delete Storage folder before the doc; delete marker after, checked with `existsAfter` | `App.jsx:378-401`, `firestore.rules:359-366` |
+| Rule ordering on deletion (Storage rules read the Firestore doc; marker deletion requires doc already gone) | Delete Storage folder before the doc; delete marker after, checked with `existsAfter` | `App.jsx:443-467`, `firestore.rules:359-366` |
 | Append-only activity logs in a rules language without loops | Compare prefix slice: new list longer and `new[0:old.size()] == old` | `firestore.rules:107-113` |
 | LibreOffice substituted fonts with different metrics, breaking letterhead tables | Install metric-compatible fonts (Liberation, Carlito, Caladea) in the image | `converter-service/Dockerfile:6-19` |
 | Cloud Run cold start delayed downloads | Ping converter and prefetch templates on page load; the print date is still computed at click time | `documentGenerator.js:77-97` |
@@ -438,7 +497,11 @@ Measurable properties could be reported (see §6).
 - Room module with explicit host boundary and public embed that strips personal data (§3.15–16).
 - Import of the university timetable with per-row status flags before commit
   (`jadwalKuliahRekap.js:11-19`).
-- Lecturer-workload views split by role and program (`CHANGELOG.md:126-130`). In production
+- Lecturer workload split into three roles (supervisor; examiner 1, the TA chair examiner;
+  examiner 2, the TA member examiner), each broken down by program, shown as a horizontal
+  stacked-bar chart or a table (`src/utils/helpers.js:225`, `src/pages/dosen/BebanDosen.jsx:29`).
+  Program colors were checked for colour-vision separation against the card surface in both
+  themes [INFERRED from the validation note in `styles.css`; no automated test]. In production
   only the supervisor view has data; examiners exist only in the programs not yet released.
 
 ---
@@ -500,7 +563,7 @@ exports.
 **Consistency / concurrency**
 - Application documents are written whole with `setDoc`; there is no version check, so two
   admins (or admin + student) editing one record concurrently is last-writer-wins
-  **[INFERRED from `App.jsx:54-63`]**. Only the number registry uses a transaction.
+  **[INFERRED from `App.jsx:64-74`]**. Only the number registry uses a transaction.
 - Workflow logic is duplicated between `helpers.js` and `firestore.rules` and kept in sync by
   hand.
 - Some time checks rely on the client clock: number month validation uses the admin's device
@@ -521,6 +584,27 @@ exports.
   fails with a message **[INFERRED from reading both paths, not run]**.
 - QR verification covers three KP letters only (`verifikasiSurat.js:24-28`); Magang/TA pending.
 - Program-schedule → room-booking sync covers Magang/MKT Expo only (`sinkronRuang.js:12-14`).
+  The sync deletes a program booking only when its student is loaded in the admin session;
+  bookings of deleted students are removed explicitly on delete
+  (`sinkronRuang.js:58-61`, `data/useJadwalRuang.js:63-68`).
+- Admin loading is bounded, not paginated (§3.18): closed (Ditutup) applications from old
+  periods still load by default, `akun`/`dosen` are still loaded whole, and the first admin
+  session after the change reads the whole `mahasiswa` collection once to fill
+  `daftarPeriode` (`useMahasiswaAdmin.js:116-123`). The nomor-surat duplicate checks in the edit
+  form that scan loaded records (`urutTerpakaiDiRecord`, `pemakaiNomorLain`) see only loaded
+  records; the registry transaction remains the authority (`nomorSuratDb.js:37-69`).
+- The "Semua periode" archive table is less capable than per-period views: name/NIM prefix
+  search only, four sort orders, a deadline filter that cannot combine with search, No. as row
+  position rather than a fixed number, and refresh returns to page 1. Each filter/sort
+  combination relies on the 76 composite indexes in `firestore.indexes.json` (index merging is
+  assumed for multi-filter queries); a combination without an index fails with a message
+  instead of results. Verified live on 2026-10-22 for: program alone; + status; + status and
+  cohort; + lecturer; + verification with deadline sort; name/NIM prefix search; status "lewat";
+  stage sort descending. Other combinations rely on the same merging **[INFERRED]**.
+- `indeksMahasiswa` and `statistik/lulus` are maintained by a trigger, so they lag writes by
+  seconds, and at-least-once trigger delivery can drift the counters; `migrate-indeks-arsip.js
+  --tulis` rebuilds both. Nothing works until the trigger, rules and indexes are deployed and
+  the script has run once.
 - "Surat Keterangan Selesai Pembukuan" has no template yet; it shows "template not available"
   (`helpers.js:670-677`).
 - `getTemplateConfig` references `TA/persetujuan-dosbing.docx` (`documentGenerator.js:393`),
@@ -549,6 +633,10 @@ exports.
 |---|---|
 | `main.jsx` | Entry; routes `/verifikasi/{token}` to the public page outside the app |
 | `src/App.jsx` | Auth session, role-based listeners, `writeDoc` guard, save/delete orchestration, `slotPengajuan` upkeep, domain gate |
+| `src/utils/useMahasiswaAdmin.js` | Admin's windowed `mahasiswa` listeners, on-demand periods, `daftarPeriode` upkeep |
+| `src/utils/rute.js`, `src/pages/mahasiswa/useFilterMahasiswa.js` | Hand-written router (path/query, push vs replace, Back guard); student-table view state in the query |
+| `src/pages/mahasiswa/useArsipMahasiswa.js`, `ArsipKontrol.jsx`, `src/utils/ringkasLulus.js` | "Semua periode" archive table (cursor paging over `indeksMahasiswa`), its notices/paging UI, graduated totals for Dashboard/Dosen |
+| `functions/indeksArsip.js`, `functions/migrate-indeks-arsip.js`, `firestore.indexes.json` | Trigger maintaining `indeksMahasiswa` + `statistik/lulus`, rebuild script, composite indexes |
 | `src/utils/firebase.js` | Firebase SDK init |
 | `src/utils/config.js`, `.env.prod`, `.env.full`, `vite.config.ts` | Build scopes (prod vs full), feature flags, two Vite entries |
 | `src/utils/domainAccess.js` | Soft restriction of Firebase domains |
@@ -650,3 +738,71 @@ always describe the current system; this list is the only place for history.
   `config/global` were ever deleted.
 - **Affects:** §1 (setting; seed citations removed), §2.3 (reads), §8 (file map); possibly §7 if
   the paper discusses privacy of client-side data.
+
+### 2026-10-20
+- **What:** TA gained a Bimbingan stage between Pendaftaran and Seminar Proposal. Uploading
+  the last required Pendaftaran document moves the student to Bimbingan and flags the entry
+  for staff, who assign the supervisor; the supervisor assignment letter (ST Pembimbing TA)
+  then becomes downloadable. The stage move is also enforced in `firestore.rules`
+  (`tahapMhsAman`). A Lembar Pengesahan Proposal TA slot was added (template pending). TA
+  examiner 1/2 are labelled Ketua/Anggota Penguji. The lecturer-workload page now separates
+  supervisor, examiner 1 and examiner 2, with a chart/table toggle.
+- **Why:** Department request to mirror the KP supervision step in TA and to see workload per
+  role.
+- **Affects:** §1 (TA stage list), §5.1 if TA is discussed as an example of rule-enforced
+  stage moves, §5.6 (workload views). TA is still not production-ready.
+
+### 2026-10-21
+- **What:** TA registration now records the TA type (regular research vs lecturer project),
+  and the required Pendaftaran documents depend on it: document entries carry an optional
+  per-student visibility predicate (`tampil` in `TA_DOKUMEN`), and both the client and
+  `firestore.rules` compute the required-upload set from the type before allowing the move to
+  Bimbingan. The supervisor-approval document was dropped (supervisors are assigned by staff
+  only), and the 120-credit check moved from a student self-declaration to a staff checkbox.
+- **Why:** Department process change for TA.
+- **Affects:** §5.1 if TA's rule-enforced stage move is used as an example (the required set is
+  now conditional); otherwise TA remains outside the production scope.
+
+### 2026-10-21 (2)
+- **What:** Admins no longer listen to the whole `mahasiswa` collection. The default load is
+  every application not yet at Lulus plus the two latest periods in full; picking an older
+  period or "Semua periode" loads it on request for the rest of the session. A persistent
+  `config/global.daftarPeriode` keeps old periods in the selector. The room-booking sync now
+  deletes bookings only for loaded students, and student/account deletion removes their
+  bookings and ends their letter numbers explicitly. The nomor-surat registry view loads one
+  year at a time (current year by default). Periods are now sorted chronologically, not alphabetically; alphabetical order put every Gasal before every Genap and made a test period the default.
+- **Why:** Planning for growth: the admin load grew with the full history of the department.
+  Chosen over server-side pagination because statistics and filters run client-side and are
+  almost all scoped to one period.
+- **Affects:** §2.1 (database row), §2.2 (`config/global`), §2.3 (reads), §3.18 (new
+  decision), §7 (limitations of bounded loading), §8 (file map). If the paper discusses
+  scalability, this is the current answer and has not been measured.
+
+### 2026-10-21 (3)
+- **What:** Admin view state moved into the URL with a small hand-written router
+  (`src/utils/rute.js`). Admin tabs are paths, settings sections are `/pengaturan/{section}`,
+  and periode, program and all student-table filters, sort, grouping and page are query
+  parameters. Page, periode and program changes add history entries; filter and paging changes
+  replace the current one. Switching tabs restores that tab's last parameters, and "Kembali"
+  from settings returns to the last admin tab. Student/lecturer portals and the edit form are
+  unchanged by design (one admin in practice, so per-record links were judged not worth it).
+- **Why:** Refresh reset the admin to the Dashboard and latest period, and Back left the app.
+  Also prepares the table filters to map onto server-side queries if pagination is ever needed.
+- **Affects:** §2.3 (new "Navigation state" paragraph), §2.4 (router row), §8 (file map).
+
+### 2026-10-22
+- **What:** "Semua periode" no longer loads the whole `mahasiswa` collection. Its student table
+  is a server-paged archive over a new trigger-maintained mirror collection `indeksMahasiswa`
+  (cursor paging, `count()`, name/NIM prefix search, four sort orders, default entry date oldest
+  first with No. = row position), and Dashboard/Dosen under "Semua periode" add graduated totals
+  from a trigger-maintained `statistik/lulus` doc to the loaded non-graduated applications. New
+  `onWrite` trigger `jagaIndeksArsip`, rebuild script `migrate-indeks-arsip.js`, admin-read-only
+  rules for both collections, and `firestore.indexes.json` (76 composite indexes). Saving or
+  deleting a record opened from the archive passes the archive's copy so slot, letter-number and
+  file cleanup still work when its period is not loaded.
+- **Why:** The full-history load behind "Semua periode" was the remaining admin load that grows
+  without bound after the windowed loading change.
+- **Affects:** §2.2 (two new collections), §2.3 (reads), §3.18 (revised decision), §7 (archive
+  limitations, trigger lag/drift, deploy prerequisites), §8 (file map). Deployed and checked live
+  the same day: 125 KP records paged correctly, in the same entry order as the per-period views;
+  the graduate summary is deployed but untested with non-zero data (no graduated records yet).

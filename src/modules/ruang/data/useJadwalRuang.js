@@ -60,6 +60,13 @@ export function useJadwalRuang(authUser, claims) {
       ...hapus.map((id) => (b) => b.delete(doc(db, 'booking', id))),
     ]),
 
+    // Mahasiswa dihapus: booking 'program' miliknya dihapus di sini, karena sinkron
+    // otomatis hanya menyentuh booking mahasiswa yang sedang dimuat.
+    hapusBookingMahasiswa: (ids) => jalankanBatch(
+      bookings.filter((x) => x.sumber === 'program' && x.ref && ids.includes(x.ref.mahasiswaId))
+        .map((x) => (b) => b.delete(doc(db, 'booking', x.id))),
+    ),
+
     // Hapus semester + seluruh booking-nya.
     hapusSemester: (semester) => jalankanBatch([
       ...bookings.filter((x) => x.semesterId === semester.id).map((x) => (b) => b.delete(doc(db, 'booking', x.id))),

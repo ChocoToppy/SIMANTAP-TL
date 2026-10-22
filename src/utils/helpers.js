@@ -11,7 +11,9 @@ export { BIDANG, KP_TEMA };
 export const PROGRAMS = {
   TA: {
     label: 'Tugas Akhir',
-    stages: ['Pendaftaran', 'Seminar Proposal', 'Seminar Hasil', 'Sidang', 'Lulus'],
+    // Bimbingan: admin menetapkan pembimbing + nomor surat, Surat Tugas Pembimbing
+    // terbit. Masuk otomatis begitu semua berkas Pendaftaran terunggah (Portal.jsx).
+    stages: ['Pendaftaran', 'Bimbingan', 'Seminar Proposal', 'Seminar Hasil', 'Sidang', 'Lulus'],
     events: ['Seminar Proposal', 'Seminar Hasil', 'Sidang'],
     klasifikasi: true,
     syarat: true,
@@ -19,6 +21,8 @@ export const PROGRAMS = {
     pembimbing: 1,
     penguji: 2,
     pembimbingLabel: 'Dosen Pembimbing',
+    penguji1Label: 'Ketua Penguji',
+    penguji2Label: 'Anggota Penguji',
   },
   KP: {
     label: 'Kerja Praktik',
@@ -94,7 +98,7 @@ export function punyaKlasifikasi(program) { return (PROGRAMS[program] || PROGRAM
 export function punyaSyarat(program) { return !!(PROGRAMS[program] || PROGRAMS.TA).syarat; }
 export function rolesFor(program) {
   const p = PROGRAMS[program] || PROGRAMS.TA;
-  return { pembimbing: p.pembimbing, penguji: p.penguji, pembimbingLabel: p.pembimbingLabel };
+  return { pembimbing: p.pembimbing, penguji: p.penguji, pembimbingLabel: p.pembimbingLabel, penguji1Label: p.penguji1Label, penguji2Label: p.penguji2Label };
 }
 export function syaratLabel(ev) {
   if (ev.includes('Sidang')) return 'Syarat Sidang';
@@ -169,16 +173,18 @@ export function indexTahap(tahap, program) {
 export function hitungBeban(mahasiswa, kodeDosen, opts = {}) {
   const { semua = false } = opts;
   let bimbingan = 0;
-  let penguji = 0;
+  let penguji1 = 0; // TA: Ketua Penguji
+  let penguji2 = 0; // TA: Anggota Penguji
   mahasiswa.forEach((m) => {
     if (m.dibatalkan) return;
     if (!semua && m.tahap === 'Lulus') return;
     if (m.pembimbing1 === kodeDosen) bimbingan++;
     if (m.pembimbing2 === kodeDosen) bimbingan++;
-    if (m.penguji1 === kodeDosen) penguji++;
-    if (m.penguji2 === kodeDosen) penguji++;
+    if (m.penguji1 === kodeDosen) penguji1++;
+    if (m.penguji2 === kodeDosen) penguji2++;
   });
-  return { bimbingan, penguji, total: bimbingan + penguji };
+  const penguji = penguji1 + penguji2;
+  return { bimbingan, penguji, penguji1, penguji2, total: bimbingan + penguji };
 }
 
 // Beban hanya untuk satu program tertentu.
@@ -208,6 +214,37 @@ export function hitungBebanRinci(mahasiswa, kodeDosen, opts) {
   };
 }
 
+// Beban dosen per PERAN (pembimbing / Ketua Penguji = penguji1 / Anggota
+// Penguji = penguji2), masing-masing dirinci per program — untuk halaman Dosen
+// (BebanDosen.jsx). Urutan program = urutan warna
+// grafik (program yang punya penguji di depan; lihat WARNA_PROGRAM_BEBAN).
+export const PROGRAM_BEBAN = {
+  pembimbing: ['TA', 'CAP', 'S2', 'KP', 'MG'],
+  penguji1: ['TA', 'CAP', 'S2'],
+  penguji2: ['TA', 'CAP', 'S2'],
+};
+const FIELD_PERAN = { pembimbing: ['pembimbing1', 'pembimbing2'], penguji1: ['penguji1'], penguji2: ['penguji2'] };
+export function hitungBebanPeran(mahasiswa, kodeDosen, opts = {}) {
+  const { semua = false } = opts;
+  const hasil = {};
+  Object.keys(PROGRAM_BEBAN).forEach((peran) => {
+    hasil[peran] = Object.fromEntries(PROGRAM_BEBAN[peran].map((p) => [p, 0]));
+    hasil[peran].total = 0;
+  });
+  mahasiswa.forEach((m) => {
+    if (m.dibatalkan) return;
+    if (!semua && m.tahap === 'Lulus') return;
+    const prog = programOf(m);
+    Object.entries(FIELD_PERAN).forEach(([peran, fields]) => {
+      if (!(prog in hasil[peran])) return;
+      const n = fields.filter((f) => m[f] === kodeDosen).length;
+      hasil[peran][prog] += n;
+      hasil[peran].total += n;
+    });
+  });
+  return hasil;
+}
+
 // ---------- Periode ----------
 export const SEMUA = 'SEMUA';
 export function filterByPeriode(mahasiswa, periode) {
@@ -216,7 +253,19 @@ export function filterByPeriode(mahasiswa, periode) {
 }
 export function daftarPeriode(mahasiswa) {
   const set = new Set(mahasiswa.map((m) => m.periode).filter(Boolean));
-  return Array.from(set).sort();
+  return urutPeriode(Array.from(set));
+}
+// Urut kronologis ("Gasal 2026/2027", "2021 Ganjil"): urut abjad menaruh semua Gasal
+// sebelum Genap. Nama tanpa tahun + Gasal/Ganjil/Genap (mis. periode uji) paling awal.
+export function kunciPeriode(p) {
+  const s = String(p || '');
+  const tahun = s.match(/\d{4}/);
+  const genap = /genap/i.test(s);
+  if (!tahun || (!genap && !/gasal|ganjil/i.test(s))) return -1;
+  return Number(tahun[0]) * 2 + (genap ? 1 : 0);
+}
+export function urutPeriode(list) {
+  return list.slice().sort((a, b) => (kunciPeriode(a) - kunciPeriode(b)) || String(a).localeCompare(String(b)));
 }
 // Dosen aktif untuk pilihan dropdown (pembimbing/penguji/wali), tapi tetap
 // sertakan dosen yang sedang terpasang di salah satu field (`current`) walau
@@ -309,7 +358,10 @@ export const LABEL_PENDAFTARAN = {
   statusKP: 'Status KP',
   terdaftarKRS: 'Terdaftar KRS TA',
   sudahUGB: 'Sudah UGB/Proposal',
-  namaPersetujuanDosen: 'Persetujuan projek dosen',
+  namaPersetujuanDosen: 'Dosen pengusul proyek',
+  jenisTA: 'Jenis TA',
+  totalSks: 'Total SKS',
+  toefl: 'Skor TOEFL',
   semester: 'Semester',
   sksIpk: 'Jumlah SKS / IPK',
   alamatWA: 'Alamat lengkap',
@@ -321,13 +373,15 @@ export const LABEL_PENDAFTARAN = {
 // Ubah objek pendaftaran menjadi daftar {label,nilai} untuk ditampilkan.
 export function ringkasPendaftaran(p) {
   if (!p) return [];
-  const lewati = ['berkasLink', 'submittedAt'];
+  // syaratSKS dicentang admin sendiri di tab Pendaftaran, bukan data dari mahasiswa.
+  const lewati = ['berkasLink', 'submittedAt', 'syaratSKS'];
   return Object.keys(p)
     .filter((k) => !lewati.includes(k) && p[k] !== '' && p[k] != null)
     .map((k) => {
       let nilai = p[k];
       if (typeof nilai === 'boolean') nilai = nilai ? 'Ya' : 'Tidak';
       if (k === 'namaPersetujuanDosen') nilai = String(nilai);
+      if (k === 'jenisTA') nilai = nilai === 'proyek' ? 'Proyek dosen' : 'Reguler';
       return { label: LABEL_PENDAFTARAN[k] || k, nilai: String(nilai) };
     });
 }
@@ -839,23 +893,42 @@ export const MKT_DOKUMEN = [
 // Dokumen per-tahap Tugas Akhir. Tata letaknya saja: label & syarat sudah
 // final, tapi isi tag template masih sementara. `event` = kegiatan yang jadwalnya
 // dipakai dokumen itu (TA punya 3 event, tidak seperti KP/Magang yang cuma satu).
-// docType null = belum ada template (kelayakan-ta) — tampil tanpa tombol unduh.
+// `tampil(m)` (opsional) = dokumen hanya ada untuk mahasiswa tertentu (lihat dokumenStatus).
 const jadwalFinal = (ev) => (m) => { const j = getJadwal(m, ev); return !!(j.dikonfirmasi && j.tanggal); };
+// Jenis TA dari form pendaftaran: 'proyek' (proyek dosen) atau 'reguler' (bawaan,
+// termasuk data lama yang belum punya jenis).
+export function jenisTAOf(m) { return ((m && m.pendaftaran) || {}).jenisTA === 'proyek' ? 'proyek' : 'reguler'; }
 export const TA_DOKUMEN = [
   {
     key: 'persetujuanUgbTA', stage: 'Pendaftaran', label: 'Persetujuan UGB', docType: 'Persetujuan UGB TA',
     syarat: 'Tersedia setelah pendaftaran diverifikasi admin. Unduh, tanda tangani, lalu unggah kembali.',
     eligible: pernahDiverifikasi,
+    tampil: (m) => jenisTAOf(m) === 'reguler',
   },
   {
-    key: 'persetujuanDosbingTA', stage: 'Pendaftaran', label: 'Persetujuan Dosen Pembimbing', docType: 'Persetujuan Dosbing TA',
+    key: 'persetujuanProyekDosenTA', stage: 'Pendaftaran', label: 'Persetujuan Proyek Dosen', docType: 'Persetujuan Proyek Dosen TA',
+    syarat: 'Tersedia setelah pendaftaran diverifikasi admin. Unduh, mintakan tanda tangan dosen pengusul, lalu unggah kembali.',
+    eligible: pernahDiverifikasi,
+    tampil: (m) => jenisTAOf(m) === 'proyek',
+  },
+  {
+    key: 'kelayakanTA', stage: 'Pendaftaran', label: 'Form Kelayakan TA', docType: 'Kelayakan TA',
     syarat: 'Tersedia setelah pendaftaran diverifikasi admin. Unduh, tanda tangani, lalu unggah kembali.',
     eligible: pernahDiverifikasi,
   },
   {
-    key: 'kelayakanTA', stage: 'Pendaftaran', label: 'Surat Kelayakan TA', docType: null,
+    // Template menyusul (lempeng-proposal-ta): sampai case-nya ada di
+    // getTemplateConfig, tampil "Template surat belum tersedia".
+    key: 'lembarPengesahanProposalTA', stage: 'Pendaftaran', label: 'Lembar Pengesahan Proposal TA', docType: 'Lembar Pengesahan Proposal TA',
     syarat: 'Tersedia setelah pendaftaran diverifikasi admin. Unduh, tanda tangani, lalu unggah kembali.',
     eligible: pernahDiverifikasi,
+  },
+  {
+    key: 'stPembimbingTA', stage: 'Bimbingan', label: 'Surat Tugas Pembimbing TA', docType: 'ST Pembimbing TA',
+    syarat: `Tersedia setelah semua berkas Pendaftaran diunggah dan admin menetapkan dosen pembimbing${FITUR_EKSPERIMENTAL ? ' serta nomor surat' : ''}.`,
+    eligible: (m) => tahapIndex('TA', m.tahap) >= tahapIndex('TA', 'Bimbingan') && pendaftaranTALengkap(m)
+      && !!m.pembimbing1 && (!FITUR_EKSPERIMENTAL || !!m.nomorSurat),
+    studentUpload: false,
   },
   {
     key: 'baSemproTA', stage: 'Seminar Proposal', label: 'Berita Acara Seminar Proposal', docType: 'BA Sempro TA', event: 'Seminar Proposal',
@@ -882,6 +955,19 @@ export const TA_DOKUMEN = [
 // Magang & MKT berbagi field Storage yang sama (dokumenMagang) — key-nya
 // sudah unik per jenis (mis. kelayakanMagang vs kelayakanMkt) jadi tidak
 // tabrakan meski disimpan di objek yang sama.
+// Berkas Pendaftaran TA yang wajib diunggah mahasiswa ini (bergantung jenis TA:
+// Persetujuan UGB vs Persetujuan Proyek Dosen). Semuanya terunggah = masuk
+// Bimbingan (uploadDokumenKP di Portal.jsx, tahapMhsAman di firestore.rules —
+// daftar key-nya harus sama) dan syarat Surat Tugas Pembimbing TA.
+export function unggahanPendaftaranTA(m) {
+  return TA_DOKUMEN
+    .filter((d) => d.stage === 'Pendaftaran' && d.studentUpload !== false && (!d.tampil || d.tampil(m)))
+    .map((d) => d.key);
+}
+export function pendaftaranTALengkap(m) {
+  return unggahanPendaftaranTA(m).every((k) => (m.dokumenTA || {})[k]);
+}
+
 const DOKUMEN_CONFIG = { KP: KP_DOKUMEN, MG: MAGANG_DOKUMEN, TA: TA_DOKUMEN };
 const DOKUMEN_FIELD = { KP: 'dokumenKP', MG: 'dokumenMagang', TA: 'dokumenTA' };
 // m opsional: kalau program === 'MG' dan m.jenisMagang === 'MKT', pakai
@@ -902,7 +988,7 @@ export function dokumenStatus(program, m, konten = {}) {
   if (!list) return [];
   const field = DOKUMEN_FIELD[program];
   const override = (konten && konten.dokumen) || {};
-  return list.map((d) => {
+  return list.filter((d) => !d.tampil || d.tampil(m)).map((d) => {
     const o = override[d.key] || {};
     return {
       ...d,
@@ -972,6 +1058,7 @@ export const AKTIVITAS_LABEL = {
   hapusBerkas: 'Menghapus dokumen',
   tahapBimbingan: 'Memasuki tahap Bimbingan (surat balasan perusahaan diterima)',
   tahapPembukuan: 'Memasuki tahap Pembukuan (lembar pengesahan diunggah)',
+  tahapBimbinganTA: 'Memasuki tahap Bimbingan (semua berkas pendaftaran TA diunggah)',
   kembaliPendaftaran: 'Kembali ke tahap Pendaftaran (surat balasan dihapus)',
   pembukuan: 'Mengirim tautan folder berkas final KP',
   perpanjanganMinta: 'Mengajukan perpanjangan',
@@ -988,6 +1075,7 @@ export const AKTIVITAS_WARNA = {
   hapusBerkas: 'red',
   tahapBimbingan: 'green',
   tahapPembukuan: 'green',
+  tahapBimbinganTA: 'green',
   kembaliPendaftaran: 'amber',
   pembukuan: 'blue',
   perpanjanganMinta: 'amber',
@@ -1005,6 +1093,7 @@ export const AKTIVITAS_LABEL_SINGKAT = {
   hapusBerkas: 'Hapus',
   tahapBimbingan: 'Bimbingan',
   tahapPembukuan: 'Pembukuan',
+  tahapBimbinganTA: 'Bimbingan',
   kembaliPendaftaran: 'Mundur',
   pembukuan: 'Folder',
   perpanjanganMinta: 'Perpanjangan',
@@ -1022,7 +1111,7 @@ const FIELD_LABEL_DETAIL_PENDAFTARAN = {
   semester: 'Semester', sksIpk: 'Jumlah SKS/IPK', tempatKP: 'Tempat/Perusahaan', instansi: 'Instansi',
   alamatWA: 'Alamat', nomorWA: 'Nomor WA', berkasLink: 'Link berkas', ipk: 'IPK',
   statusKP: 'Status Kerja Praktik', terdaftarKRS: 'Status KRS', sudahUGB: 'Status UGB/proposal',
-  namaPersetujuanDosen: 'Persetujuan dosen',
+  namaPersetujuanDosen: 'Dosen pengusul proyek', jenisTA: 'Jenis TA', totalSks: 'Total SKS', toefl: 'Skor TOEFL',
 };
 
 // Bandingkan data pendaftaran lama vs baru, kembalikan daftar label field yang

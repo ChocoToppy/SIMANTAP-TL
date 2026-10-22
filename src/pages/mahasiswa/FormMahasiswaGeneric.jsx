@@ -1,5 +1,5 @@
 import React from 'react';
-import { PROGRAM_KEYS, programLabel, punyaKlasifikasi, KLASIFIKASI, ringkasPendaftaran } from '../../utils/helpers.js';
+import { PROGRAM_KEYS, programLabel, punyaKlasifikasi, KLASIFIKASI, ringkasPendaftaran, punyaSyarat } from '../../utils/helpers.js';
 import { bidangUntukPilihan } from '../../utils/pilihan.js';
 import { Field, Modal } from '../../components/ui.jsx';
 import { LinkBerkasRow } from './LinkBerkasRow.jsx';
@@ -47,6 +47,13 @@ export function FormMahasiswaGeneric({
           <div style={{ marginTop: 10 }}>
             <LinkBerkasRow label="Link berkas pendaftaran" url={p.berkasLink} onUbah={(v) => setM((prev) => ({ ...prev, pendaftaran: { ...(prev.pendaftaran || {}), berkasLink: v } }))} diperiksa={p.berkasDiperiksa} onDiperiksa={(v) => setM((prev) => ({ ...prev, pendaftaran: { ...(prev.pendaftaran || {}), berkasDiperiksa: v } }))} />
           </div>
+          {/* Syarat SKS diperiksa admin dari tautan berkas (tidak lagi dicentang mahasiswa). */}
+          {punyaSyarat(m.program) && (
+            <label className="check" style={{ marginTop: 10 }}>
+              <input type="checkbox" checked={!!p.syaratSKS} onChange={(e) => setM((prev) => ({ ...prev, pendaftaran: { ...(prev.pendaftaran || {}), syaratSKS: e.target.checked } }))} />
+              <span>Sudah lulus 120 SKS dengan IPK ≥ 2,00 (diperiksa dari transkrip)</span>
+            </label>
+          )}
           <div className="sched-grid" style={{ marginTop: 10 }}>
             <Field label="Status verifikasi">
               <select value={m.verifikasi || 'terverifikasi'} onChange={(e) => set('verifikasi', e.target.value)}>

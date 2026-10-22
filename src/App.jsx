@@ -8,14 +8,14 @@ import { Portal } from './pages/Portal.jsx';
 import { DosenPortal } from './pages/DosenPortal.jsx';
 import { PanduanPage } from './pages/PanduanPage.jsx';
 import { PenggunaanRuangPortal } from './modules/ruang';
-import { arsipkanJadwal, idPengajuan, PROGRAMS, PROGRAM_KEYS, programOf, programLabel, stagesFor, eventsFor, punyaKlasifikasi, punyaSyarat, rolesFor, syaratLabel, getJadwal, STAGES, KLASIFIKASI, BIDANG, KP_TEMA, HARI, bidangLabel, todayISO, parseISO, daysBetween, BULAN, formatTanggal, kondisi, isAktif, indexTahap, hitungBeban, hitungBebanProgram, hitungBebanRinci, SEMUA, filterByPeriode, daftarPeriode, PERIODE_AKTIF, TOPIK, VERIFIKASI, statusVerif, tambahHari, LABEL_PENDAFTARAN, ringkasPendaftaran, RUANG, menitJam, rentangJadwal, jamTampil, beririsan, dosenTerlibat, kumpulkanEvent, cariBentrok, pesanNotifikasi, waLink, mailtoLink, waMahasiswa, DURASI_EVENT, JAM_KERJA, durasiEvent, jamTambah, dalamJamKerja, tahapBerikut, eventAktif, BERKAS_SYARAT, berkasSyarat, bolehAjukanJadwal, orphanedUploadPaths } from './utils/helpers.js';
+import { arsipkanJadwal, idPengajuan, PROGRAMS, PROGRAM_KEYS, programOf, programLabel, stagesFor, eventsFor, punyaKlasifikasi, punyaSyarat, rolesFor, syaratLabel, getJadwal, STAGES, KLASIFIKASI, BIDANG, KP_TEMA, HARI, bidangLabel, todayISO, parseISO, daysBetween, BULAN, formatTanggal, kondisi, isAktif, indexTahap, hitungBeban, hitungBebanProgram, hitungBebanRinci, SEMUA, filterByPeriode, daftarPeriode, PERIODE_AKTIF, TOPIK, VERIFIKASI, statusVerif, tambahHari, LABEL_PENDAFTARAN, ringkasPendaftaran, RUANG, menitJam, rentangJadwal, jamTampil, beririsan, dosenTerlibat, kumpulkanEvent, cariBentrok, pesanNotifikasi, waLink, mailtoLink, waMahasiswa, DURASI_EVENT, JAM_KERJA, durasiEvent, jamTambah, dalamJamKerja, tahapBerikut, eventAktif, BERKAS_SYARAT, berkasSyarat, bolehAjukanJadwal, orphanedUploadPaths, urutPeriode } from './utils/helpers.js';
 import { deleteUploadedFile, deleteUploadedFolder } from './utils/fileUpload.js';
 import { PERIODE_BUKA_AWAL, PENGUMUMAN_AWAL, PERIODE_AKTIF_AWAL, PANDUAN_AWAL } from './data/seed.js';
 import { Badge, StageBar, ExportMenu, TextSizeToggle, ThemeToggle, RolePill, TabIcon, LogoutIcon, Dropdown, Muat, PasswordField, HamburgerIcon } from './components/ui.jsx';
 import { db, auth } from './utils/firebase.js';
 import { setPilihan } from './utils/pilihan.js';
 import { konfirmasiKeluar } from './utils/perubahanBelumDisimpan.js';
-import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, query, where } from 'firebase/firestore';
+import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, query, where, getDocs } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { readClaims, logout, changeOwnPassword, adminCreateUser, adminResetPassword, adminDeleteStudent, adminDeleteAdmin, claimSuperAdmin, adminUpdateSelf, studentUpdateProfile } from './utils/auth.js';
 import { bolehMasukDomainIni, KUNCI_DITOLAK } from './utils/domainAccess.js';
@@ -24,6 +24,16 @@ import gearIcon from './assets/gear.png';
 import { FITUR_RUANG } from './utils/config.js';
 import { akhiriNomorTerhapus } from './utils/nomorSuratDb.js';
 import { useJadwalRuang, useSinkronProgram } from './modules/ruang';
+import { useMahasiswaAdmin, catatPeriode, isiDaftarPeriode } from './utils/useMahasiswaAdmin.js';
+import { useRute, pindah, ganti, ubahParam } from './utils/rute.js';
+
+// Program yang terbuka saat tabel Mahasiswa dibuka tanpa ?program= (atau dengan kode tak dikenal).
+const PROGRAM_AWAL_MAHASISWA = 'KP';
+
+const TAB_PATH = {
+  dashboard: '/dashboard', mahasiswa: '/mahasiswa', dosen: '/dosen',
+  ...(FITUR_RUANG ? { ruang: '/ruang' } : {}),
+};
 
 // Dirender saat akun non-super-admin login di domain terbatas: tandai penolakan
 // (dibaca layar Login untuk menampilkan pesan) lalu langsung keluar.
@@ -137,7 +147,7 @@ function GantiPasswordWajib({ onSelesai, onLogout }) {
 }
 
 export default function App() {
-  const [mahasiswaList, setMahasiswaList] = useState([]);
+  const [mhsNonAdmin, setMhsNonAdmin] = useState([]); // mahasiswa & dosen; admin: useMahasiswaAdmin
   const [dosenList, setDosenList] = useState([]);
   const [akunList, setAkunList] = useState([]);
   const [adminList, setAdminList] = useState([]);
@@ -145,6 +155,7 @@ export default function App() {
   const [config, setConfig] = useState({
     periodeBuka: PERIODE_BUKA_AWAL, pengumuman: PENGUMUMAN_AWAL, periodeAktif: PERIODE_AKTIF_AWAL, panduan: PANDUAN_AWAL,
   });
+  const [configSiap, setConfigSiap] = useState(false); // config/global sudah terbaca dari server
 
   // ----- Sesi: Firebase Auth + custom claims (role/kode), bukan localStorage -----
   const [authUser, setAuthUser] = useState(undefined); // undefined = belum diketahui (loading)
@@ -174,7 +185,21 @@ export default function App() {
     }
   }
 
-  const [tab, setTab] = useState('dashboard');
+  const isAdmin = claims?.role === 'admin';
+  const periodeDikenal = useMemo(
+    () => [...(config.daftarPeriode || []), ...(config.periodeBuka || [])],
+    [config.daftarPeriode, config.periodeBuka]
+  );
+  const mhsAdmin = useMahasiswaAdmin(isAdmin, periodeDikenal);
+  const mahasiswaList = isAdmin ? mhsAdmin.list : mhsNonAdmin;
+  const setMahasiswaList = isAdmin ? mhsAdmin.setList : setMhsNonAdmin;
+  const daftarPeriodeDiisi = useRef(false);
+  useEffect(() => {
+    if (!isAdmin || !configSiap || Array.isArray(config.daftarPeriode) || daftarPeriodeDiisi.current) return;
+    daftarPeriodeDiisi.current = true;
+    isiDaftarPeriode(config.periodeBuka || []).catch((e) => console.error('Gagal mengisi daftar periode:', e));
+  }, [isAdmin, configSiap, config.daftarPeriode, config.periodeBuka]);
+
   // Sidebar admin di layar sempit: laci yang bisa dibuka/ditutup (hamburger).
   const [menuOpen, setMenuOpen] = useState(false);
   // Sidebar desktop: disematkan = selalu melebar, tidak lagi bergantung hover.
@@ -186,28 +211,44 @@ export default function App() {
     setPinned(next);
     try { localStorage.setItem('sidebarPinned', next ? '1' : '0'); } catch { /* storage diblokir */ }
   }
-  // Filter program: dipegang di sini (bukan di halamannya) karena di mobile
-  // pilihannya ada di sidebar.
-  const [dashProg, setDashProg] = useState('ALL');
-  const [mhsProg, setMhsProg] = useState('KP');
-
-  // Rute sederhana berbasis path asli (tanpa library router) — hanya dipakai
-  // untuk memberi halaman Pengaturan alamatnya sendiri (/pengaturan), terpisah
-  // dari tab admin utama. Firebase Hosting sudah mengarahkan semua path ke
-  // index.html (lihat firebase.json), jadi refresh/buka langsung di alamat ini
-  // tetap berfungsi.
-  const [route, setRoute] = useState(() => window.location.pathname);
-  useEffect(() => {
-    const onPop = () => setRoute(window.location.pathname);
-    window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
-  }, []);
-  function navigate(path) {
-    // Draf editor Pengaturan yang belum disimpan: minta konfirmasi dulu (lihat perubahanBelumDisimpan.js).
-    if (path !== window.location.pathname && !konfirmasiKeluar()) return;
-    if (path !== window.location.pathname) window.history.pushState(null, '', path);
-    setRoute(path);
+  // Halaman dan pilihan tampilan ada di URL (lihat utils/rute.js). Admin: tab = path,
+  // periode & program = query. Pindah tab mengingat query terakhir tab tujuan.
+  const rute = useRute();
+  const route = rute.path;
+  const navigate = (path) => pindah(path);
+  const tabAdmin = Object.keys(TAB_PATH).find((k) => TAB_PATH[k] === route);
+  const tab = tabAdmin || 'dashboard';
+  const paramTab = useRef({});
+  const tabTerakhir = useRef('dashboard');
+  if (tabAdmin) { paramTab.current[tabAdmin] = rute.params; tabTerakhir.current = tabAdmin; }
+  function setTab(k) {
+    pindah(TAB_PATH[k], { ...(paramTab.current[k] || {}), periode: rute.params.periode });
   }
+  function kembaliKeAdmin() {
+    const k = tabTerakhir.current;
+    pindah(TAB_PATH[k], paramTab.current[k] || {});
+  }
+  useEffect(() => {
+    if (isAdmin && !tabAdmin && !route.startsWith('/pengaturan')) ganti(TAB_PATH.dashboard, rute.params);
+  }, [isAdmin, tabAdmin, route, rute.params]);
+
+  // Program di sidebar mobile juga, jadi dipegang di sini, bukan di halamannya. Selalu
+  // ditulis di URL (seperti periode): mengganti PROGRAM_AWAL_MAHASISWA kelak tidak mengubah
+  // isi tautan lama. Dashboard memakai "semua"; kode tak dikenal jatuh ke bawaan tab itu.
+  const pakaiProgram = tab === 'dashboard' || tab === 'mahasiswa';
+  const progBawaan = tab === 'dashboard' ? 'semua' : PROGRAM_AWAL_MAHASISWA;
+  const progParam = String(rute.params.program || '');
+  const progKode = PROGRAM_KEYS.find((k) => k.toLowerCase() === progParam.toLowerCase())
+    || (tab === 'dashboard' && progParam.toLowerCase() === 'semua' ? 'semua' : '');
+  const prog = progKode || progBawaan;
+  const dashProg = prog === 'semua' ? 'ALL' : prog;
+  const mhsProg = prog;
+  useEffect(() => {
+    if (isAdmin && tabAdmin && pakaiProgram && progParam !== prog) ubahParam({ program: prog });
+  }, [isAdmin, tabAdmin, pakaiProgram, progParam, prog]);
+  const setDashProg = (p) => ubahParam({ program: p === 'ALL' ? 'semua' : p }, { riwayat: true });
+  // Kode bidang KP dan TA/Capstone berbeda, jadi filter bidang dikosongkan saat ganti program.
+  const setMhsProg = (p) => ubahParam({ program: p, bidang: '', hal: '' }, { riwayat: true });
   function keluar() {
     if (!konfirmasiKeluar()) return;
     logout();
@@ -235,17 +276,12 @@ export default function App() {
   // selain admin, query harus disertai where() yang cocok dengan
   // firestore.rules (lihat catatan di sana), atau dokumen tunggal (bukan list).
   useEffect(() => {
-    if (claims?.role === 'admin') {
-      const unsub = onSnapshot(collection(db, 'mahasiswa'), (snap) => {
-        setMahasiswaList(snap.docs.map((d) => ({ ...d.data(), id: d.id })));
-      }, () => setMahasiswaList([]));
-      return () => unsub();
-    }
+    if (claims?.role === 'admin') { setMhsNonAdmin([]); return undefined; }
     if (claims?.role === 'student' && claims.nim) {
       const q = query(collection(db, 'mahasiswa'), where('owner', '==', claims.nim));
       const unsub = onSnapshot(q, (snap) => {
-        setMahasiswaList(snap.docs.map((d) => ({ ...d.data(), id: d.id })));
-      }, () => setMahasiswaList([]));
+        setMhsNonAdmin(snap.docs.map((d) => ({ ...d.data(), id: d.id })));
+      }, () => setMhsNonAdmin([]));
       return () => unsub();
     }
     if (claims?.role === 'lecturer' && claims.kode) {
@@ -257,7 +293,7 @@ export default function App() {
       function republish() {
         const merged = new Map();
         perField.forEach((docs) => docs.forEach((d) => merged.set(d.id, d)));
-        setMahasiswaList(Array.from(merged.values()));
+        setMhsNonAdmin(Array.from(merged.values()));
       }
       const unsubs = fields.map((f) => onSnapshot(
         query(collection(db, 'mahasiswa'), where(f, '==', claims.kode)),
@@ -266,7 +302,7 @@ export default function App() {
       ));
       return () => unsubs.forEach((u) => u());
     }
-    setMahasiswaList([]);
+    setMhsNonAdmin([]);
   }, [claims]);
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'dosen'), (snap) => {
@@ -307,7 +343,7 @@ export default function App() {
   useEffect(() => {
     const configRef = doc(db, 'config', 'global');
     const unsub = onSnapshot(configRef, (snap) => {
-      if (snap.exists()) setConfig((prev) => ({ ...prev, ...snap.data() }));
+      if (snap.exists()) { setConfig((prev) => ({ ...prev, ...snap.data() })); setConfigSiap(true); }
       else if (claims?.role === 'admin') seedFirestore().catch((e) => console.error('FB seed err:', e));
     });
     return () => unsub();
@@ -317,11 +353,12 @@ export default function App() {
   const { data: jadwalRuang, aksi: aksiJadwalRuang } = useJadwalRuang(authUser, claims);
   const sinkronTidakMasuk = useSinkronProgram({ aktif: claims?.role === 'admin', mahasiswa: mahasiswaList, data: jadwalRuang, aksi: aksiJadwalRuang });
 
-  const periodeBuka = useMemo(() => (data.periodeBuka || []).slice().sort(), [data.periodeBuka]);
+  const periodeBuka = useMemo(() => urutPeriode(data.periodeBuka || []), [data.periodeBuka]);
+  // Admin: daftarPeriode (config) ikut dihitung karena data periode lama belum tentu dimuat.
   const periodeList = useMemo(() => {
-    const set = new Set([...daftarPeriode(data.mahasiswa), ...periodeBuka]);
-    return Array.from(set).sort();
-  }, [data.mahasiswa, periodeBuka]);
+    const set = new Set([...daftarPeriode(data.mahasiswa), ...periodeBuka, ...(isAdmin ? data.daftarPeriode || [] : [])]);
+    return urutPeriode(Array.from(set));
+  }, [data.mahasiswa, periodeBuka, isAdmin, data.daftarPeriode]);
   // Angkatan aktif = pilihan yang muncul di form pendaftaran mahasiswa (strict
   // select); daftarAngkatan (semua, termasuk yang diarsipkan) dipakai sebagai
   // saran datalist di form edit admin — lihat SeksiAngkatan.jsx untuk arsip.
@@ -332,28 +369,53 @@ export default function App() {
   const daftarAngkatan = useMemo(() => (data.angkatan || []).map((a) => a.label).sort(), [data.angkatan]);
   // Daftar Tema KP/Bidang TA hasil edit admin — harus terpasang sebelum anak-anak dirender (lihat pilihan.js).
   setPilihan(data.konten);
-  // Periode awal = periode terbaru, dipilih sekali begitu daftar periode dari
-  // Firestore tersedia; setelah itu mengikuti pilihan admin.
-  const [periode, setPeriode] = useState(SEMUA);
-  const periodeAwalDipilih = useRef(false);
+  // Periode dari ?periode= ("semua" = Semua periode). Tanpa param atau tidak dikenal:
+  // periode terbaru, lalu ditulis ke URL supaya tautan tetap menunjuk periode yang sama.
+  const periodeParam = rute.params.periode || '';
+  const periodeTerbaru = periodeList[periodeList.length - 1] || '';
+  const periode = periodeParam === 'semua' ? SEMUA
+    : periodeList.includes(periodeParam) ? periodeParam : (periodeTerbaru || SEMUA);
   useEffect(() => {
-    if (periodeAwalDipilih.current || !periodeList.length) return;
-    periodeAwalDipilih.current = true;
-    setPeriode(periodeList[periodeList.length - 1]);
-  }, [periodeList]);
+    if (!isAdmin || !tabAdmin || !periodeTerbaru || periodeParam === 'semua' || periodeList.includes(periodeParam)) return;
+    // Periode dari tautan yang belum dikenal: tunggu data selesai dimuat sebelum menggantinya.
+    if (periodeParam && mhsAdmin.memuat) return;
+    ubahParam({ periode: periodeTerbaru });
+  }, [isAdmin, tabAdmin, periodeParam, periodeTerbaru, periodeList, mhsAdmin.memuat]);
   useEffect(() => {
-    if (periode !== SEMUA && !periodeList.includes(periode)) {
-      setPeriode(periodeList.length ? periodeList[periodeList.length - 1] : SEMUA);
-    }
-  }, [periodeList, periode]);
+    if (!isAdmin) return;
+    // "Semua periode" tidak memuat semuanya: tabelnya arsip per halaman (useArsipMahasiswa).
+    if (periode !== SEMUA) mhsAdmin.muatPeriode(periode);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, periodeParam, periode]);
 
   const mhsPeriode = useMemo(() => filterByPeriode(data.mahasiswa, periode), [data.mahasiswa, periode]);
+  // "Semua periode": Dashboard/Dosen menghitung yang dimuat tanpa Lulus, ditambah statistik/lulus
+  // (lihat utils/ringkasLulus.js). Bila semua sudah dimuat (Kelompokkan per Angkatan), pakai datanya.
+  const pakaiRingkas = isAdmin && periode === SEMUA && !mhsAdmin.semuaDimuat;
+  const [ringkasLulus, setRingkasLulus] = useState(null);
+  useEffect(() => {
+    if (!pakaiRingkas) { setRingkasLulus(null); return undefined; }
+    return onSnapshot(doc(db, 'statistik', 'lulus'), (s) => setRingkasLulus(s.exists() ? s.data() : {}), (e) => {
+      console.error('Gagal membaca statistik/lulus:', e);
+      setRingkasLulus({});
+    });
+  }, [pakaiRingkas]);
+  const mhsRingkas = useMemo(
+    () => (pakaiRingkas ? mhsPeriode.filter((m) => m.tahap !== 'Lulus') : mhsPeriode),
+    [pakaiRingkas, mhsPeriode]
+  );
+  const ringkasProp = pakaiRingkas ? (ringkasLulus || {}) : null;
+  // Ganti periode = tampilan tabel kembali ke bawaan periode itu (pengelompokan, halaman 1).
+  function pilihPeriode(p) {
+    ubahParam({ periode: p === SEMUA ? 'semua' : p, grup: '', hal: '' }, { riwayat: true });
+  }
 
-  function simpanMahasiswa(rec) {
+  // lamaCadangan: versi tersimpan dari tabel arsip, untuk record yang periodenya belum dimuat.
+  function simpanMahasiswa(rec, lamaCadangan = null) {
     // Berkas KP/perpanjangan yang ada di record lama tapi tidak lagi ada di
     // record baru (diganti atau dihapus) sudah tidak dirujuk siapa pun —
     // hapus dari Storage sekarang juga supaya tidak menumpuk jadi sampah.
-    const lama = mahasiswaList.find((x) => x.id === rec.id);
+    const lama = mahasiswaList.find((x) => x.id === rec.id) || lamaCadangan;
     let m = arsipkanJadwal(lama, rec); // jadwal yang diganti masuk riwayat
     // Pengajuan yang pernah terverifikasi tidak bisa dihapus mahasiswa lagi,
     // meski kemudian kembali ke 'baru' lewat edit (firestore.rules mewajibkan ini).
@@ -367,6 +429,9 @@ export default function App() {
     });
     writeDoc('mahasiswa', m.id, m, 'mahasiswa');
     if (claims?.role === 'admin') {
+      if (m.periode && Array.isArray(config.daftarPeriode) && !config.daftarPeriode.includes(m.periode)) {
+        catatPeriode(m.periode).catch((e) => console.error('Gagal mencatat periode:', e));
+      }
       const slotLama = slotPengajuanUntuk(lama);
       const slotBaru = slotPengajuanUntuk(m);
       if (slotLama && slotLama !== slotBaru) hapusDoc('slotPengajuan', slotLama);
@@ -375,8 +440,8 @@ export default function App() {
       }
     }
   }
-  async function hapusMahasiswa(id) {
-    const m = mahasiswaList.find((x) => x.id === id);
+  async function hapusMahasiswa(id, cadangan = null) {
+    const m = mahasiswaList.find((x) => x.id === id) || cadangan;
     setMahasiswaList((prev) => prev.filter((x) => x.id !== id));
     // Semua berkas mahasiswa ini disimpan di bawah uploads/{id}/... — hapus
     // seluruh folder sekaligus supaya tidak ada sisa berkas yatim di Storage.
@@ -398,17 +463,26 @@ export default function App() {
     const slot = slotPengajuanUntuk(m);
     if (slot) deleteDoc(doc(db, 'slotPengajuan', slot)).catch(() => {});
     akhiriNomorTerhapus(m).catch((e) => console.error('Registri nomor surat:', e));
+    hapusBookingMilik([id]);
+  }
+  function hapusBookingMilik(ids) {
+    if (claims?.role !== 'admin' || !aksiJadwalRuang) return;
+    aksiJadwalRuang.hapusBookingMahasiswa(ids).catch((e) => console.error('Booking ruang:', e));
   }
   // Hapus akun mahasiswa sepenuhnya: akun Auth, akun/{nim}, loginIndex/{nim},
   // dan semua data KP terkait — dipakai untuk membersihkan akun dummy/uji
   // coba dari daftar akun di halaman Pengaturan.
   async function hapusAkun(nim) {
+    // Dibaca dulu: pengajuan lama (Lulus, periode yang belum dimuat) tidak ada di mahasiswaList.
+    const milik = await getDocs(query(collection(db, 'mahasiswa'), where('owner', '==', nim)));
+    const rekam = new Map(milik.docs.map((d) => [d.id, { ...d.data(), id: d.id }]));
     const { deletedMahasiswaIds } = await adminDeleteStudent(nim);
     setMahasiswaList((prev) => prev.filter((x) => !deletedMahasiswaIds.includes(x.id)));
     deletedMahasiswaIds.forEach((id) => {
       deleteUploadedFolder(`uploads/${id}`);
-      akhiriNomorTerhapus(mahasiswaList.find((x) => x.id === id)).catch((e) => console.error('Registri nomor surat:', e));
+      akhiriNomorTerhapus(rekam.get(id) || mahasiswaList.find((x) => x.id === id)).catch((e) => console.error('Registri nomor surat:', e));
     });
+    hapusBookingMilik(deletedMahasiswaIds);
   }
   function simpanDosen(ds) {
     setDosenList((prev) => {
@@ -442,7 +516,11 @@ export default function App() {
     if (!v) return;
     const list = config.periodeBuka || [];
     if (list.includes(v)) return;
-    simpanConfig({ ...config, periodeBuka: [...list, v] });
+    const next = { ...config, periodeBuka: [...list, v] };
+    // Belum ada daftarPeriode: biarkan kosong supaya isiDaftarPeriode tetap berjalan.
+    const tercatat = config.daftarPeriode;
+    if (Array.isArray(tercatat) && !tercatat.includes(v)) next.daftarPeriode = [...tercatat, v];
+    simpanConfig(next);
   }
   function tutupPeriode(p) {
     simpanConfig({ ...config, periodeBuka: (config.periodeBuka || []).filter((x) => x !== p) });
@@ -561,7 +639,7 @@ export default function App() {
   }
 
   // ----- Halaman Pengaturan (admin) — alamat terpisah (/pengaturan), bukan tab -----
-  if (route === '/pengaturan') {
+  if (route === '/pengaturan' || route.startsWith('/pengaturan/')) {
     return (
       <div className="app">
         <header className="topbar">
@@ -576,12 +654,14 @@ export default function App() {
           <div className="topbar-right">
             <ThemeToggle />
             <TextSizeToggle />
-            <button className="btn ghost" onClick={() => navigate('/')}>← Kembali</button>
+            <button className="btn ghost" onClick={kembaliKeAdmin}>← Kembali</button>
           </div>
         </header>
         <div className="masthead-rule" />
         <main className="content">
           <Pengaturan
+            seksi={route.split('/')[2] || ''}
+            onPindahSeksi={(slug) => pindah('/pengaturan/' + slug)}
             periodeBuka={periodeBuka}
             periodeAktif={data.periodeAktif || ''}
             onBukaPeriode={bukaPeriode}
@@ -660,7 +740,7 @@ export default function App() {
           <Dropdown
             className="periode-pick"
             value={periode}
-            onChange={setPeriode}
+            onChange={pilihPeriode}
             ariaLabel="Periode"
             options={[...periodeList.map((pp) => ({ value: pp, label: pp })), { value: SEMUA, label: 'Semua periode' }]}
           />
@@ -711,7 +791,7 @@ export default function App() {
             <Dropdown
               className="periode-pick"
               value={periode}
-              onChange={setPeriode}
+              onChange={pilihPeriode}
               ariaLabel="Periode"
               options={[...periodeList.map((pp) => ({ value: pp, label: pp })), { value: SEMUA, label: 'Semua periode' }]}
             />
@@ -723,13 +803,20 @@ export default function App() {
         <div className="masthead-rule" />
 
         <main className="content">
-          {tab === 'dashboard' && <Dashboard mahasiswa={mhsPeriode} dosen={data.dosen} prog={dashProg} setProg={setDashProg} />}
+          {mhsAdmin.memuat && <p className="hint muat-mhs" role="status">Memuat data mahasiswa…</p>}
+          {mhsAdmin.gagal && (
+            <div className="banner-galat" role="alert">
+              <span>Sebagian data mahasiswa gagal dimuat, jadi angka dan daftar di bawah mungkin belum lengkap.</span>
+              <button type="button" className="btn btn-sm" onClick={mhsAdmin.cobaLagi}>Coba lagi</button>
+            </div>
+          )}
+          {tab === 'dashboard' && <Dashboard mahasiswa={mhsRingkas} ringkasLulus={ringkasProp} dosen={data.dosen} prog={dashProg} setProg={setDashProg} />}
           {tab === 'mahasiswa' && (
-            <Mahasiswa programTab={mhsProg} setProgramTab={setMhsProg} jadwalRuang={jadwalRuang} mahasiswa={mhsPeriode} allMahasiswa={data.mahasiswa} allDosen={data.dosen} periode={periode} periodeList={periodeList} daftarAngkatan={daftarAngkatan} konten={data.konten || {}} onSave={simpanMahasiswa} onDelete={hapusMahasiswa} />
+            <Mahasiswa params={rute.params} programTab={mhsProg} setProgramTab={setMhsProg} jadwalRuang={jadwalRuang} mahasiswa={mhsPeriode} allMahasiswa={data.mahasiswa} allDosen={data.dosen} periode={periode} periodeList={periodeList} daftarAngkatan={daftarAngkatan} konten={data.konten || {}} onSave={simpanMahasiswa} onDelete={hapusMahasiswa} onMuatSemua={mhsAdmin.muatSemua} onMuatPeriode={mhsAdmin.muatPeriode} />
           )}
           {FITUR_RUANG && tab === 'ruang' && <PenggunaanRuangPortal mahasiswa={mhsPeriode} semuaMahasiswa={data.mahasiswa || []} jadwalRuang={jadwalRuang} dosen={data.dosen || []} aksi={aksiJadwalRuang} catatanSinkron={sinkronTidakMasuk} />}
           {tab === 'dosen' && (
-            <Dosen dosen={data.dosen} mahasiswa={mhsPeriode} periodeLabel={periode === SEMUA ? 'semua periode' : periode} onSave={simpanDosen} onDelete={hapusDosen} />
+            <Dosen dosen={data.dosen} mahasiswa={mhsRingkas} ringkasLulus={ringkasProp} periodeLabel={periode === SEMUA ? 'semua periode' : periode} onSave={simpanDosen} onDelete={hapusDosen} />
           )}
         </main>
 

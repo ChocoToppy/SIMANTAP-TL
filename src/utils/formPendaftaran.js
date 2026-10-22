@@ -33,7 +33,8 @@ export const META = {
   jenis: { nama: 'Jenis (Magang/MKT)', tipe: 'select', di: 'm', kolom: 'jenisMagang', label: () => 'Jenis', kunciPosisi: true, wajibTetap: true },
   periode: { nama: 'Periode', tipe: 'select', di: 'm', kolom: 'periode', label: () => 'Periode', wajibTetap: true },
   nama: { nama: 'Nama', tipe: 'text', di: 'm', kolom: 'nama', label: () => 'Nama', wajibTetap: true },
-  angkatan: { nama: 'Angkatan', tipe: 'select', di: 'm', kolom: 'angkatan', label: () => 'Angkatan' },
+  // Klasifikasi penting (filter & rekap per angkatan): wajib di semua program.
+  angkatan: { nama: 'Angkatan', tipe: 'select', di: 'm', kolom: 'angkatan', label: () => 'Angkatan', wajibTetap: true },
   judul: {
     nama: 'Judul', tipe: 'textarea', di: 'm', kolom: 'judul', full: true, wajibTetap: true,
     label: (k) => judulLabelFor({ program: programDari(k), jenisMagang: k === 'MKT' ? 'MKT' : 'Magang' }),
@@ -51,13 +52,22 @@ export const META = {
   batasAkhir: { nama: 'Tanggal berakhir', tipe: 'date', di: 'm', kolom: 'batasAkhir', label: (k) => `Berakhir ${NAMA_KP(k)}` },
   alamatWA: { nama: 'Alamat', tipe: 'textarea', di: 'p', kolom: 'alamatWA', full: true, label: () => 'Alamat lengkap' },
   syarat: { nama: 'Syarat pendaftaran', tipe: 'blok', label: () => 'Syarat pendaftaran' },
-  namaPersetujuanDosen: { nama: 'Persetujuan dosen', tipe: 'select', di: 'p', kolom: 'namaPersetujuanDosen', full: true, label: () => 'Nama persetujuan projek dosen (opsional)' },
+  namaPersetujuanDosen: { nama: 'Persetujuan dosen', tipe: 'select', di: 'p', kolom: 'namaPersetujuanDosen', full: true, label: (k) => (k === 'TA' ? 'Dosen pengusul proyek' : 'Nama persetujuan projek dosen (opsional)') },
   berkasLink: {
     nama: 'Link berkas', tipe: 'text', di: 'p', kolom: 'berkasLink', full: true, placeholder: 'https://drive.google.com/...',
     label: (k) => (gayaKP(k)
       ? `Link berkas (${k === 'KP' ? 'Transkrip, IRS, KTM' : 'Surat penerimaan, Transkrip, IRS, KTM, Proposal Magang'}) — Google Drive`
-      : 'Link berkas (Surat UGB, persetujuan dosen, transkrip, IRS, proposal) — Google Drive, opsional'),
+      : k === 'TA' ? 'Link pengiriman berkas — Google Drive'
+        : 'Link berkas (Surat UGB, persetujuan dosen, transkrip, IRS, proposal) — Google Drive, opsional'),
+    // Isi tautan, tampil sebagai daftar bernomor di bawah isian (FormPendaftaran).
+    isi: (k) => (k === 'TA' ? ['Proposal', 'Transkrip', 'IRS', 'Sertifikat TOEFL'] : null),
   },
+  // TA: Reguler (penelitian/skripsi) → dokumen Persetujuan UGB; Proyek dosen →
+  // Persetujuan Proyek Dosen + wajib memilih dosen pengusulnya (namaPersetujuanDosen).
+  jenisTA: { nama: 'Jenis Tugas Akhir', tipe: 'select', di: 'p', kolom: 'jenisTA', wajibTetap: true, label: () => 'Jenis Tugas Akhir' },
+  // Dicetak di Form Kelayakan TA ({total_sks}, {hasil_toefl}).
+  totalSks: { nama: 'Total SKS', tipe: 'text', di: 'p', kolom: 'totalSks', label: () => 'Total SKS lulus', placeholder: 'mis. 124' },
+  toefl: { nama: 'Skor TOEFL', tipe: 'text', di: 'p', kolom: 'toefl', label: () => 'Skor TOEFL', placeholder: 'mis. 450' },
   nomorWA: { nama: 'Nomor WA', tipe: 'text', di: 'p', kolom: 'nomorWA', label: () => 'Nomor WA', placeholder: '08xxxxxxxxxx' },
 };
 
@@ -67,7 +77,9 @@ export const META = {
 export const MEDAN_SURAT_BALASAN = ['tempatKP', 'instansi', 'tanggalMulai', 'batasAkhir'];
 
 // Butir di dalam blok "Syarat pendaftaran" (TA/Capstone). Urutannya tetap.
-export const BUTIR_SYARAT = ['syaratSKS', 'ipk', 'statusKP', 'terdaftarKRS', 'sudahUGB'];
+// syaratSKS (lulus 120 SKS & IPK ≥ 2,00) tidak lagi diisi mahasiswa: admin yang
+// mencentangnya setelah memeriksa tautan berkas (modal admin, tab Pendaftaran).
+export const BUTIR_SYARAT = ['ipk', 'statusKP', 'terdaftarKRS', 'sudahUGB'];
 export const META_SYARAT = {
   syaratSKS: { nama: 'Syarat SKS & IPK', tipe: 'centang', label: () => 'Sudah lulus 120 SKS dengan IPK ≥ 2,00' },
   ipk: { nama: 'IPK', tipe: 'text', label: () => 'IPK', placeholder: 'mis. 3,20' },
@@ -86,6 +98,7 @@ export function urutanBawaan(kunci) {
     ...kepala, 'periode', 'nama', 'angkatan', 'judul', 'dosenWali',
     ...(punyaKlasifikasi(program) ? ['klasifikasi'] : []), 'bidang',
     ...(punyaSyarat(program) ? ['syarat'] : []),
+    ...(program === 'TA' ? ['totalSks', 'toefl', 'jenisTA'] : []),
     'namaPersetujuanDosen', 'berkasLink', 'nomorWA',
   ];
 }
@@ -110,6 +123,7 @@ export function medanForm(kunci, id, konten) {
   return {
     id, tipe: meta.tipe, nama: meta.nama, full: !!meta.full, kunciPosisi: !!meta.kunciPosisi, wajibTetap: !!meta.wajibTetap,
     labelBawaan, hintBawaan: meta.hint || '', placeholderBawaan: meta.placeholder || '',
+    isi: meta.isi ? meta.isi(kunci) : null,
     label: (ov.label || '').trim() || labelBawaan,
     hint: ov.hint !== undefined ? ov.hint : (meta.hint || ''),
     placeholder: ov.placeholder !== undefined ? ov.placeholder : (meta.placeholder || ''),

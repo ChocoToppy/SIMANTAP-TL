@@ -1,6 +1,7 @@
 // ===================== pilihan.js =====================
 // Daftar pilihan dropdown yang bisa diubah admin dari Pengaturan → Tema & Bidang
-// tanpa deploy ulang: Tema KP/Magang (KP_TEMA) dan Bidang TA/Capstone/S2 (BIDANG).
+// tanpa deploy ulang: Tema (KP_TEMA) untuk KP, Magang/MKT, dan TA; Bidang (BIDANG)
+// untuk Capstone & Tesis S2. Program mana memakai daftar mana: pakaiTemaKP().
 //
 // Isi array di bawah = nilai BAWAAN. Override admin disimpan di
 // config/global → konten.pilihan.{kpTema|bidang} sebagai daftar lengkap
@@ -82,6 +83,19 @@ export function bidangUntukPilihan(saatIni) { return untukPilihan(semuaBidang(),
 export function kodeKpTemaPertama() { return (semuaKpTema().find((x) => x.isActive) || {}).kode || ''; }
 export function kodeBidangPertama() { return (semuaBidang().find((x) => x.isActive) || {}).kode || ''; }
 export function adalahKodeKpTema(kode) { return semuaKpTema().some((x) => x.kode === kode); }
+
+// Program yang memakai daftar Tema (KP_TEMA); sisanya memakai Bidang (BIDANG).
+// program = kode di data ('TA', 'KP', 'MG', 'CAP', 'S2'; MKT tersimpan sebagai 'MG').
+export function pakaiTemaKP(program) { return program === 'KP' || program === 'MG' || program === 'TA'; }
+export function pilihanTemaBidang(program, saatIni) {
+  return pakaiTemaKP(program) ? kpTemaUntukPilihan(saatIni) : bidangUntukPilihan(saatIni);
+}
+export function kodeTemaBidangPertama(program) {
+  return pakaiTemaKP(program) ? kodeKpTemaPertama() : kodeBidangPertama();
+}
+export function semuaTemaBidang(program) {
+  return pakaiTemaKP(program) ? semuaKpTema() : semuaBidang();
+}
 
 export function labelPilihan(kode) {
   const b = semuaBidang().find((x) => x.kode === kode) || semuaKpTema().find((x) => x.kode === kode);

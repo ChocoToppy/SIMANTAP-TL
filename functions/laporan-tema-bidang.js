@@ -5,7 +5,8 @@
 //    2026-10-19 form pendaftaran selalu mulai dengan bidang 'U', jadi mahasiswa
 //    yang tidak menyentuh dropdown tersimpan "Udara" walau layar menampilkan
 //    tema KP pertama, dan {tema_kp} di surat tercetak "Udara".
-//  - TA/Capstone/S2 dengan kode Tema KP.
+//  - TA (sejak 2026-10-20 memakai daftar Tema yang sama dengan KP) dengan kode
+//    Bidang lama (mis. 'AL'), dan Capstone/S2 dengan kode Tema.
 // Perbaiki tiap pengajuan lewat modal edit admin: dropdown-nya kini
 // menampilkan nilai yang salah sebagai "... (tidak valid, pilih ulang)".
 //
@@ -35,7 +36,7 @@ async function main() {
   mhsSnap.docs.forEach((d) => {
     const m = d.data();
     const program = m.program || 'TA';
-    const gayaKP = program === 'KP' || program === 'MG';
+    const gayaKP = program === 'KP' || program === 'MG' || program === 'TA'; // = pakaiTemaKP di src/utils/pilihan.js
     const sah = gayaKP ? kpTema.has(m.bidang) : bidang.has(m.bidang);
     if (!sah) salah.push({ id: d.id, m, program });
   });

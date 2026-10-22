@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { perpanjanganDocType, PROGRAMS, programOf, stagesFor, eventsFor, rolesFor, syaratLabel, SEMUA, buatId, todayISO, RUANG, jamTampil, cariBentrok, waMahasiswa, tahapBerikut, tahapSebelumnya, eventAktif, berkasSyarat, catatAktivitas, formatTanggal, normalizeUrl, dokumenFieldFor, dosenAktifUntuk } from '../../utils/helpers.js';
 import { opsiRuang, periksaUsulanRuang, teksBentrokRuang, milikProgram } from '../../modules/ruang';
 import { FITUR_RUANG } from '../../utils/config.js';
-import { kodeKpTemaPertama, kodeBidangPertama, adalahKodeKpTema } from '../../utils/pilihan.js';
+import { kodeTemaBidangPertama, pakaiTemaKP, adalahKodeKpTema } from '../../utils/pilihan.js';
 import { catatNomorManual } from '../../utils/nomorSuratDb.js';
 import { bacaNomor, waktuNomor, pemakaiNomorLain, urutTerpakaiDiRecord, NAMA_BULAN } from '../../utils/nomorSurat.js';
 import { Field, Badge, StageStepper, ArrowIcon } from '../../components/ui.jsx';
@@ -12,6 +12,7 @@ import { LinkBerkasRow } from './LinkBerkasRow.jsx';
 import { FormMahasiswaKP } from './FormMahasiswaKP.jsx';
 import { FormMahasiswaGeneric } from './FormMahasiswaGeneric.jsx';
 import { BebanDosenMini } from './BebanDosenMini.jsx';
+import { usePengajuanMilik } from './usePengajuanMilik.js';
 
 // ===================== mahasiswa/FormMahasiswa.jsx =====================
 // Modal tambah/edit mahasiswa (semua program) — file ini memegang SELURUH
@@ -30,7 +31,7 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
     periode: periode && periode !== SEMUA ? periode : (periodeList[periodeList.length - 1] || ''),
     angkatan: '', klasifikasi: 'Penelitian',
     // Kode awal dari daftar program itu sendiri (Tema KP vs Bidang TA), lihat gantiProgram.
-    bidang: defaultProgram === 'KP' || defaultProgram === 'MG' ? kodeKpTemaPertama() : kodeBidangPertama(),
+    bidang: kodeTemaBidangPertama(defaultProgram),
     pembimbing1: '', pembimbing2: '', penguji1: '', penguji2: '',
     tahap: 'Pendaftaran',
     tanggalMulai: todayISO(), batasAkhir: '',
@@ -166,9 +167,7 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
       if (r.penguji < 2) next.penguji2 = '';
       if (p === 'MG' && !next.jenisMagang) next.jenisMagang = 'Magang';
       // Tema KP (KP/Magang) dan Bidang (TA/Capstone/S2) memakai daftar kode berbeda.
-      const gayaKP = p === 'KP' || p === 'MG';
-      if (gayaKP && !adalahKodeKpTema(next.bidang)) next.bidang = kodeKpTemaPertama();
-      if (!gayaKP && adalahKodeKpTema(next.bidang)) next.bidang = kodeBidangPertama();
+      if (pakaiTemaKP(p) !== adalahKodeKpTema(next.bidang)) next.bidang = kodeTemaBidangPertama(p);
       return next;
     });
   }
@@ -236,7 +235,10 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
 
   // Pengajuan lain yang masih terbuka untuk mahasiswa & program yang sama: pengajuan
   // yang ditutup ini tidak boleh dibuka kembali (satu pengajuan terbuka per program).
-  const adaPengganti = !!m.owner && allMahasiswa.some((x) => x.id !== m.id && x.owner === m.owner && programOf(x) === programOf(m) && !x.dibatalkan);
+  // Hanya dibutuhkan banner pengajuan ditutup, jadi Firestore dibaca hanya saat m.dibatalkan.
+  const milikLain = usePengajuanMilik(m.owner, !!m.dibatalkan);
+  const pengajuanOwner = new Map([...milikLain, ...allMahasiswa].map((x) => [x.id, x])); // versi live menang
+  const adaPengganti = !!m.owner && [...pengajuanOwner.values()].some((x) => x.id !== m.id && x.owner === m.owner && programOf(x) === programOf(m) && !x.dibatalkan);
   const dosenPilihan = dosenAktifUntuk(allDosen, m.pembimbing1, m.pembimbing2, m.penguji1, m.penguji2, m.dosenWali);
   const dosenOpts = (
     <>
@@ -245,15 +247,19 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
     </>
   );
   // Grafik beban ringkas di samping dropdown pembimbing/penguji.
-  const bebanBlok = (peran) => <BebanDosenMini m={m} allMahasiswa={allMahasiswa} dosen={dosenPilihan} peran={peran} />;
+  // TA: Ketua (penguji1) & Anggota (penguji2) Penguji adalah peran berbeda, jadi
+  // grafik penguji dipecah dua; program lain tetap satu grafik penguji gabungan.
+  const bebanBlok = (peran) => (peran === 'penguji' && m.program === 'TA'
+    ? <>{['penguji1', 'penguji2'].map((p) => <BebanDosenMini key={p} m={m} allMahasiswa={allMahasiswa} dosen={dosenPilihan} peran={p} />)}</>
+    : <BebanDosenMini m={m} allMahasiswa={allMahasiswa} dosen={dosenPilihan} peran={peran} />);
 
   const stages = stagesFor(m.program);
   const events = eventsFor(m.program);
   const roles = rolesFor(m.program);
   const pembimbing1Label = roles.pembimbing === 1 ? (roles.pembimbingLabel || 'Pembimbing') : 'Pembimbing 1';
-  // TA: penguji 1 sejak Seminar Proposal, penguji 2 bergabung saat Sidang.
-  const penguji1Label = roles.penguji === 1 ? 'Penguji' : 'Penguji 1';
-  const penguji2Label = 'Penguji 2';
+  // TA: penguji 1 = Ketua Penguji (sejak Seminar Proposal), penguji 2 = Anggota Penguji (Sidang).
+  const penguji1Label = roles.penguji1Label || (roles.penguji === 1 ? 'Penguji' : 'Penguji 1');
+  const penguji2Label = roles.penguji2Label || 'Penguji 2';
   const p = m.pendaftaran || {};
 
   // ----- Blok kontak mahasiswa (dipakai di kedua tata letak) -----

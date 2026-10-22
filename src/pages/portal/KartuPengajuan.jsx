@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { dokumenStatus, perpanjanganDocType, statusVerif, pernahDiverifikasi, adaSuratBalasan, ditutup, bolehAksesBerkas, bolehUnduhDokumen, alasanUnduhTerkunci, jumlahPerluUlang, pembukuanDisetujui, kondisi, programOf, eventAktifAwal, bolehAjukanJadwal, formatTanggal, jamTampil, bidangLabel, programLabel, programDisplayLabel, jenisMagangOf, normalizeUrl, judulLabelFor } from '../../utils/helpers.js';
+import { rolesFor, dokumenStatus, perpanjanganDocType, statusVerif, pernahDiverifikasi, adaSuratBalasan, ditutup, bolehAksesBerkas, bolehUnduhDokumen, alasanUnduhTerkunci, jumlahPerluUlang, pembukuanDisetujui, kondisi, programOf, eventAktifAwal, bolehAjukanJadwal, formatTanggal, jamTampil, bidangLabel, programLabel, programDisplayLabel, jenisMagangOf, normalizeUrl, judulLabelFor } from '../../utils/helpers.js';
 import { Badge, StageBar, StageStepper } from '../../components/ui.jsx';
 import { IkonLanjut, IkonMap } from '../../components/DokIkon.jsx';
 import { generateDocument, getTemplateConfig } from '../../utils/documentGenerator.js';
@@ -43,7 +43,10 @@ export function KartuPengajuan({ m, allDosen = [], konten = {}, panduan = [], on
     ? { tahap: 'Pendaftaran' }
     : program === 'KP' && (m.tahap === 'Bimbingan' || m.tahap === 'Pembukuan')
       ? { tahap: m.tahap, linkTerkirim: !!(m.pembukuan || {}).berkasLink, disetujui: pembukuanDisetujui(m) }
-      : null;
+      // TA: Pendaftaran → unggah semua berkas; Bimbingan → tunggu pembimbing / ST terbit.
+      : program === 'TA' && (m.tahap === 'Pendaftaran' || m.tahap === 'Bimbingan')
+        ? { ta: true, tahap: m.tahap, stSiap: !!(dokumenStatus('TA', m).find((d) => d.key === 'stPembimbingTA') || {}).eligible }
+        : null;
   const adaDokumen = ['KP', 'MG', 'TA'].includes(program);
 
   // Pengajuan yang ditutup admin: arsip baca-saja, tanpa tahapan maupun aksi.
@@ -119,7 +122,13 @@ export function KartuPengajuan({ m, allDosen = [], konten = {}, panduan = [], on
       {(pemb.length > 0 || peng.length > 0) && (
         <dl className="kartu-dosen">
           {pemb.length > 0 && <DosenBaris label="Pembimbing" kode={pemb} dosenByKode={dosenByKode} />}
-          {peng.length > 0 && <DosenBaris label="Penguji" kode={peng} dosenByKode={dosenByKode} />}
+          {/* TA: Ketua & Anggota Penguji dibedakan; program lain cukup "Penguji". */}
+          {peng.length > 0 && (rolesFor(program).penguji1Label ? (
+            <>
+              {m.penguji1 && <DosenBaris label={rolesFor(program).penguji1Label} kode={[m.penguji1]} dosenByKode={dosenByKode} />}
+              {m.penguji2 && <DosenBaris label={rolesFor(program).penguji2Label} kode={[m.penguji2]} dosenByKode={dosenByKode} />}
+            </>
+          ) : <DosenBaris label="Penguji" kode={peng} dosenByKode={dosenByKode} />)}
         </dl>
       )}
 
@@ -154,7 +163,13 @@ function StatusTahap({ v, aktif, lulus, tanggalLulus, evA, jEv, sidang, disetuju
   }
   if (aktif && langkahKP && !lulus) {
     let teks;
-    if (langkahKP.tahap === 'Pendaftaran') {
+    if (langkahKP.ta) {
+      teks = langkahKP.tahap === 'Pendaftaran'
+        ? <div className="callout">Unggah semua berkas Pendaftaran untuk masuk ke tahap Bimbingan.</div>
+        : langkahKP.stSiap
+          ? <div className="callout callout-green"><strong>Surat Tugas Pembimbing</strong> sudah tersedia di halaman dokumen.</div>
+          : <div className="callout">Menunggu admin memeriksa berkas dan menetapkan dosen pembimbing.</div>;
+    } else if (langkahKP.tahap === 'Pendaftaran') {
       teks = <div className="callout">Unggah <strong>Surat Balasan Perusahaan</strong> untuk masuk ke tahap Bimbingan.</div>;
     } else if (langkahKP.tahap === 'Bimbingan') {
       teks = <div className="callout">Unduh dan tanda tangani <strong>Lembar Pengesahan KP</strong>, lalu unggah pindaiannya untuk masuk ke tahap Pembukuan.</div>;

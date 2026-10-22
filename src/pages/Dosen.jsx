@@ -1,45 +1,48 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, stagesFor, eventsFor, punyaKlasifikasi, punyaSyarat, rolesFor, syaratLabel, getJadwal, STAGES, KLASIFIKASI, BIDANG, KP_TEMA, HARI, bidangLabel, todayISO, parseISO, daysBetween, BULAN, formatTanggal, kondisi, isAktif, indexTahap, hitungBeban, hitungBebanProgram, hitungBebanRinci, SEMUA, filterByPeriode, daftarPeriode, buatId, PERIODE_AKTIF, TOPIK, VERIFIKASI, statusVerif, tambahHari, LABEL_PENDAFTARAN, ringkasPendaftaran, RUANG, menitJam, rentangJadwal, jamTampil, beririsan, dosenTerlibat, kumpulkanEvent, cariBentrok, pesanNotifikasi, waLink, mailtoLink, waMahasiswa, DURASI_EVENT, JAM_KERJA, durasiEvent, jamTambah, dalamJamKerja, tahapBerikut, eventAktif, BERKAS_SYARAT, berkasSyarat, bolehAjukanJadwal } from '../utils/helpers.js';
+import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, stagesFor, eventsFor, punyaKlasifikasi, punyaSyarat, rolesFor, syaratLabel, getJadwal, STAGES, KLASIFIKASI, BIDANG, KP_TEMA, HARI, bidangLabel, todayISO, parseISO, daysBetween, BULAN, formatTanggal, kondisi, isAktif, indexTahap, hitungBeban, hitungBebanProgram, hitungBebanRinci, hitungBebanPeran, PROGRAM_BEBAN, SEMUA, filterByPeriode, daftarPeriode, buatId, PERIODE_AKTIF, TOPIK, VERIFIKASI, statusVerif, tambahHari, LABEL_PENDAFTARAN, ringkasPendaftaran, RUANG, menitJam, rentangJadwal, jamTampil, beririsan, dosenTerlibat, kumpulkanEvent, cariBentrok, pesanNotifikasi, waLink, mailtoLink, waMahasiswa, DURASI_EVENT, JAM_KERJA, durasiEvent, jamTambah, dalamJamKerja, tahapBerikut, eventAktif, BERKAS_SYARAT, berkasSyarat, bolehAjukanJadwal } from '../utils/helpers.js';
 import { csvEscape, triggerDownload, downloadCSV, downloadDoc, cetakSuratPDF, loadXLSX, downloadXLSX } from '../utils/exportUtils.js';
 import { Badge, StageBar, Field, Modal, Empty, ExportMenu } from '../components/ui.jsx';
+import { BebanDosen } from './dosen/BebanDosen.jsx';
+import { tambahPeranLulus } from '../utils/ringkasLulus.js';
 
 // ===================== Dosen.js =====================
 // Dosen.js — daftar dosen + beban otomatis dirinci per program
 
-export function Dosen({ dosen, mahasiswa, periodeLabel, onSave, onDelete }) {
+// ringkasLulus: hanya di "Semua periode", saat pengajuan Lulus tidak dimuat (lihat ringkasLulus.js).
+export function Dosen({ dosen, mahasiswa, periodeLabel, onSave, onDelete, ringkasLulus = null }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [semua, setSemua] = useState(true);   // true: termasuk lulus
   const [sortBy, setSortBy] = useState('total'); // 'total' | 'nama'
 
+  // Urutan ditentukan BebanDosen per peran yang sedang dilihat.
   const rows = useMemo(
-    () =>
-      dosen
-        .map((d) => ({ ...d, ...hitungBebanRinci(mahasiswa, d.kode, { semua }) }))
-        .sort((a, b) =>
-          sortBy === 'nama'
-            ? a.nama.localeCompare(b.nama)
-            : (b.total - a.total || a.kode.localeCompare(b.kode))
-        ),
-    [dosen, mahasiswa, semua, sortBy]
+    () => dosen.map((d) => ({ ...d, peran: tambahPeranLulus(hitungBebanPeran(mahasiswa, d.kode, { semua }), semua ? ringkasLulus : null, d.kode) })),
+    [dosen, mahasiswa, semua, ringkasLulus]
   );
-
-  const maxTotal = rows.reduce((mx, r) => Math.max(mx, r.total), 0) || 1;
-  const bebanTone = (t) => (t >= 8 ? 'red' : t >= 6 ? 'amber' : 'blue');
 
   function tambah() { setEditing(null); setOpen(true); }
   // `d` di sini adalah baris tabel (raw dosen + beban terhitung dari
-  // hitungBebanRinci) — pakai data mentah dari prop `dosen`, bukan `d`
-  // langsung, supaya field beban (bimbinganTA, total, dst.) yang cuma untuk
-  // tampilan tidak ikut ke form lalu tersimpan sebagai field asing di Firestore.
+  // hitungBebanPeran) — pakai data mentah dari prop `dosen`, bukan `d`
+  // langsung, supaya field beban (`peran`) yang cuma untuk tampilan tidak
+  // ikut ke form lalu tersimpan sebagai field asing di Firestore.
   function edit(d) { setEditing(dosen.find((x) => x.kode === d.kode) || null); setOpen(true); }
   function simpan(d) { onSave(d); setOpen(false); }
   function hapus(d) {
     if (window.confirm(`Hapus dosen ${d.kode}? Pastikan tidak sedang membimbing/menguji.`)) onDelete(d.kode);
   }
 
-  const eksporHeaders = ['Kode', 'Nama', 'NIP', 'Kompetensi', 'Status', 'Bimbingan TA', 'Penguji TA', 'Bimbingan Capstone', 'Penguji Capstone', 'Bimbingan KP', 'Bimbingan Magang', 'Bimbingan Tesis S2', 'Penguji Tesis S2', 'Total beban'];
-  const eksporData = () => rows.map((d) => [d.kode, d.nama, d.nip, d.kompetensi, d.status, d.bimbinganTA, d.pengujiTA, d.bimbinganCAP, d.pengujiCAP, d.bimbinganKP, d.bimbinganMG, d.bimbinganS2, d.pengujiS2, d.total]);
+  // Ekspor memuat ketiga peran sekaligus, dirinci per program.
+  const NAMA_PERAN = { pembimbing: 'Pembimbing', penguji1: 'Ketua Penguji', penguji2: 'Anggota Penguji' };
+  const NAMA_PROG = { TA: 'TA', CAP: 'Capstone', S2: 'Tesis S2', KP: 'KP', MG: 'Magang' };
+  const kolomPeran = Object.entries(PROGRAM_BEBAN).flatMap(([peran, progs]) => [...progs, 'total'].map((p) => [peran, p]));
+  const eksporHeaders = ['Kode', 'Nama', 'NIP', 'Kompetensi', 'Status',
+    ...kolomPeran.map(([peran, p]) => `${NAMA_PERAN[peran]} ${p === 'total' ? 'total' : NAMA_PROG[p]}`), 'Total beban'];
+  const eksporData = () => [...rows].sort((a, b) => a.kode.localeCompare(b.kode)).map((d) => [
+    d.kode, d.nama, d.nip, d.kompetensi, d.status,
+    ...kolomPeran.map(([peran, p]) => d.peran[peran][p]),
+    Object.keys(PROGRAM_BEBAN).reduce((t, peran) => t + d.peran[peran].total, 0),
+  ]);
   async function ekspor(format) {
     const data = eksporData();
     if (format === 'csv') { downloadCSV('rekap-dosen.csv', eksporHeaders, data); return; }
@@ -66,60 +69,7 @@ export function Dosen({ dosen, mahasiswa, periodeLabel, onSave, onDelete }) {
         <button className="btn btn-primary" onClick={tambah}>+ Tambah dosen</button>
       </div>
 
-      <div className="table-wrap card">
-        <table className="tbl tbl-wide">
-          <thead>
-            <tr>
-              <th>Dosen</th>
-              <th>Kompetensi</th>
-              <th>Status</th>
-              <th className="num">Bimbingan TA</th>
-              <th className="num">Penguji TA</th>
-              <th className="num">Bimbingan Capstone</th>
-              <th className="num">Penguji Capstone</th>
-              <th className="num">Bimbingan KP</th>
-              <th className="num">Bimbingan Magang</th>
-              <th className="num">Bimbingan Tesis S2</th>
-              <th className="num">Penguji Tesis S2</th>
-              <th style={{ minWidth: 130 }}>Total beban</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((d) => (
-              <tr key={d.kode}>
-                <td>
-                  <div className="cell-name">{d.kode}</div>
-                  <div className="cell-sub">{d.nama}</div>
-                </td>
-                <td className="cell-sub">{d.kompetensi || '—'}</td>
-                <td>{d.status || '—'}</td>
-                <td className="num">{d.bimbinganTA}</td>
-                <td className="num">{d.pengujiTA}</td>
-                <td className="num">{d.bimbinganCAP}</td>
-                <td className="num">{d.pengujiCAP}</td>
-                <td className="num">{d.bimbinganKP}</td>
-                <td className="num">{d.bimbinganMG}</td>
-                <td className="num">{d.bimbinganS2}</td>
-                <td className="num">{d.pengujiS2}</td>
-                <td>
-                  <div className="bar-row tight">
-                    <div className="bar-track">
-                      <div className={`bar-fill fill-${bebanTone(d.total)}`} style={{ width: `${d.total ? Math.max(8, (d.total / maxTotal) * 100) : 0}%` }} />
-                    </div>
-                    <span className="bar-val">{d.total}</span>
-                  </div>
-                </td>
-                <td className="cell-actions">
-                  <button className="link-btn" onClick={() => edit(d)}>Edit</button>
-                  <button className="link-btn danger" onClick={() => hapus(d)}>Hapus</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {rows.length === 0 && <Empty>Belum ada dosen. Klik "+ Tambah dosen" untuk menambah.</Empty>}
-      </div>
+      <BebanDosen rows={rows} sortBy={sortBy} onEdit={edit} onHapus={hapus} />
 
       {open && (
         <FormDosen awal={editing} existing={dosen} onCancel={() => setOpen(false)} onSave={simpan} />

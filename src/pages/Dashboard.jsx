@@ -2,13 +2,15 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, programDisplayLabel, stagesFor, eventsFor, punyaKlasifikasi, punyaSyarat, rolesFor, syaratLabel, getJadwal, STAGES, KLASIFIKASI, BIDANG, KP_TEMA, HARI, bidangLabel, todayISO, parseISO, daysBetween, BULAN, formatTanggal, kondisi, isAktif, indexTahap, hitungBeban, hitungBebanProgram, hitungBebanRinci, SEMUA, filterByPeriode, daftarPeriode, buatId, PERIODE_AKTIF, TOPIK, VERIFIKASI, statusVerif, tambahHari, LABEL_PENDAFTARAN, ringkasPendaftaran, RUANG, menitJam, rentangJadwal, jamTampil, beririsan, dosenTerlibat, kumpulkanEvent, cariBentrok, pesanNotifikasi, waLink, mailtoLink, waMahasiswa, DURASI_EVENT, JAM_KERJA, durasiEvent, jamTambah, dalamJamKerja, tahapBerikut, eventAktif, BERKAS_SYARAT, berkasSyarat, bolehAjukanJadwal } from '../utils/helpers.js';
 import { csvEscape, triggerDownload, downloadCSV, downloadDoc, cetakSuratPDF, loadXLSX } from '../utils/exportUtils.js';
 import { Badge, StageBar, Field, Modal, Empty, ExportMenu } from '../components/ui.jsx';
+import { jumlahLulus, lulusPerAngkatan as lulusPerAngkatanRingkas, bebanLulus, tambahBeban } from '../utils/ringkasLulus.js';
 
 // ===================== Dashboard.js =====================
 // Dashboard.js — ringkasan untuk koordinator (lintas program, bisa difilter)
 
 // prog (ALL | TA | KP | CAP | MG | S2) dipegang App supaya sidebar mobile bisa
 // ikut mengubahnya.
-export function Dashboard({ mahasiswa, dosen, prog, setProg }) {
+// ringkasLulus: hanya di "Semua periode", saat pengajuan Lulus tidak dimuat (lihat ringkasLulus.js).
+export function Dashboard({ mahasiswa, dosen, prog, setProg, ringkasLulus = null }) {
   const [bebanMode, setBebanMode] = useState('semua'); // 'semua' (incl lulus) | 'aktif'
 
   // Mahasiswa sesuai filter program (untuk metrik, beban, perhatian, sebaran).
@@ -22,16 +24,19 @@ export function Dashboard({ mahasiswa, dosen, prog, setProg }) {
   const mendekati = withK.filter((x) => x.k.key === 'mendekati');
 
   // Beban dosen (otomatis) — per periode aktif (lihat selektor periode di atas).
-  // Dipisah jadi dua grafik: sebagai pembimbing dan sebagai penguji. Beban
-  // pembimbing tidak dijumlah lintas program (pembimbing KP ≠ pembimbing TA),
-  // jadi dipecah per program; beban penguji tetap lintas program.
+  // Dipisah per peran: pembimbing, Ketua Penguji (penguji1), Anggota Penguji
+  // (penguji2). Beban pembimbing tidak dijumlah lintas program (pembimbing KP ≠
+  // pembimbing TA), jadi dipecah per program; beban penguji lintas program.
   const opsBeban = { semua: bebanMode === 'semua' };
   const urutPeran = (list, peran) => list.filter((d) => d[peran] > 0).sort((a, b) => a.kode.localeCompare(b.kode));
-  const bebanPenguji = urutPeran(dosen.map((d) => ({ ...d, ...hitungBeban(scoped, d.kode, opsBeban) })), 'penguji');
+  const lulusRingkas = (kode, p) => (ringkasLulus && opsBeban.semua ? bebanLulus(ringkasLulus, kode, p) : null);
+  const bebanSemua = dosen.map((d) => ({ ...d, ...tambahBeban(hitungBeban(scoped, d.kode, opsBeban), lulusRingkas(d.kode, prog)) }));
+  const bebanKetua = urutPeran(bebanSemua, 'penguji1');
+  const bebanAnggota = urutPeran(bebanSemua, 'penguji2');
   const grupBimbingan = (prog === 'ALL' ? PROGRAM_KEYS : [prog])
     .map((p) => ({
       program: p,
-      data: urutPeran(dosen.map((d) => ({ ...d, ...hitungBebanProgram(scoped, d.kode, p, opsBeban) })), 'bimbingan'),
+      data: urutPeran(dosen.map((d) => ({ ...d, ...tambahBeban(hitungBebanProgram(scoped, d.kode, p, opsBeban), lulusRingkas(d.kode, p)) })), 'bimbingan'),
     }))
     .filter((g) => g.data.length > 0);
 
@@ -54,6 +59,7 @@ export function Dashboard({ mahasiswa, dosen, prog, setProg }) {
 
   // Lulus per angkatan — dikelompokkan dari daftar `lulus` (sudah ikut filter program).
   const lulusPerAngkatan = useMemo(() => {
+    if (ringkasLulus) return lulusPerAngkatanRingkas(ringkasLulus, prog);
     const bucket = {};
     lulus.forEach((m) => {
       const k = m.angkatan || '—';
@@ -62,7 +68,7 @@ export function Dashboard({ mahasiswa, dosen, prog, setProg }) {
     return Object.keys(bucket)
       .sort((a, b) => String(a).localeCompare(String(b), 'id', { numeric: true }))
       .map((k) => ({ angkatan: k, jumlah: bucket[k] }));
-  }, [lulus]);
+  }, [lulus, ringkasLulus, prog]);
   const maxLulusAngkatan = lulusPerAngkatan.length ? Math.max(...lulusPerAngkatan.map((x) => x.jumlah)) : 1;
 
   const FILTERS = [
@@ -88,7 +94,7 @@ export function Dashboard({ mahasiswa, dosen, prog, setProg }) {
 
       <div className="metrics">
         <Metric label="Aktif" value={aktif.length} />
-        <Metric label="Lulus" value={lulus.length} tone="green" />
+        <Metric label="Lulus" value={ringkasLulus ? jumlahLulus(ringkasLulus, prog) : lulus.length} tone="green" />
         <Metric label="Mendekati deadline" value={mendekati.length} tone="amber" />
         <Metric label="Lewat batas" value={lewat.length} tone="red" />
       </div>
@@ -113,7 +119,10 @@ export function Dashboard({ mahasiswa, dosen, prog, setProg }) {
               </div>
             ))}
           </div>
-          <BebanChart judul="Penguji" data={bebanPenguji} peran="penguji" tone={bebanTone} />
+          <div className="bars-kolom">
+            <BebanChart judul="Ketua Penguji" data={bebanKetua} peran="penguji1" tone={bebanTone} />
+            <BebanChart judul="Anggota Penguji" data={bebanAnggota} peran="penguji2" tone={bebanTone} />
+          </div>
         </div>
       </section>
 

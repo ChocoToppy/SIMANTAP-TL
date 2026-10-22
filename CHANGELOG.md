@@ -1,5 +1,65 @@
 # Changelog
 
+## 22-10-2026 — "Semua periode" sebagai arsip per halaman
+- "Semua periode" tidak lagi memuat seluruh data mahasiswa. Tabel Mahasiswa-nya diambil per halaman dari Firestore (`useArsipMahasiswa.js`): urutan bawaan = urut masuk, terlama dulu; kolom No. = posisi baris di hasil saat ini (lanjut antar halaman); tombol « ‹ › dan "x–y dari N"; refresh kembali ke halaman 1.
+- Di arsip: cari = awalan nama atau NIM (cari di tengah kata tetap ada di tampilan per periode), urutan hanya No., Mahasiswa, Tahap & jadwal, Deadline. Filter deadline (mendekati/lewat) tidak bisa digabung dengan pencarian. Ekspor dari arsip mengambil semua baris yang cocok saat tombol ditekan.
+- Membuka record dari arsip memuat periode record itu dulu, supaya grafik beban mini dan cek bentrok/nomor di form tetap lengkap. Simpan/hapus dari arsip membawa salinan record, jadi slot pengajuan, nomor surat dan berkas tetap dibereskan walau periodenya belum dimuat.
+- Dashboard & Dosen di "Semua periode": angka dari data yang dimuat (belum Lulus) ditambah jumlah lulus dari dokumen `statistik/lulus`.
+- "Kelompokkan per Angkatan" tetap memuat semua data (nomor per angkatan lintas periode). Pengelompokan bawaan di "Semua periode" kini Normal, bukan per periode.
+- Server: trigger baru `jagaIndeksArsip` (`functions/indeksArsip.js`) menjaga koleksi `indeksMahasiswa` (salinan field yang bisa di-query, terpisah dari record supaya tulisan mahasiswa tidak tertolak rules) dan `statistik/lulus`. Skrip `functions/migrate-indeks-arsip.js` mengisi/menghitung ulang keduanya. `firestore.rules`: keduanya hanya dibaca admin, tidak bisa ditulis klien. `firestore.indexes.json` baru (76 indeks komposit), ditautkan di `firebase.json`.
+- Urutan deploy: functions → rules & indeks → skrip `--tulis` → aplikasi. Sebelum itu arsip menampilkan pesan bahwa aturannya belum di-deploy.
+
+## 21-10-2026 (4) — Tampilan admin tersimpan di URL
+- Tab admin kini punya alamat sendiri: `/dashboard`, `/mahasiswa`, `/dosen`, `/ruang`. `/` dan alamat tak dikenal diarahkan ke `/dashboard`. Seksi Pengaturan juga: `/pengaturan/periode`, `/pengaturan/nomor-surat`, dst.
+- Periode (`?periode=`, `semua` untuk Semua periode) dan program (`?program=KP`, Dashboard `?program=semua`) selalu ditulis di URL, termasuk nilai bawaannya, supaya tautan lama tetap membuka tampilan yang sama walau periode baru dibuka atau program bawaan tabel Mahasiswa (`PROGRAM_AWAL_MAHASISWA`, kini KP) kelak diganti. Kelima kode program berlaku di semua build; kode huruf kecil dirapikan (`mg` → `MG`) dan kode tak dikenal jatuh ke program bawaan. Tautan ke periode lama memuat periode itu seperti saat dipilih dari pilihan periode; periode tak dikenal jatuh ke periode terbaru.
+- Tabel Mahasiswa: cari, filter (status, angkatan, bidang, verifikasi, dosen), urutan, pengelompokan, baris per halaman dan halaman disimpan di URL (`useFilterMahasiswa.js`). Nilai bawaan tidak ditulis. Refresh dan tautan yang ditempel mengembalikan tampilan yang sama. Kolom tersembunyi tetap disimpan per browser.
+- Tombol Kembali/Maju browser: berpindah antar tab, periode, program dan seksi Pengaturan. Mengetik, mengubah filter, mengurutkan dan berpindah halaman tidak menambah riwayat. Kembali dari editor Pengaturan yang masih punya draf meminta konfirmasi.
+- Pindah tab mengembalikan filter terakhir tab tujuan; "← Kembali" dari Pengaturan kembali ke tab dan filter terakhir (setelah refresh: ke Dashboard).
+- Router ditulis sendiri di `utils/rute.js` (tanpa library). Portal mahasiswa, portal dosen dan form edit mahasiswa tidak berubah; refresh tetap menutup form edit.
+
+## 21-10-2026 (3) — Admin tidak lagi memuat seluruh data mahasiswa
+- Admin kini memuat semua pengajuan yang belum Lulus (periode mana pun) ditambah seluruh isi 2 periode terbaru (`useMahasiswaAdmin.js`). Memilih periode lain di pilihan periode memuat periode itu; "Semua periode" memuat semuanya. Data yang sudah dimuat tetap ada sampai logout. Mahasiswa dan dosen tidak terpengaruh (query mereka sudah terbatas).
+- Daftar periode untuk pilihan periode disimpan di `config/global.daftarPeriode`, supaya periode lama tetap muncul walau datanya belum dimuat. Diisi otomatis sekali saat admin pertama membuka aplikasi (membaca seluruh koleksi satu kali), lalu bertambah saat periode dibuka atau data disimpan dengan periode baru.
+- Tabel Mahasiswa: "Kelompokkan per Angkatan" memuat semua data, karena nomor per angkatan dihitung lintas periode. Pencarian tanpa hasil di satu periode menyarankan memilih "Semua periode".
+- Banner pengajuan ditutup: pengecekan "sudah ada pengajuan baru yang terbuka" membaca langsung pengajuan milik mahasiswa itu dari Firestore, tidak lagi hanya dari data yang dimuat.
+- Hapus akun mahasiswa: pengajuannya dibaca dulu dari Firestore supaya nomor surat pengajuan lama (yang tidak dimuat) tetap diakhiri.
+- Jadwal ruang: sinkron otomatis hanya menghapus booking milik mahasiswa yang sedang dimuat. Booking mahasiswa yang dihapus kini dihapus langsung saat mahasiswa/akunnya dihapus (`hapusBookingMahasiswa`).
+- Pengaturan → Nomor Surat: hanya memuat tahun yang dipilih, bawaannya tahun ini. Pilihan tahun tersedia dari nomor tertua sampai tahun ini; "Semua tahun" memuat semuanya.
+- Muncul keterangan "Memuat data mahasiswa…" selama data dimuat, dan banner merah dengan tombol "Coba lagi" bila sebagian data gagal dimuat.
+- Periode kini diurutkan kronologis (`urutPeriode` di `helpers.js`), bukan abjad. Urut abjad menaruh semua "Gasal …" sebelum "Genap …" dan periode uji ("Test Genap") di akhir, sehingga periode bawaan admin bisa jatuh ke periode yang salah. Nama periode tanpa tahun + Gasal/Ganjil/Genap ditaruh paling awal.
+
+## 21-10-2026 (2) — Pendaftaran TA: jenis TA, kelayakan, syarat SKS oleh admin
+- Form pendaftaran TA punya isian baru "Jenis Tugas Akhir" (wajib, mulai kosong): Reguler (penelitian/skripsi) atau Proyek dosen (`pendaftaran.jenisTA`). Proyek dosen memunculkan isian "Dosen pengusul proyek" (wajib; `namaPersetujuanDosen`, sebelumnya opsional untuk semua TA); Reguler menyembunyikannya.
+- Dokumen Pendaftaran TA mengikuti jenisnya: Reguler → Persetujuan UGB (`persetujuan-ugb`), Proyek dosen → Persetujuan Proyek Dosen (`persetujuan-proyek-dosen`, baru; tag diganti ke `{nama_dosen_proyek}` `{nip_dosen_proyek}` `{judul_ta}`). Dokumen tampil lewat `tampil(m)` di `TA_DOKUMEN`; syarat masuk Bimbingan (`unggahanPendaftaranTA` / aturan `firestore.rules`) ikut menyesuaikan.
+- Persetujuan Dosen Pembimbing dihapus seluruhnya (dokumen, generator, syarat masuk Bimbingan). Pembimbing ditentukan admin.
+- Form Kelayakan TA kini punya template (`kelayakan-ta`) dengan data baru dari form pendaftaran: Total SKS lulus (`totalSks`) dan Skor TOEFL (`toefl`), plus IPK dan dosen wali.
+- Centang "Sudah lulus 120 SKS dengan IPK ≥ 2,00" pindah ke admin (modal admin, tab Pendaftaran TA; Capstone di modal generik), diperiksa dari tautan berkas; mahasiswa tidak lagi bisa mengisinya (`syaratSKS` keluar dari `fieldPendaftaran` di `firestore.rules`).
+- Tautan berkas TA kini berisi: Proposal, Transkrip, IRS, Sertifikat TOEFL (tampil juga di tab Pendaftaran admin).
+- `firestore.rules`: field pendaftaran baru `jenisTA` (hanya '', 'reguler', 'proyek'), `totalSks`, `toefl`.
+
+## 21-10-2026 — Angkatan wajib di semua program
+- Isian Angkatan di form pendaftaran mahasiswa kini selalu wajib (ditandai *, divalidasi saat kirim) untuk semua program, lewat `wajibTetap` di `formPendaftaran.js`; tombol wajibnya di Pengaturan → Form Pendaftaran terkunci menyala. Sebelumnya tidak wajib di kode, dan hanya wajib bila admin menyalakan tombolnya per program.
+- `firestore.rules` menolak pengajuan baru tanpa angkatan dan edit yang mengosongkannya. Pengajuan lama yang angkatannya kosong tetap bisa diedit selama angkatannya tidak diubah menjadi kosong; data lama tidak diisi otomatis.
+
+## 20-10-2026 (3) — TA memakai daftar Tema yang sama dengan KP
+- Dropdown Topik/Bidang TA kini berisi daftar Tema yang sama dengan KP & Magang (`KP_TEMA`, diubah di Pengaturan → Form Pendaftaran pada kartu Tema/Bidang mana pun dari ketiga program itu). Daftar Bidang lama (`BIDANG`) tinggal untuk Capstone & Tesis S2. Aturannya satu tempat: `pakaiTemaKP` di `utils/pilihan.js`, dipakai form pendaftaran mahasiswa, modal admin, filter tabel Mahasiswa, dan editor Pengaturan.
+- Data lama: pengajuan TA yang menyimpan kode Bidang lama (mis. "Air Limbah") tetap tercetak dengan label lamanya, tapi dropdown-nya menampilkan "… (tidak valid, pilih ulang)". `functions/laporan-tema-bidang.js` kini ikut mendaftar pengajuan TA tersebut.
+
+## 20-10-2026 (2) — Ketua & Anggota Penguji dihitung terpisah di semua grafik beban
+- Ketua Penguji (penguji1) dan Anggota Penguji (penguji2) kini peran berbeda di semua grafik beban, tidak lagi dijumlah sebagai "penguji": `hitungBeban` mengembalikan `penguji1` & `penguji2` (total `penguji` tetap ada).
+- Modal admin TA: tab Seminar Proposal menampilkan beban Ketua Penguji saja; tab Sidang dan halaman data menampilkan dua grafik (Ketua & Anggota). Program lain tetap satu grafik penguji gabungan (`BebanDosenMini`).
+- Dashboard: grafik "Penguji" dipecah menjadi "Ketua Penguji" dan "Anggota Penguji".
+- Halaman Dosen: pilihan peran bernama "Ketua Penguji" dan "Anggota Penguji" (sebelumnya "Penguji 1 · Ketua (TA)" / "Penguji 2 · Anggota (TA)"), begitu pula kolom ekspor. Penguji 1/2 Capstone & Tesis S2 ikut terhitung di peran yang sama.
+
+## 20-10-2026 — TA: tahap Bimbingan, Ketua/Anggota Penguji; beban dosen per peran
+- TA kini Pendaftaran → **Bimbingan** → Seminar Proposal → Seminar Hasil → Sidang → Lulus. Mengunggah berkas Pendaftaran terakhir (Persetujuan UGB, Persetujuan Dosen Pembimbing, Surat Kelayakan TA, Lembar Pengesahan Proposal TA; `UNGGAHAN_PENDAFTARAN_TA`) memindahkan mahasiswa ke Bimbingan dan menandai "Menunggu verifikasi" supaya admin menetapkan pembimbing; `tahapMhsAman` di `firestore.rules` mengizinkan langkah ini hanya bila keempat berkas ada. Bimbingan → Seminar Proposal tetap lewat admin.
+- Dropdown dosen pembimbing (dan panel Nomor Surat) TA pindah dari tab Pendaftaran ke tab Bimbingan di modal admin.
+- Dokumen baru: "Lembar Pengesahan Proposal TA" (Pendaftaran; template `lempeng-proposal-ta` menyusul, sementara tampil "Template surat belum tersedia") dan "Surat Tugas Pembimbing TA" (Bimbingan, `TA/st-pembimbing-ta.docx`, diunduh mahasiswa setelah semua berkas Pendaftaran terunggah dan admin menetapkan pembimbing serta nomor surat).
+- Kartu mahasiswa TA: di Pendaftaran meminta semua berkas, di Bimbingan menunggu pembimbing / memberi tahu ST sudah tersedia.
+- Form pendaftaran TA: isian tautan berjudul "Link pengiriman berkas — Google Drive" dengan isi bernomor di bawahnya (Proposal, Transkrip, IRS).
+- TA: Penguji 1 = **Ketua Penguji**, Penguji 2 = **Anggota Penguji** (label di modal admin, kolom tabel, kartu mahasiswa, kolom peran portal dosen).
+- Halaman Dosen: beban dipisah per peran (Pembimbing, Penguji 1 · Ketua, Penguji 2 · Anggota), dirinci per program, dengan pilihan tampilan Grafik (batang bertumpuk mendatar per dosen, rincian saat diarahkan/difokus) atau Tabel (dengan Edit/Hapus). Pilihan diingat per perangkat. Ekspor memuat ketiga peran. `hitungBebanPeran` di `helpers.js`, `pages/dosen/BebanDosen.jsx`.
+
 ## 19-10-2026 (3) — Cache lokal & data contoh dihapus
 - Aplikasi tidak lagi menyimpan salinan data (mahasiswa, dosen, akun) di `localStorage` browser. Sebelumnya salinan ini tertinggal setelah logout, termasuk NIM, nomor WA, alamat, dan tautan berkas, dan bisa sekilas menampilkan data pengguna sebelumnya. Sisa cache lama (`sistem-ta-v2`) dihapus otomatis saat aplikasi dibuka. Yang masih disimpan di browser hanya preferensi tampilan (tema, ukuran teks, sidebar, kolom tabel).
 - Data contoh dihapus dari `src/data/seed.js` (mahasiswa fiktif, daftar dosen lama, pengumuman contoh). Project Firebase yang masih kosong kini hanya dibuatkan `config/global` kosong; dosen ditambahkan lewat Pengaturan → Staf atau tab Dosen.
@@ -38,6 +98,7 @@
 ## 16-10-2026 (2) — Simpan tidak menutup modal edit
 - Modal edit admin: "Simpan" kini menyimpan tanpa menutup modal (tombolnya menampilkan "Tersimpan ✓" sebentar), jadi panah ‹ › bisa langsung dipakai ke entri berikutnya. Setelah tersimpan, isi form diselaraskan ke record versi tersimpan (`awal` dari `Mahasiswa.jsx` mengikuti data terbaru), termasuk patokan "belum disimpan", banner perubahan data, dan centang unggah ulang. Menambah mahasiswa baru tetap menutup modal setelah Simpan.
 - Panah ‹ › dengan perubahan yang belum disimpan kini bertanya "Simpan perubahan lalu pindah?": OK menyimpan (dengan pemeriksaan yang sama seperti tombol Simpan) lalu pindah, Batal tetap di entri ini. Sebelumnya pilihannya membuang perubahan.
+- Perbaikan: urutan ‹ › kini dibekukan saat modal dibuka (`urutanBeku` di `Mahasiswa.jsx`). Sebelumnya urutannya mengikuti filter/sortir tabel secara langsung, jadi menyimpan entri yang lalu keluar dari filter (mis. filter "Menunggu verifikasi" lalu disimpan Terverifikasi) membuat tombol ‹ › hilang.
 - Tombol kiri footer "Batal" menjadi "Tutup" untuk record lama. Menutup modal (Tutup, ✕, atau klik di luar) dengan perubahan yang belum disimpan meminta konfirmasi dulu.
 
 ## 16-10-2026 — Generator surat TA lama dihapus

@@ -1,0 +1,1133 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "program",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "dibuatPada",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "program",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "nama",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "program",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "tahap",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "program",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "batasAkhir",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "program",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "nim",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "angkatan",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "dibuatPada",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "angkatan",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "nama",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "angkatan",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "tahap",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "angkatan",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "batasAkhir",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "angkatan",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "nim",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "bidang",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "dibuatPada",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "bidang",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "nama",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "bidang",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "tahap",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "bidang",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "batasAkhir",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "bidang",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "nim",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "verif",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "dibuatPada",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "verif",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "nama",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "verif",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "tahap",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "verif",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "batasAkhir",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "verif",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "nim",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "dibuatPada",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "nama",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "tahap",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "batasAkhir",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "nim",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "dosen",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "dibuatPada",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "dosen",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "nama",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "dosen",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "tahap",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "dosen",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "batasAkhir",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "dosen",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "nim",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "program",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "dibuatPada",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "program",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "nama",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "program",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "tahap",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "program",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "batasAkhir",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "program",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "nim",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "program",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "dibuatPada",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "program",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "nama",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "program",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "tahap",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "program",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "batasAkhir",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "program",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "nim",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "angkatan",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "dibuatPada",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "angkatan",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "nama",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "angkatan",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "tahap",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "angkatan",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "batasAkhir",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "angkatan",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "nim",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "bidang",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "dibuatPada",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "bidang",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "nama",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "bidang",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "tahap",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "bidang",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "batasAkhir",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "bidang",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "nim",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "verif",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "dibuatPada",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "verif",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "nama",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "verif",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "tahap",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "verif",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "batasAkhir",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "verif",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "nim",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "dibuatPada",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "nama",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "tahap",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "batasAkhir",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "nim",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "dosen",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "dibuatPada",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "dosen",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "nama",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "dosen",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "tahap",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "dosen",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "batasAkhir",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "dosen",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "nim",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "program",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "dibuatPada",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "program",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "nama",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "program",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "tahap",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "program",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "batasAkhir",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "program",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "nim",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "program",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "periode",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "dibuatPada",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "angkatan",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "periode",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "dibuatPada",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "bidang",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "periode",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "dibuatPada",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "verif",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "periode",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "dibuatPada",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "periode",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "dibuatPada",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "indeksMahasiswa",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "dosen",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "periode",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "dibuatPada",
+          "order": "ASCENDING"
+        }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

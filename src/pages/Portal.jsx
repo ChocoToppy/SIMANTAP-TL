@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { catatAktivitas, ditutup, tandaiMenungguVerifikasi, hitungPerubahanData, KUNCI_SURAT_BALASAN, dokumenConfigFor, dokumenFieldFor, eventAktif, programOf, programLabel } from '../utils/helpers.js';
+import { catatAktivitas, ditutup, unggahanPendaftaranTA, pendaftaranTALengkap, tandaiMenungguVerifikasi, hitungPerubahanData, KUNCI_SURAT_BALASAN, dokumenConfigFor, dokumenFieldFor, eventAktif, programOf, programLabel } from '../utils/helpers.js';
 import { PROGRAM_KEYS_PENDAFTARAN } from './portal/shared.js';
 import { Empty, TextSizeToggle, ThemeToggle, TabIcon } from '../components/ui.jsx';
 import { readFileForUpload } from '../utils/fileUpload.js';
@@ -73,6 +73,13 @@ export function Portal({ nim, nama, email, mahasiswa, allDosen, periodeBuka = []
     if (key === 'lembarPengesahanKP' && m.tahap === 'Bimbingan') {
       rec = { ...rec, tahap: 'Pembukuan' };
       rec = catatAktivitas(rec, 'tahapPembukuan');
+    }
+    // TA: berkas Pendaftaran terakhir → Bimbingan, menunggu admin memeriksa &
+    // menetapkan pembimbing (Surat Tugas Pembimbing terbit setelahnya).
+    if (programOf(m) === 'TA' && m.tahap === 'Pendaftaran' && unggahanPendaftaranTA(rec).includes(key) && pendaftaranTALengkap(rec)) {
+      rec = { ...rec, tahap: 'Bimbingan' };
+      rec = catatAktivitas(rec, 'tahapBimbinganTA');
+      rec = tandaiMenungguVerifikasi(rec);
     }
     onSave(rec);
   }

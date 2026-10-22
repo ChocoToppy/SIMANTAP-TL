@@ -4,7 +4,7 @@ import { InspektorField } from './InspektorField.jsx';
 import { TeksLive } from './TeksLive.jsx';
 import { BarSimpan } from './BarSimpan.jsx';
 import { useDraftKonten } from './useDraftKonten.js';
-import { setPilihan } from '../../utils/pilihan.js';
+import { setPilihan, pakaiTemaKP } from '../../utils/pilihan.js';
 import { FormPendaftaran } from '../portal/FormPendaftaran.jsx';
 import { OpsiTemaEditor } from './OpsiTemaEditor.jsx';
 
@@ -90,7 +90,7 @@ export function SeksiForm({ konten: kontenTersimpan = {}, onSimpan: simpanKeServ
   const adaPerubahan = !!(cur.urutan || Object.keys(cur.medan || {}).length);
 
   function isiKartu(id) {
-    if (id === 'bidang') return <OpsiTemaEditor jenis={gayaKP(kunci) ? 'kpTema' : 'bidang'} konten={konten} onSimpan={onSimpan} />;
+    if (id === 'bidang') return <OpsiTemaEditor jenis={pakaiTemaKP(kunci === 'MKT' ? 'MG' : kunci) ? 'kpTema' : 'bidang'} konten={konten} onSimpan={onSimpan} />;
     if (id === 'syarat') {
       return (
         <div className="ff-opsi">

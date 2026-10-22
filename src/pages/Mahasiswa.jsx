@@ -1,12 +1,15 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, punyaKlasifikasi, formatTanggal, formatTanggalSingkat, kondisi, SEMUA, statusVerif, cariBentrok, eventAktif, bidangLabel, tanggalDibuat, aktivitasTerakhir, hitungNomorUrut, jenisMagangOf } from '../utils/helpers.js';
-import { semuaKpTema, semuaBidang } from '../utils/pilihan.js';
+import { semuaTemaBidang } from '../utils/pilihan.js';
 import { Badge, StageBar, ExportMenu, ColumnMenu, ColResizeHandle, Empty, TombolHapusCari } from '../components/ui.jsx';
 import { useColumnWidths } from '../utils/useColumnWidths.js';
 import { perluDitinjau, kunciUrutNomor } from '../utils/nomorSurat.js';
 import { AktivitasMini, JadwalMini } from './mahasiswa/AktivitasCells.jsx';
 import { FormMahasiswa } from './mahasiswa/FormMahasiswa.jsx';
 import { eksporMahasiswa } from './mahasiswa/exportMahasiswa.js';
+import { useFilterMahasiswa } from './mahasiswa/useFilterMahasiswa.js';
+import { useArsipMahasiswa, URUT_ARSIP } from './mahasiswa/useArsipMahasiswa.js';
+import { KeteranganArsip, PaginasiArsip } from './mahasiswa/ArsipKontrol.jsx';
 
 // ===================== Mahasiswa.jsx =====================
 // Mahasiswa.jsx — daftar + cari + filter + tambah/edit (multi-program)
@@ -29,22 +32,31 @@ function kolomDosenProgram(programKey) {
   const p = PROGRAMS[programKey] || PROGRAMS.TA;
   const cols = [{ key: 'pembimbing1', label: p.pembimbingLabel || 'Pembimbing 1' }];
   if (p.pembimbing >= 2) cols.push({ key: 'pembimbing2', label: 'Pembimbing 2' });
-  if (p.penguji >= 1) cols.push({ key: 'penguji1', label: p.penguji >= 2 ? 'Penguji 1' : 'Penguji' });
-  if (p.penguji >= 2) cols.push({ key: 'penguji2', label: 'Penguji 2' });
+  if (p.penguji >= 1) cols.push({ key: 'penguji1', label: p.penguji1Label || (p.penguji >= 2 ? 'Penguji 1' : 'Penguji') });
+  if (p.penguji >= 2) cols.push({ key: 'penguji2', label: p.penguji2Label || 'Penguji 2' });
   return cols;
 }
 
 // Satu tabel = satu program (kolomnya beda-beda tiap program, jadi tidak
 // dicampur lagi). programTab dipegang App (default KP) supaya sidebar mobile
 // bisa ikut mengubahnya.
-export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeList, daftarAngkatan = [], konten = {}, onSave, onDelete, programTab, setProgramTab, jadwalRuang = null }) {
-  const [q, setQ] = useState('');
-  const [fAngkatan, setFAngkatan] = useState('');
-  const [fBidang, setFBidang] = useState('');
-  // KP/Magang & TA/Capstone pakai daftar kode bidang yang beda (KP_TEMA vs BIDANG) —
-  // reset filter ini tiap pindah tab supaya tidak nyangkut kode dari tab sebelumnya
-  // yang tidak berlaku lagi (bakal bikin hasil filter kosong tanpa alasan jelas).
-  useEffect(() => { setFBidang(''); }, [programTab]);
+export function Mahasiswa({ params = {}, mahasiswa, allMahasiswa, allDosen, periode, periodeList, daftarAngkatan = [], konten = {}, onSave, onDelete, programTab, setProgramTab, jadwalRuang = null, onMuatSemua = null, onMuatPeriode = null }) {
+  // Filter bidang dikosongkan saat ganti program oleh setProgramTab (App), karena kode
+  // bidang KP/Magang dan TA/Capstone berbeda.
+  const {
+    q, setQ, fAngkatan, setFAngkatan, fBidang, setFBidang, fStatus, setFStatus, fVerif, setFVerif,
+    fDosen, setFDosen, resetFilter, sortBy, sortDir, ubahSort, groupMode, setGroupMode,
+    pageSize, setPageSize, page, setPage,
+  } = useFilterMahasiswa(params, periode);
+  // "Semua periode" = tabel arsip per halaman dari Firestore (useArsipMahasiswa), kecuali
+  // Kelompokkan per Angkatan yang memang memuat semuanya.
+  const arsipAktif = periode === SEMUA && groupMode !== 'angkatan';
+  const [versiArsip, setVersiArsip] = useState(0);
+  const filterArsip = useMemo(
+    () => ({ program: programTab, q, fAngkatan, fBidang, fStatus, fVerif, fDosen, sortBy, sortDir, groupMode }),
+    [programTab, q, fAngkatan, fBidang, fStatus, fVerif, fDosen, sortBy, sortDir, groupMode]
+  );
+  const arsip = useArsipMahasiswa({ aktif: arsipAktif, filter: filterArsip, pageSize, versi: versiArsip });
 
   // Kolom tabel yang disembunyikan (pilihan pengguna) — beda dari lebar kolom
   // (colWidths), ini SENGAJA diingat lintas sesi via localStorage, karena
@@ -68,9 +80,6 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
       return next;
     });
   }
-  const [fStatus, setFStatus] = useState('all');
-  const [fVerif, setFVerif] = useState('');
-  const [fDosen, setFDosen] = useState('');
   const [editing, setEditing] = useState(null);
   const [open, setOpen] = useState(false);
   const [sudahPindah, setSudahPindah] = useState(false); // true = modal edit dibuka lewat ‹ › (tanpa animasi buka)
@@ -80,23 +89,27 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
   const [filtersOpen, setFiltersOpen] = useState(false);
   // Kolom cari diciutkan jadi ikon di layar sempit; melebar saat ditekan.
   const [searchOpen, setSearchOpen] = useState(false);
-  const [sortBy, setSortBy] = useState('nama'); // nama | tahap | deadline | aktivitas | …
-  const [sortDir, setSortDir] = useState('asc');
-  function ubahSort(key) {
-    if (sortBy === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-    // Aktivitas: klik pertama langsung yang terbaru di atas.
-    else { setSortBy(key); setSortDir(key === 'aktivitas' ? 'desc' : 'asc'); }
-  }
-  const panah = (key) => (sortBy === key ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '');
+  const urutBisa = (key) => !arsipAktif || (key in URUT_ARSIP && !arsip.urutDipaksa);
+  const panah = (key) => (sortBy === key && urutBisa(key) ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '');
+  const thSort = (key) => (urutBisa(key)
+    ? { className: 'th-sort', onClick: () => ubahSort(key) }
+    : { title: arsipAktif && arsip.urutDipaksa ? 'Urutan mengikuti pencarian atau filter yang aktif' : 'Tidak bisa diurutkan di Semua periode' });
 
   // Nomor identitas tetap (berdasarkan urutan pendaftaran pertama), dihitung dari
   // SELURUH data — tidak berubah walau tabel disortir/difilter.
   const nomorUrut = useMemo(() => hitungNomorUrut(allMahasiswa || mahasiswa), [allMahasiswa, mahasiswa]);
   const dosenByKode = useMemo(() => Object.fromEntries((allDosen || []).map((d) => [d.kode, d])), [allDosen]);
-  const [groupMode, setGroupMode] = useState(periode === SEMUA ? 'periode' : 'none');
+  // Nomor per angkatan dihitung lintas periode, jadi butuh seluruh data (lihat useMahasiswaAdmin).
+  // Lewat efek, supaya tautan yang sudah membawa ?grup=angkatan ikut memuat semuanya.
   useEffect(() => {
-    setGroupMode(periode === SEMUA ? 'periode' : 'none');
-  }, [periode]);
+    if (groupMode === 'angkatan' && onMuatSemua) onMuatSemua();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupMode]);
+  const teksKosong = arsipAktif && arsip.memuat ? 'Memuat…'
+    : arsipAktif && q.trim() ? `Tidak ada yang nama atau NIM-nya diawali "${q.trim()}".`
+    : q.trim() && periode !== SEMUA
+      ? `Tidak ada data yang cocok di periode ${periode}. Untuk mencari di semua periode, pilih "Semua periode".`
+      : 'Tidak ada data yang cocok.';
 
   const dosenCols = useMemo(() => kolomDosenProgram(programTab), [programTab]);
   const COLS = useMemo(() => [
@@ -131,7 +144,7 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
   // Opsi filter Bidang ikut tab program aktif — KP/Magang pakai daftar tema KP_TEMA,
   // bukan BIDANG (topik TA/CAP), sesuai field `bidang` yang dipakai tiap gaya program
   // (lihat gantiProgram di FormPendaftaran.jsx).
-  const bidangOpsiFilter = (programTab === 'KP' || programTab === 'MG') ? semuaKpTema() : semuaBidang();
+  const bidangOpsiFilter = semuaTemaBidang(programTab);
 
   const angkatanList = useMemo(
     () => Array.from(new Set(mahasiswa.filter((m) => programOf(m) === programTab).map((m) => m.angkatan))).sort((a, b) => b - a),
@@ -139,6 +152,7 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
   );
 
   const rows = useMemo(() => {
+    if (arsipAktif) return [];
     const term = q.trim().toLowerCase();
     return mahasiswa
       .map((m) => ({ m, k: kondisi(m) }))
@@ -179,7 +193,11 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
           : m.nama;
         return String(val(a.m)).localeCompare(String(val(b.m)), 'id') * arah;
       });
-  }, [mahasiswa, programTab, q, fAngkatan, fBidang, fStatus, fVerif, fDosen, sortBy, sortDir, nomorUrut, groupMode]);
+  }, [arsipAktif, mahasiswa, programTab, q, fAngkatan, fBidang, fStatus, fVerif, fDosen, sortBy, sortDir, nomorUrut, groupMode]);
+  // Arsip: baris halaman ini dari Firestore. `tampil` = semua baris yang tersedia di layar.
+  const rowsArsip = useMemo(() => arsip.rows.map((m) => ({ m, k: kondisi(m) })), [arsip.rows]);
+  const tampil = arsipAktif ? rowsArsip : rows;
+  const noArsip = useMemo(() => new Map(arsip.rows.map((m, i) => [m.id, arsip.mulai + i + 1])), [arsip.rows, arsip.mulai]);
 
   const notif = useMemo(() => {
     let baru = 0, kiriman = 0, perluJadwal = 0, perluHasil = 0, bentrok = 0, kelompok = 0;
@@ -202,14 +220,12 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
   // Paginasi — pencarian/filter (di atas) selalu jalan di atas SELURUH `mahasiswa`,
   // bukan cuma halaman yang lagi tampil; paginasi cuma memotong hasil akhir buat
   // ditampilkan. Default 100 baris/halaman, bisa diperkecil.
-  const [pageSize, setPageSize] = useState(100);
-  const [page, setPage] = useState(1);
-  useEffect(() => {
-    setPage(1);
-  }, [q, programTab, fAngkatan, fBidang, fStatus, fVerif, fDosen, pageSize, groupMode, periode]);
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
   const safePage = Math.min(page, totalPages);
-  const pageRows = useMemo(() => rows.slice((safePage - 1) * pageSize, safePage * pageSize), [rows, safePage, pageSize]);
+  const pageRows = useMemo(
+    () => (arsipAktif ? rowsArsip : rows.slice((safePage - 1) * pageSize, safePage * pageSize)),
+    [arsipAktif, rowsArsip, rows, safePage, pageSize]
+  );
 
   // Kelompokkan baris halaman ini (yang sudah difilter & disortir) berdasarkan
   // periode/angkatan, menjaga urutan relatif yang sudah ada — mirip tampilan
@@ -227,6 +243,7 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
   }, [pageRows, groupMode]);
 
   function noUntuk(m) {
+    if (arsipAktif) return noArsip.get(m.id) ?? '—';
     if (groupMode === 'angkatan') return (nomorUrut[m.id] || {}).angkatan ?? '—';
     return (nomorUrut[m.id] || {}).periode ?? '—';
   }
@@ -235,37 +252,55 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
   // hasil filter/sort (lintas halaman), dengan pengelompokan periode/angkatan
   // ikut diterapkan seperti di grupRows.
   const urutanEdit = useMemo(() => {
-    if (groupMode === 'none') return rows.map((r) => r.m.id);
+    if (groupMode === 'none') return tampil.map((r) => r.m.id);
     const keyOf = (m) => (groupMode === 'angkatan' ? (m.angkatan || '—') : (m.periode || '—'));
     const map = new Map();
-    rows.forEach((r) => {
+    tampil.forEach((r) => {
       const k = keyOf(r.m);
       if (!map.has(k)) map.set(k, []);
       map.get(k).push(r.m.id);
     });
     return Array.from(map.values()).flat();
-  }, [rows, groupMode]);
+  }, [tampil, groupMode]);
+  // Urutan ‹ › dibekukan saat modal dibuka: menyimpan bisa mengeluarkan entri dari
+  // filter/sortir aktif (mis. filter "Menunggu verifikasi" lalu disimpan Terverifikasi),
+  // yang sebelumnya menghilangkan tombol ‹ › karena entri itu tak lagi ada di urutan.
+  const [urutanBeku, setUrutanBeku] = useState([]);
   function pindahEdit(id) {
-    const r = rows.find((x) => x.m.id === id);
-    if (r) { setSudahPindah(true); setEditing(r.m); }
+    const m = (allMahasiswa || mahasiswa).find((x) => x.id === id) || arsip.rows.find((x) => x.id === id);
+    if (m) { setSudahPindah(true); setEditing(m); }
   }
 
   function tambah() { setSudahPindah(false); setEditing(null); setOpen(true); }
-  function edit(m) { setSudahPindah(false); setEditing(m); setOpen(true); }
+  // Dari arsip: muat periode record itu, supaya cek lintas record di form (bentrok, beban, nomor) lengkap.
+  function edit(m) {
+    if (arsipAktif && onMuatPeriode && m.periode) onMuatPeriode(m.periode);
+    setSudahPindah(false); setUrutanBeku(urutanEdit); setEditing(m); setOpen(true);
+  }
   // Simpan menutup modal hanya untuk mahasiswa baru; record lama tetap terbuka
   // supaya admin bisa lanjut ke entri berikutnya dengan ‹ ›.
-  function simpan(m) { onSave(m); if (!editing) setOpen(false); }
+  function simpan(m) {
+    onSave(m, arsip.rows.find((x) => x.id === m.id) || null);
+    if (arsipAktif) setVersiArsip((v) => v + 1);
+    if (!editing) setOpen(false);
+  }
   // Versi terkini record yang sedang diedit (setelah disimpan, App mungkin
   // menambah field), supaya FormMahasiswa bisa menyelaraskan isinya.
   const editingTerkini = editing ? ((allMahasiswa || mahasiswa).find((x) => x.id === editing.id) || editing) : null;
-  function hapus(m) { if (window.confirm(`Hapus data ${m.nama}?`)) onDelete(m.id); }
+  function hapus(m) {
+    if (!window.confirm(`Hapus data ${m.nama}?`)) return;
+    Promise.resolve(onDelete(m.id, m)).then(() => { if (arsipAktif) setVersiArsip((v) => v + 1); });
+  }
 
   // Nama lengkap dosen dipakai khusus saat ekspor (kolom tabel tetap pakai kode
   // singkat spy hemat lebar) — lihat dosenByKode di bawah.
   const namaLengkapDosen = (kode) => (kode && dosenByKode[kode]) ? dosenByKode[kode].nama : (kode || '');
 
   async function ekspor(format) {
-    await eksporMahasiswa(format, rows.map((x) => x.m), { nomorUrut, namaLengkapDosen });
+    if (!arsipAktif) { await eksporMahasiswa(format, rows.map((x) => x.m), { nomorUrut, namaLengkapDosen }); return; }
+    // Arsip: semua baris yang cocok diambil sekarang; No. = posisi di hasil itu.
+    const semua = await arsip.semua();
+    await eksporMahasiswa(format, semua, { nomorUrut: Object.fromEntries(semua.map((m, i) => [m.id, { periode: i + 1 }])), namaLengkapDosen });
   }
 
   return (
@@ -285,7 +320,7 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
           </button>
           <input
             className="search"
-            placeholder="Cari nama, NIM, atau judul…"
+            placeholder={arsipAktif ? "Cari awalan nama atau NIM…" : "Cari nama, NIM, atau judul…"}
             value={q}
             autoFocus={searchOpen}
             onChange={(e) => setQ(e.target.value)}
@@ -307,7 +342,7 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
               className="btn toolbar-clear"
               title="Bersihkan filter"
               aria-label="Bersihkan filter"
-              onClick={() => { setFStatus('all'); setFAngkatan(''); setFBidang(''); setFVerif(''); setFDosen(''); }}
+              onClick={resetFilter}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
                 <line x1="6" y1="6" x2="18" y2="18" />
@@ -328,7 +363,7 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
                 </select>
                 <select value={fAngkatan} onChange={(e) => setFAngkatan(e.target.value)}>
                   <option value="">Semua angkatan</option>
-                  {angkatanList.map((a) => <option key={a} value={a}>Angkatan {a}</option>)}
+                  {(arsipAktif ? [...daftarAngkatan].reverse() : angkatanList).map((a) => <option key={a} value={a}>Angkatan {a}</option>)}
                 </select>
                 <select value={fBidang} onChange={(e) => setFBidang(e.target.value)}>
                   <option value="">Semua bidang</option>
@@ -371,6 +406,7 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
           {notif.kelompok > 0 && <span>👥 <strong>{notif.kelompok}</strong> jadwal terindikasi sidang kelompok. </span>}
         </div>
       )}
+      {arsipAktif && <KeteranganArsip arsip={arsip} />}
       <div className="table-wrap card mhs-table-wrap" ref={tableWrapRef}>
         <table className="tbl tbl-resizable" style={{ width: tableWidth }}>
           <colgroup>
@@ -380,16 +416,16 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
           </colgroup>
           <thead>
             <tr>
-              <th className="th-sort" onClick={() => ubahSort('no')}>No.{panah('no')}<ColResizeHandle onMouseDown={(e) => startResize(0, e)} /></th>
-              <th className="th-sort" onClick={() => ubahSort('nama')}>Mahasiswa{panah('nama')}<ColResizeHandle onMouseDown={(e) => startResize(1, e)} /></th>
-              {!hiddenCols.has('judul') && <th className="th-sort" onClick={() => ubahSort('judul')}>Judul{panah('judul')}<ColResizeHandle onMouseDown={(e) => startResize(2, e)} /></th>}
-              {!hiddenCols.has('tahap') && <th className="th-sort" onClick={() => ubahSort('tahap')}>Tahap &amp; jadwal{panah('tahap')}<ColResizeHandle onMouseDown={(e) => startResize(3, e)} /></th>}
+              <th {...thSort('no')}>No.{panah('no')}<ColResizeHandle onMouseDown={(e) => startResize(0, e)} /></th>
+              <th {...thSort('nama')}>Mahasiswa{panah('nama')}<ColResizeHandle onMouseDown={(e) => startResize(1, e)} /></th>
+              {!hiddenCols.has('judul') && <th {...thSort('judul')}>Judul{panah('judul')}<ColResizeHandle onMouseDown={(e) => startResize(2, e)} /></th>}
+              {!hiddenCols.has('tahap') && <th {...thSort('tahap')}>Tahap &amp; jadwal{panah('tahap')}<ColResizeHandle onMouseDown={(e) => startResize(3, e)} /></th>}
               {dosenCols.map((c, i) => (
-                !hiddenCols.has(c.key) && <th key={c.key} className="th-sort" onClick={() => ubahSort(c.key)}>{c.label}{panah(c.key)}<ColResizeHandle onMouseDown={(e) => startResize(4 + i, e)} /></th>
+                !hiddenCols.has(c.key) && <th key={c.key} {...thSort(c.key)}>{c.label}{panah(c.key)}<ColResizeHandle onMouseDown={(e) => startResize(4 + i, e)} /></th>
               ))}
-              {!hiddenCols.has('deadline') && <th className="th-sort" onClick={() => ubahSort('deadline')}>Deadline{panah('deadline')}<ColResizeHandle onMouseDown={(e) => startResize(4 + dosenCols.length, e)} /></th>}
-              {!hiddenCols.has('aktivitas') && <th className="th-sort" onClick={() => ubahSort('aktivitas')}>Aktivitas{panah('aktivitas')}<ColResizeHandle onMouseDown={(e) => startResize(5 + dosenCols.length, e)} /></th>}
-              {!hiddenCols.has('nomorSurat') && <th className="th-sort" onClick={() => ubahSort('nomorSurat')}>No. Surat{panah('nomorSurat')}<ColResizeHandle onMouseDown={(e) => startResize(6 + dosenCols.length, e)} /></th>}
+              {!hiddenCols.has('deadline') && <th {...thSort('deadline')}>Deadline{panah('deadline')}<ColResizeHandle onMouseDown={(e) => startResize(4 + dosenCols.length, e)} /></th>}
+              {!hiddenCols.has('aktivitas') && <th {...thSort('aktivitas')}>Aktivitas{panah('aktivitas')}<ColResizeHandle onMouseDown={(e) => startResize(5 + dosenCols.length, e)} /></th>}
+              {!hiddenCols.has('nomorSurat') && <th {...thSort('nomorSurat')}>No. Surat{panah('nomorSurat')}<ColResizeHandle onMouseDown={(e) => startResize(6 + dosenCols.length, e)} /></th>}
               <th></th>
             </tr>
           </thead>
@@ -444,15 +480,15 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
             })()}
           </tbody>
         </table>
-        {rows.length === 0 && <Empty>Tidak ada data yang cocok.</Empty>}
+        {tampil.length === 0 && <Empty>{teksKosong}</Empty>}
       </div>
 
       {/* Tampilan daftar (bukan tabel) untuk layar sempit — data & urutan sama
           persis dengan tabel di atas (pageRows/grupRows), cuma ditata ulang
           jadi baris bertumpuk supaya tidak perlu geser ke samping di HP. */}
       <div className="mhs-mobile-rows">
-        {rows.length === 0 ? (
-          <Empty>Tidak ada data yang cocok.</Empty>
+        {tampil.length === 0 ? (
+          <Empty>{teksKosong}</Empty>
         ) : (() => {
           const barisMobile = ({ m, k }) => (
             <div className="mhs-row" key={m.id} onClick={() => edit(m)}>
@@ -487,7 +523,8 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
         })()}
       </div>
 
-      {rows.length > 0 && (
+      {arsipAktif && <PaginasiArsip arsip={arsip} jumlah={rowsArsip.length} pageSize={pageSize} setPageSize={setPageSize} />}
+      {!arsipAktif && rows.length > 0 && (
         <div className="pagination">
           <span className="hint">
             Menampilkan {rows.length === 0 ? 0 : (safePage - 1) * pageSize + 1}–{Math.min(safePage * pageSize, rows.length)} dari {rows.length} data
@@ -509,7 +546,7 @@ export function Mahasiswa({ mahasiswa, allMahasiswa, allDosen, periode, periodeL
         <FormMahasiswa
           key={editing ? editing.id : 'baru'}
           awal={editingTerkini}
-          urutan={urutanEdit}
+          urutan={urutanBeku}
           onPindah={pindahEdit}
           sudahPindah={sudahPindah}
           allDosen={allDosen}

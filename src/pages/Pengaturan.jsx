@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { SeksiPeriode } from './pengaturan/SeksiPeriode.jsx';
 import { SeksiAngkatan } from './pengaturan/SeksiAngkatan.jsx';
 import { SeksiPengumuman } from './pengaturan/SeksiPengumuman.jsx';
@@ -12,7 +12,6 @@ import { SeksiJadwalRuang } from '../modules/ruang';
 import { FITUR_RUANG } from '../utils/config.js';
 import { ErrorBoundary } from '../components/ErrorBoundary.jsx';
 import { TabIcon } from '../components/ui.jsx';
-import { konfirmasiKeluar } from '../utils/perubahanBelumDisimpan.js';
 
 // ===================== Pengaturan.jsx =====================
 // Halaman admin "Pengaturan" — dulunya tiga modal terpisah (Kelola periode /
@@ -38,6 +37,7 @@ const SUB_TABS = [
   { key: 'nomorSurat', label: 'Registri Nomor Surat', icon: 'dokumen' },
   ...(FITUR_RUANG ? [{ key: 'ruang', label: 'Jadwal Ruang', icon: 'ruang' }] : []),
 ];
+const slugSeksi = (key) => key.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase());
 
 export function Pengaturan({
   periodeBuka, periodeAktif, onBukaPeriode, onTutupPeriode, onSetPeriodeAktif,
@@ -49,11 +49,13 @@ export function Pengaturan({
   isSuperAdmin = false, currentAdminUid, onDeleteAdmin, onClaimSuperAdmin, onUpdateSelfAdmin,
   angkatan = [], onTambahAngkatan, onToggleAngkatanAktif,
   jadwalRuang = null, aksiJadwalRuang,
+  seksi = '', onPindahSeksi,
 }) {
-  const [subTab, setSubTab] = useState(SUB_TABS[0].key);
-  const aktif = SUB_TABS.find((t) => t.key === subTab) || SUB_TABS[0];
-  // Pindah menu: minta konfirmasi bila editor visual masih punya draf yang belum disimpan.
-  const pindahSeksi = (k) => { if (k === subTab || konfirmasiKeluar()) setSubTab(k); };
+  // Seksi dari URL (/pengaturan/nomor-surat); kosong atau tidak dikenal = seksi pertama.
+  const aktif = SUB_TABS.find((t) => slugSeksi(t.key) === seksi) || SUB_TABS[0];
+  const subTab = aktif.key;
+  // onPindahSeksi (rute.pindah) yang meminta konfirmasi bila editor masih punya draf.
+  const pindahSeksi = (k) => { if (k !== subTab) onPindahSeksi(slugSeksi(k)); };
 
   return (
     <div className="pengaturan-layout">

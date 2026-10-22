@@ -55,6 +55,9 @@ export function rancangSinkronProgram(mahasiswa, data) {
     const lama = ada.get(id);
     if (!lama || SAMA.some((k) => lama[k] !== b[k])) set.push(b);
   });
-  const hapus = [...ada.keys()].filter((id) => !inginkan.has(id));
+  // Admin tidak memuat semua mahasiswa (useMahasiswaAdmin): booking milik mahasiswa yang
+  // tidak dimuat dibiarkan. Booking mahasiswa yang dihapus: lihat hapusBookingMahasiswa.
+  const dimuat = new Set((mahasiswa || []).map((m) => m.id));
+  const hapus = [...ada.keys()].filter((id) => !inginkan.has(id) && dimuat.has((ada.get(id).ref || {}).mahasiswaId));
   return { set, hapus, tidakMasuk };
 }

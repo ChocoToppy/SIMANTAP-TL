@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { PROGRAM_KEYS, programLabel, programDisplayLabel, ringkasPendaftaran, normalizeUrl, formatTanggal, judulLabelFor, statusVerif, pembukuanDisetujui } from '../../utils/helpers.js';
-import { kpTemaUntukPilihan, bidangUntukPilihan } from '../../utils/pilihan.js';
+import { pilihanTemaBidang } from '../../utils/pilihan.js';
+import { META } from '../../utils/formPendaftaran.js';
 import { Field, Modal, MessageIcon, Badge, LampIcon, PencilIcon } from '../../components/ui.jsx';
 import { KpDocumentPanel } from '../../components/kpDocuments.jsx';
 import { LinkBerkasRow } from './LinkBerkasRow.jsx';
@@ -112,8 +113,7 @@ export function FormMahasiswaKP({
           <Field label={judulLabelFor(m)} full><textarea rows={2} value={m.judul} onChange={(e) => set('judul', e.target.value)} /></Field>
           <Field label="Bidang">
             <select value={m.bidang} onChange={(e) => set('bidang', e.target.value)}>
-              {/* Modal ini juga dipakai TA, yang memakai daftar Bidang, bukan Tema KP. */}
-              {(m.program === 'TA' ? bidangUntukPilihan(m.bidang) : kpTemaUntukPilihan(m.bidang)).map((b) => <option key={b.kode} value={b.kode}>{b.label}</option>)}
+              {pilihanTemaBidang(m.program, m.bidang).map((b) => <option key={b.kode} value={b.kode}>{b.label}</option>)}
             </select>
           </Field>
 
@@ -230,18 +230,21 @@ export function FormMahasiswaKP({
               <div style={{ marginTop: 10 }}>
                 <LinkBerkasRow label="Link berkas pendaftaran" url={p.berkasLink} onUbah={(v) => setM((prev) => ({ ...prev, pendaftaran: { ...(prev.pendaftaran || {}), berkasLink: v } }))} diperiksa={p.berkasDiperiksa} onDiperiksa={(v) => setM((prev) => ({ ...prev, pendaftaran: { ...(prev.pendaftaran || {}), berkasDiperiksa: v } }))} />
               </div>
-            </div>
-          )}
-
-          {tahapTab === 'Pendaftaran' && m.program === 'TA' && (
-            <div className="sched">
-              <div className="sched-title">Dosen pembimbing</div>
-              <div className="sched-grid">
-                <Field label={pembimbing1Label} full><select value={m.pembimbing1} onChange={(e) => set('pembimbing1', e.target.value)}>{dosenOpts}</select></Field>
-                <NomorSuratPanel m={m} setM={setM} baru={baru} terpakai={nomorTerpakai} />
-              </div>
-              {bebanBlok('bimbingan')}
-              <div className="hint" style={{ marginTop: 6 }}>Pembimbing yang sama dipakai di Seminar Proposal, Seminar Hasil, dan Sidang. Nomor surat dipakai untuk semua dokumen TA.</div>
+              {m.program === 'TA' && (
+                <>
+                  <div className="hint" style={{ marginTop: 6 }}>
+                    Berisi:
+                    <ol style={{ margin: '4px 0 0', paddingLeft: 20 }}>
+                      {(META.berkasLink.isi('TA') || []).map((x) => <li key={x}>{x}</li>)}
+                    </ol>
+                  </div>
+                  {/* Diperiksa admin dari tautan di atas; mahasiswa tidak lagi mencentangnya sendiri. */}
+                  <label className="check" style={{ marginTop: 10 }}>
+                    <input type="checkbox" checked={!!p.syaratSKS} onChange={(e) => setM((prev) => ({ ...prev, pendaftaran: { ...(prev.pendaftaran || {}), syaratSKS: e.target.checked } }))} />
+                    <span>Sudah lulus 120 SKS dengan IPK ≥ 2,00 (diperiksa dari transkrip)</span>
+                  </label>
+                </>
+              )}
             </div>
           )}
 
@@ -251,7 +254,7 @@ export function FormMahasiswaKP({
               <div className="sched-grid">
                 <Field label={penguji1Label} full><select value={m.penguji1} onChange={(e) => set('penguji1', e.target.value)}>{dosenOpts}</select></Field>
               </div>
-              {bebanBlok('penguji')}
+              {bebanBlok('penguji1')}
               <div className="hint" style={{ marginTop: 6 }}>Penguji ini juga menguji di Seminar Hasil dan Sidang.</div>
             </div>
           )}
@@ -267,6 +270,7 @@ export function FormMahasiswaKP({
                 <NomorSuratPanel m={m} setM={setM} baru={baru} terpakai={nomorTerpakai} />
               </div>
               {bebanBlok('bimbingan')}
+              {m.program === 'TA' && <div className="hint" style={{ marginTop: 6 }}>Pembimbing yang sama dipakai di Seminar Proposal, Seminar Hasil, dan Sidang. Nomor surat dipakai untuk semua dokumen TA, termasuk Surat Tugas Pembimbing.</div>}
             </div>
           )}
 
@@ -280,7 +284,7 @@ export function FormMahasiswaKP({
                 )}
               </div>
               {bebanBlok('penguji')}
-              <div className="hint" style={{ marginTop: 6 }}>Penguji 1 sama dengan penguji Seminar Proposal. Pembimbing diubah di tab Pendaftaran.</div>
+              <div className="hint" style={{ marginTop: 6 }}>{m.program === 'TA' ? 'Ketua Penguji sama dengan penguji Seminar Proposal.' : 'Penguji 1 sama dengan penguji Seminar Proposal.'} Pembimbing diubah di tab Bimbingan.</div>
             </div>
           )}
 

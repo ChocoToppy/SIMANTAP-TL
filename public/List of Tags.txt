@@ -303,13 +303,31 @@ persetujuan-ugb
 {tgl_cetak}
 {nama_pembimbing} / {nip_pembimbing} (sent, not in the template yet)
 
-persetujuan-dosbing
+persetujuan-dosbing — REMOVED from the app (2026-10-21). The pembimbing is now chosen by
+the admin only; the file "persetujuan-dosbing (not used).docx" is not read by anything.
 
-documentGenerator.js reads TA/persetujuan-dosbing.docx, which DOES NOT EXIST — the file
-is still named "persetujuan-dosbing (WiP).docx", so downloading this document fails
-until the file is renamed (or the path in documentGenerator.js is changed).
-Template tags: {nama_mhs} {nim} {nama_pembimbing} {nip_pembimbing}.
-Also available: {judul_ta} {tema_ta} {tgl_cetak} {nama_dosen_wali} {nip_dosen_wali}
+persetujuan-ugb is used for TA jenis "Reguler"; TA jenis "Proyek dosen" uses
+persetujuan-proyek-dosen instead (jenisTA in the registration form).
+
+persetujuan-proyek-dosen (Persetujuan Proyek Dosen TA, tahap Pendaftaran, jenis Proyek dosen)
+Tags renamed 2026-10-21 from {{Dosen}} {{NIP}} {{Judul TA}}:
+{nama_dosen_proyek} - the "Dosen pengusul proyek" picked in the registration form
+  (pendaftaran.namaPersetujuanDosen)
+{nip_dosen_proyek}
+{judul_ta}
+Also sent: {nama_mhs} {nim} {tema_ta} {tgl_cetak} {nama_dosen_wali} {nip_dosen_wali}
+
+kelayakan-ta (Form Kelayakan TA, tahap Pendaftaran)
+The template still uses {{Nama}} {{NIM}} {{IPK}} {{Total SKS}} {{Hasil TOEFL}} {{Dosen Wali}} {{NIP}},
+which docxtemplater cannot read — they must become:
+{nama_mhs}
+{nim}
+{ipk} - pendaftaran.ipk
+{total_sks} - pendaftaran.totalSks (new TA registration field)
+{hasil_toefl} - pendaftaran.toefl (new TA registration field)
+{nama_dosen_wali}
+{nip_dosen_wali}
+Also sent: {judul_ta} {tgl_cetak}
 
 perpanjangan-ta
 
@@ -330,7 +348,14 @@ perpanjangan-ta
 NOTE: the footer reads "Dicetak tgl: {mulai_ta} – {akhir_ta}" (a date range, not the
   print date). Left as is; change it to "Dicetak tgl: {tgl_cetak}" if that was the intent.
 
-st-pembimbing-ta - NOT wired in documentGenerator.js yet (no docType/case)
+lempeng-proposal-ta (Lembar Pengesahan Proposal TA, tahap Pendaftaran) - TEMPLATE PENDING.
+docType 'Lembar Pengesahan Proposal TA' is listed in TA_DOKUMEN (key lembarPengesahanProposalTA)
+and shows "Template surat belum tersedia" until the .docx exists and getTemplateConfig has a case.
+The student must upload its signed scan before moving to Bimbingan (UNGGAHAN_PENDAFTARAN_TA).
+
+st-pembimbing-ta (ST Pembimbing TA, tahap Bimbingan) - wired 2026-10-20 (docType 'ST Pembimbing TA').
+Student downloads it once every Pendaftaran upload is in and the admin has set the pembimbing
+(and nomor surat). Also sent: {tema_ta}, {tgl_cetak}, {nama_dosen_wali}, {nip_dosen_wali}.
 
 {no_surat}
 {nama_mhs}
