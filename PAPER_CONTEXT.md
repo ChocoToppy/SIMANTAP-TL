@@ -131,11 +131,11 @@ other three programs are future work **[INFERRED framing, confirm with the autho
  ├─ qrcode: render QR PNG, inject into .docx                 │
  └─ Firebase JS SDK ──────────────┐                          │
                                   ▼                          ▼
- Firebase project "simantap-tl"                     Cloud Functions (HTTP, public, CORS *)
+ Firebase project "simantap-tl"                     Cloud Functions (HTTP, public, CORS *; asia-southeast2)
  ├─ Authentication (email+password, custom claims)  ├─ verifikasiSuratPublik
  ├─ Firestore (per-entity collections, Security     └─ jadwalRuangPublik  (/api/ruang)
  │   Rules = server-side validation)
- ├─ Storage (uploads/{applicationId}/..., rules)    Cloud Functions (callable, authenticated)
+ ├─ Storage (uploads/{applicationId}/..., rules)    Cloud Functions (callable, authenticated; asia-southeast2)
  └─ Firestore trigger catatPerubahanDataSurat       ├─ account mgmt (create/reset/delete/claims)
                                                     └─ terbitkanVerifikasi (issue QR token)
  Cloud Run "simantap-pdf-converter" (asia-southeast2)
@@ -150,7 +150,7 @@ other three programs are future work **[INFERRED framing, confirm with the autho
 | Auth | Firebase Auth + custom claims `{role, nim | kode, super}` | `src/utils/auth.js`, `functions/index.js` |
 | Database | Cloud Firestore, real-time listeners (`onSnapshot`) | `src/App.jsx:285-357`, `src/utils/useMahasiswaAdmin.js` |
 | Authorization / validation | Firestore & Storage Security Rules | `firestore.rules` (467 lines), `storage.rules` |
-| Server logic | Cloud Functions v1, Node 20 | `functions/index.js`, `functions/verifikasiSurat.js` |
+| Server logic | Cloud Functions v1, Node 22 | `functions/index.js`, `functions/verifikasiSurat.js` |
 | File storage | Firebase Storage, PDF only, ≤25 MB | `src/utils/fileUpload.js`, `storage.rules` |
 | Letter generation | docxtemplater 3.69 + PizZip in the browser | `src/utils/documentGenerator.js` |
 | PDF conversion | Express + LibreOffice Writer on Cloud Run | `converter-service/server.js`, `converter-service/Dockerfile` |
@@ -165,7 +165,7 @@ From `firestore.rules` and `src/App.jsx`:
 
 | Collection | Key | Content | Who writes |
 |---|---|---|---|
-| `mahasiswa/{id}` | `{nim}_{program}` (or `_2`, `_3` after closure) | One application: form data, stage, verification state, lecturers, schedule per event, uploads, extension, activity log, change-tracking | admin; student (whitelisted fields only) |
+| `mahasiswa/{id}` | `{nim}_{program}` (or `_2`, `_3` after closure) | One application: form data, stage, verification state, lecturers, schedule per event, uploads, extension, KP program window (`mulaiProgram`, `batasProgram`), activity log, change-tracking | admin; student (whitelisted fields only) |
 | `slotPengajuan/{nim}_{program}` | uniqueness marker | Points to the doc holding (nim, program) when its ID is not the canonical one | admin, functions, migration script |
 | `akun/{nim}` | student account profile | `uid, email, isActive, mustChangePassword` | admin, functions; student only clears `mustChangePassword` |
 | `dosen/{kode}` | lecturer profile | | admin |
@@ -174,7 +174,7 @@ From `firestore.rules` and `src/App.jsx`:
 | `auditLog/*` | account actions | | functions only |
 | `config/global` | open periods, every period ever used (`daftarPeriode`), announcements, guides, admin-editable content/form text | | admin; public read |
 | `angkatan/*` | cohort years (archived, never deleted) | | admin |
-| `nomorSurat/{year-seq}` | letter-number registry | never deleted | admin |
+| `nomorSurat/{year-month-seq}` | letter-number registry | never deleted | admin |
 | `verifikasiSurat/{token}` | QR verification records | | functions only, no client access |
 | `dataSuratDiubah/{applicationId}` | timestamp of last change to printed fields | | trigger only |
 | `indeksMahasiswa/{applicationId}` | queryable mirror of one application for the "Semua periode" archive table (program, periode, angkatan, bidang, tahap, deadline, NIM, lower-case name, entry date, status, verification, lecturer codes) | | trigger only; admin read |
@@ -249,8 +249,8 @@ complete) intentionally download as editable `.docx` (`docx: true`, e.g. `:281-3
 
 **Verification scan.** QR → `https://simantaptlundip.com/verifikasi/{token}` → `main.jsx`
 renders `VerifikasiSurat` outside the authenticated app → fetches
-`verifikasiSuratPublik?t=token` on the `cloudfunctions.net` URL → verdict
-(`src/pages/VerifikasiSurat.jsx:10`, `functions/verifikasiSurat.js:167-204`).
+`verifikasiSuratPublik?t=token` on the `asia-southeast2-simantap-tl.cloudfunctions.net` URL → verdict
+(`src/pages/VerifikasiSurat.jsx:11`, `functions/verifikasiSurat.js:179-216`).
 
 ### 2.4 Why each technology (stated in code/docs vs. inferred)
 
@@ -322,13 +322,18 @@ Each item lists the alternative that was tried or considered and why it lost.
    status (blocks students needlessly) (`CHANGELOG.md:28-34`).
 
 8. **Letter-number registry: hybrid manual + suggested, transactional, never deleted.** One
-   sequence per calendar year across programs (`src/utils/nomorSurat.js:7-13`); registry docs
-   `nomorSurat/{year-seq}` are never deleted so ended numbers are never reused
-   (`firestore.rules:459-467`). Recording happens in a transaction that rejects a number held
-   by another student or already ended (`src/utils/nomorSuratDb.js:37-69`). History of
+   sequence per calendar month across programs, restarting at 001 each month
+   (`src/utils/nomorSurat.js:7-13, 30-35`). The faculty format uses a three-digit sequence; at
+   full adoption (≈800 students, each passing through four or five programs) the department
+   issues on the order of 800 numbers a year, which a yearly sequence would overflow, while the
+   month numeral already in every number keeps `001/…/X/2026` and `001/…/XI/2026` distinct
+   (developer decision 2026-10-23). Registry docs `nomorSurat/{year-month-seq}` are never
+   deleted so ended numbers are never reused (`firestore.rules:463-471`). Recording happens in
+   a transaction that rejects a number held by another student or already ended
+   (`src/utils/nomorSuratDb.js:38-70`). History of
    alternatives in `CHANGELOG.md:112-124, 201-206`: (a) fully automatic read-only issuing —
    replaced so staff can still type numbers; (b) a counter collection — dropped in favour of
-   computing the smallest unused number from the registry (`nomorSuratDb.js:21-30`); (c)
+   computing the smallest unused number from the registry (`nomorSuratDb.js:17-31`); (c)
    per-academic-period sequences — rejected, the number belongs to the letter, not the student
    (developer notes). One number covers all letters of one application cycle; the QR token, not
    the number, identifies an individual letter.
@@ -357,7 +362,24 @@ Each item lists the alternative that was tried or considered and why it lost.
     (`src/utils/formPendaftaran.js:3-11`, `CHANGELOG.md:216-222`). Dropdown options are
     deactivated, never deleted, so old records keep their labels (`CHANGELOG.md:219`).
 
-13. **Extension letters print from an approval history, not the current deadline.** Otherwise
+13. **The tracked deadline is a program window, separate from the printed internship period.**
+    For KP the app tracks a 3-month window from the supervisor assignment letter's date, plus
+    approved extensions (at most one month), so the total never exceeds the 4 months allowed. The first numbered KP letter is that letter, and one number serves the
+    whole application. Staff fix the letter date before drawing a number: it defaults to one month
+    before the confirmed fieldwork start (the supervisor must receive it before departure), or
+    today if that has passed, and the number's month/year must match it, so numbers can be drawn
+    early yet the paper, the registry and the deadline agree (`src/utils/perpanjangan.js:59-90`,
+    `src/pages/mahasiswa/LangkahSuratTugas.jsx:14`, `src/pages/mahasiswa/FormMahasiswa.jsx:216-226`). The student-entered company dates
+    (`tanggalMulai`/`batasAkhir`) only print on letters. Before a number exists there is no
+    deadline ("Menunggu surat tugas"), and the clock stops once the signed approval sheet moves
+    the student to the archiving stage (`src/utils/helpers.js:158-170`). The window is stored,
+    not computed at read time, because the archive table filters deadlines with Firestore
+    queries; the index mirror carries it (`functions/indeksArsip.js:39`). The department's KP
+    handbook (Buku Panduan KP, not in the repo) sets 4 months from the assignment letter and a
+    3-month maximum for fieldwork, and does not mention extensions; the department confirmed
+    (2026-10-23) that the 4 months include the one-month extension, which also matches the
+    letter template's fixed "Jangka Waktu: 3 (tiga) bulan".
+    Extension letters print from an approval history, not the current deadline. Otherwise
     re-downloading after the deadline moved would shift the printed period
     (`src/utils/perpanjangan.js:4-9`). Month addition clamps to month end (31 Jan + 1 → 28/29
     Feb) (`nomorSurat.js:94-103`). Limits: KP/Magang 1×1 month, TA 2×1 month (`:20-24`). The
@@ -437,18 +459,19 @@ Each item lists the alternative that was tried or considered and why it lost.
 | Bootstrap of first super admin (chicken-and-egg) | Any admin may claim it while none exists; path then locks | `functions/index.js:225-250` |
 | NIM change must keep ownership, claims and uniqueness consistent | Batch: move account doc, rewrite `owner/nim` on applications, rebuild `slotPengajuan`, then reset claims | `functions/index.js:347-437` |
 | Rule ordering on deletion (Storage rules read the Firestore doc; marker deletion requires doc already gone) | Delete Storage folder before the doc; delete marker after, checked with `existsAfter` | `App.jsx:450-474`, `firestore.rules:364-371` |
+| Firestore caps rule evaluation at 1000 expressions per request and reports overruns as "Missing or insufficient permissions"; the student-write check ran every sub-check on every save, so a legitimate save (deleting the company reply letter, which also moves the stage back) was refused, found only via the console Rules Playground | Each sub-check runs only when its own fields changed; when they did not, the sub-check is trivially true, so the guard does not loosen the rules | `firestore.rules:298-320` |
 | Append-only activity logs in a rules language without loops | Compare prefix slice: new list longer and `new[0:old.size()] == old` | `firestore.rules:112-118` |
 | LibreOffice substituted fonts with different metrics, breaking letterhead tables | Install metric-compatible fonts (Liberation, Carlito, Caladea) in the image | `converter-service/Dockerfile:6-19` |
 | Cloud Run cold start delayed downloads | Ping converter and prefetch templates on page load; the print date is still computed at click time | `documentGenerator.js:77-97` |
 | Injecting a QR into an arbitrary Word template | Template author inserts a placeholder image with alt text `qr-verifikasi`; code rewrites the image relationship in document/header/footer parts and registers PNG content type; fails closed if no placeholder, because the placeholder is a real QR to the homepage | `src/utils/qrVerifikasi.js:50-82` |
 | Printed letter could disagree with the server snapshot (admin edited but did not save) | Client compares printed fields with the snapshot returned by `terbitkanVerifikasi` and refuses to print on mismatch | `qrVerifikasi.js:24-43` |
-| Concurrent number assignment by two admins | Firestore transaction reads the registry doc before writing | `nomorSuratDb.js:44-68` |
+| Concurrent number assignment by two admins | Firestore transaction reads the registry doc before writing | `nomorSuratDb.js:45-69` |
 | Counter stored as text ("5") produced number 51 | `Number()` coercion; later counter removed entirely | `CHANGELOG.md:123`, `nomorSuratDb.js:26` |
 | Template tag typos broke printing (`{tgl_sidang}}`, `(judul_kp)`) or printed "undefined" (removed tags) | Tags renamed by role; tag inventory maintained in `public/List of Tags.txt` | `CHANGELOG.md:14, 106-110` |
 | Legacy room names in student data didn't match the official room list | Fuzzy normalisation + per-room aliases | `ruangBooking.js:24-35` |
 | Firestore batch limit (500 ops) during room import | Chunk at 400 ops | `useJadwalRuang.js:15-23` |
 | `scp -r` from Windows OpenSSH created dirs with mode 707; LiteSpeed (group `nobody`) returned 404 for the whole site | Deploy script runs `chmod 755` on every directory after copy | `DEPLOY.md:131-189`, `scripts/deploy-cpanel.mjs:26-32` |
-| Production host (cPanel) has no `/api` rewrites | Public verification page calls the function's `cloudfunctions.net` URL with CORS | `src/pages/VerifikasiSurat.jsx:5-10` |
+| Production host (cPanel) has no `/api` rewrites | Public verification page calls the function's `cloudfunctions.net` URL with CORS | `src/pages/VerifikasiSurat.jsx:5-11` |
 | Migrating accounts from plaintext passwords to Firebase Auth without forcing resets | One-off Admin SDK script; placeholder emails + `mustChangePassword` where no email was known | `functions/migrate.js` |
 
 ---
@@ -612,7 +635,7 @@ exports.
   session after the change reads the whole `mahasiswa` collection once to fill
   `daftarPeriode` (`useMahasiswaAdmin.js:116-123`). The nomor-surat duplicate checks in the edit
   form that scan loaded records (`urutTerpakaiDiRecord`, `pemakaiNomorLain`) see only loaded
-  records; the registry transaction remains the authority (`nomorSuratDb.js:37-69`).
+  records; the registry transaction remains the authority (`nomorSuratDb.js:38-70`).
 - The "Semua periode" archive table is less capable than per-period views: name/NIM prefix
   search only, four sort orders, a deadline filter that cannot combine with search, No. as row
   position rather than a fixed number, and refresh returns to page 1. Each filter/sort
@@ -838,3 +861,80 @@ always describe the current system; this list is the only place for history.
   matters on shared office computers holding all students' data.
 - **Affects:** §3.19 (new decision), §7 (security limitations), §8 (file map). Verified in the
   browser with shortened limits; the rules change is not yet deployed.
+
+### 2026-10-23
+- **What:** KP deadline tracking separated from the student-entered company period. New
+  admin-written fields `mulaiProgram` / `batasProgram` on `mahasiswa/{id}` hold a 4-month
+  program window anchored to the first recorded letter number, extended by approved
+  extensions. Status badges, deadline filters (via the index mirror), the "needs review" flag,
+  the extension base and the KP extension letter use it. One-off migration script
+  `functions/migrate-jendela-program.js`.
+- **Why:** Students enter only their fieldwork period (often one month), so the app flagged
+  students as overdue while they were still within the program.
+- **Affects:** §2.2 (new fields on `mahasiswa`), §3 decision 13, §5.4 if deadlines are discussed,
+  §6 if the paper reports deadline accuracy.
+
+### 2026-10-23 (2)
+- **What:** The KP program window now starts at a staff-confirmed assignment-letter date instead
+  of the moment a number is saved. Staff confirm the fieldwork start from the company reply,
+  accept or adjust a default letter date (fieldwork start minus one month), then draw a number
+  dated in that month, which may be a future month. The letter prints that date.
+- **Why:** Staff draw numbers early so they are not forgotten, which started the 4-month clock
+  months before fieldwork; tying the clock to the letter date keeps paper, registry and deadline
+  consistent with the KP handbook.
+- **Affects:** §3 decision 13; §5.4 (printed artifacts consistent with records).
+
+### 2026-10-23 (3)
+- **What:** The student-write rule (`perubahanMhsAman`, `firestore.rules:298-320`) now runs each
+  sub-check only when the fields it inspects are among the changed keys.
+- **Why:** A student deleting the company reply letter (which also moves the stage back to
+  Pendaftaran) was refused as "Missing or insufficient permissions". The Rules Playground showed
+  the real cause: the request hit Firestore's limit of 1000 evaluated expressions. Skipped
+  sub-checks are ones that are trivially true when their fields are unchanged.
+- **Affects:** §4 (new challenge row); §5.1 and §7 if the paper discusses the cost limits of
+  rules as a validation layer.
+
+### 2026-10-23 (4)
+- **What:** The letter-number sequence now restarts every month instead of every calendar year.
+  Registry IDs change from `{year}-{seq}` to `{year}-{month}-{seq}`; next-number suggestion,
+  duplicate checks and sorting work per month. Existing registry entries, and the student and
+  QR-verification records pointing at them, are renamed by `functions/migrate-nomor-bulanan.js`.
+- **Why:** The faculty format allows three digits. At full adoption (≈800 students, four or
+  five programs each) yearly volume approaches 999; a monthly sequence gives 999 per month
+  without changing the printed format, since the month numeral already distinguishes letters.
+- **Affects:** §2.2 (registry key), §3 decision 8, §4 if numbering capacity is discussed.
+
+### 2026-10-23 (5)
+- **What:** A KP record now remembers which company reply letter its assignment-letter number was
+  issued for (`suratBalasanNomor`, admin-only). If the student deletes or replaces that letter
+  afterwards, the staff number panel reopens with a notice to re-confirm the date and draw a new
+  number (`suratBalasanBerganti`, `src/utils/nomorSurat.js`); the old number expires on save.
+  The supervising lecturer is kept.
+- **Why:** A new company letter usually moves the fieldwork dates and therefore the assignment
+  letter date; previously the panel stayed locked on the old number and nothing prompted staff.
+  With monthly sequences, spending a number per re-issue is cheap, and expiring the old one makes
+  the superseded paper fail QR verification.
+- **Affects:** §2.2 (new admin-only field on `mahasiswa`), §3 decision 8 / 13, §5.4.
+
+### 2026-10-23 (6)
+- **What:** The KP assignment letter now prints the program window (letter date to +3 months,
+  `periodeSuratTugasKP` in `src/utils/perpanjangan.js`) instead of the fieldwork dates from the
+  company letter; the QR server computes the same period (`functions/verifikasiSurat.js`).
+- **Why:** Printing fieldwork dates made the letter disagree with the deadline the system
+  enforces. The window itself was cut from 4 to 3 months: the department confirmed the
+  handbook's 4-month limit includes the single one-month extension, which matches the template's fixed
+  "3 (tiga) bulan".
+- **Affects:** §5.4 (printed artifacts consistent with records), §3 decision 13.
+
+### 2026-10-23 (7)
+- **What:** User-facing Cloud Functions (all callables, `jadwalRuangPublik`, `verifikasiSuratPublik`)
+  are pinned to `asia-southeast2` via `functions/region.js`; the client calls them with
+  `getFunctions(app, 'asia-southeast2')` (`src/utils/firebase.js:34`), the verification page uses the
+  regional URL, and the `/api/ruang` rewrite names the region (`firebase.json`). Background triggers
+  (`onUserCreate`, `jagaIndeksArsip`, `catatPerubahanDataSurat`) stay in `us-central1`.
+- **Why:** Functions had no region, so they ran in `us-central1` while Firestore is in
+  `asia-southeast2`: every callable crossed the Pacific, and each Firestore call inside it crossed
+  back. Triggers were left because they are not on a user's critical path and a duplicate
+  `jagaIndeksArsip` during cutover would double-count `statistik/lulus` (`FieldValue.increment`).
+- **Affects:** §2.1 architecture diagram, §5.4 (public verification), any latency or deployment
+  discussion. The latency gain is [INFERRED] from region distance; not measured.

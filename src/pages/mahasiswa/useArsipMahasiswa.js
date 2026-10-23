@@ -17,10 +17,11 @@ const KOSONG = []; // referensi tetap, supaya efek yang bergantung pada kursor t
 const STATUS_INDEKS = { aktif: 'aktif', lulus: 'lulus', batal: 'ditutup' };
 
 // Dua filter rentang di field berbeda butuh indeks lain; pencarian menang atas filter deadline.
-export function bangunArsip({ program, q, fAngkatan, fBidang, fStatus, fVerif, fDosen, sortBy, sortDir, groupMode }) {
+export function bangunArsip({ program, q, fAngkatan, fBidang, fTahap, fStatus, fVerif, fDosen, sortBy, sortDir, groupMode }) {
   const syarat = [where('program', '==', program)];
   if (fAngkatan) syarat.push(where('angkatan', '==', String(fAngkatan)));
   if (fBidang) syarat.push(where('bidang', '==', fBidang));
+  if (fTahap) syarat.push(where('tahap', '==', fTahap));
   if (fVerif) syarat.push(where('verif', '==', fVerif));
   if (fDosen) syarat.push(where('dosen', 'array-contains', fDosen));
   if (STATUS_INDEKS[fStatus]) syarat.push(where('status', '==', STATUS_INDEKS[fStatus]));

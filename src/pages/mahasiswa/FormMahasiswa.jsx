@@ -1,9 +1,10 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { perpanjanganDocType, PROGRAMS, programOf, stagesFor, eventsFor, rolesFor, syaratLabel, SEMUA, buatId, todayISO, RUANG, jamTampil, cariBentrok, waMahasiswa, tahapBerikut, tahapSebelumnya, eventAktif, berkasSyarat, catatAktivitas, formatTanggal, normalizeUrl, dokumenFieldFor, dosenAktifUntuk } from '../../utils/helpers.js';
 import { opsiRuang, periksaUsulanRuang, teksBentrokRuang, milikProgram } from '../../modules/ruang';
 import { FITUR_RUANG } from '../../utils/config.js';
 import { kodeTemaBidangPertama, pakaiTemaKP, adalahKodeKpTema } from '../../utils/pilihan.js';
 import { catatNomorManual } from '../../utils/nomorSuratDb.js';
+import { isiJendelaProgram } from '../../utils/perpanjangan.js';
 import { bacaNomor, waktuNomor, pemakaiNomorLain, urutTerpakaiDiRecord, NAMA_BULAN } from '../../utils/nomorSurat.js';
 import { Field, Badge, StageStepper, ArrowIcon } from '../../components/ui.jsx';
 import { generateDocument, getTemplateConfig } from '../../utils/documentGenerator.js';
@@ -102,7 +103,9 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
   const dosenByKode = useMemo(() => Object.fromEntries((allDosen || []).map((d) => [d.kode, d])), [allDosen]);
   // Nomor urut tahun ini yang dipakai record lain tapi belum tercatat di registri,
   // supaya "Ambil nomor" tidak menyarankannya.
-  const nomorTerpakai = useMemo(() => urutTerpakaiDiRecord(allMahasiswa, new Date().getFullYear(), m.id), [allMahasiswa, m.id]);
+  // Nomor urut per bulan yang dipakai record lain tapi belum tercatat di registri (untuk
+  // "Ambil nomor"; tahunnya = tahun surat, yang untuk KP bisa tahun depan).
+  const nomorTerpakai = useCallback((tahun, bulan) => urutTerpakaiDiRecord(allMahasiswa, tahun, bulan, m.id), [allMahasiswa, m.id]);
   const bentrokLive = useMemo(() => cariBentrok(allMahasiswa, m), [allMahasiswa, m]);
   // Bentrok dengan jadwal ruang (kuliah/kegiatan) — peringatan untuk admin, boleh tetap disimpan.
   const bentrokRuangLive = useMemo(() => {
@@ -201,13 +204,29 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
     calon = tanpaSaran;
     const nomorSurat = (calon.nomorSurat || '').trim();
     const berubah = nomorSurat !== ((awal && awal.nomorSurat) || '').trim();
-    if (berubah && nomorSurat) {
-      const p = bacaNomor(nomorSurat);
+    // KP: tanggal surat tugas yang digeser ke bulan lain dengan nomor lama tetap harus
+    // ditolak, jadi pemeriksaan bulan di bawah juga berjalan saat hanya tanggalnya berubah.
+    const stBerubah = programOf(calon) === 'KP' && (calon.mulaiProgram || '') !== ((awal && awal.mulaiProgram) || '');
+    if ((berubah || stBerubah) && nomorSurat) {
+      const p = bacaNomor(nomorSurat, { longgar: !berubah });
       if (!p) { setErr('Tidak bisa menyimpan: format nomor surat tidak sesuai. Lihat panduan format di samping isian Nomor Surat.'); return false; }
       const now = new Date();
       const bulanIni = `${NAMA_BULAN[now.getMonth()]} ${now.getFullYear()}`;
       const bulanNomor = `${NAMA_BULAN[p.bulan - 1]} ${p.tahun}`;
-      const waktu = waktuNomor(p, now);
+      // KP: nomor = surat tugas, bertanggal mulaiProgram (ditetapkan di panel Nomor Surat,
+      // bawaan 1 bulan sebelum KP di perusahaan). Bulan/tahun nomor wajib sama dengan
+      // tanggal itu, dan boleh bulan depan karena nomor sengaja diambil lebih awal.
+      const kp = programOf(calon) === 'KP';
+      if (kp) {
+        const st = calon.mulaiProgram || '';
+        if (!st) { setErr('Tidak bisa menyimpan: tentukan dulu tanggal surat tugas di bawah isian Nomor Surat.'); return false; }
+        const [tSt, bSt] = st.split('-').map(Number);
+        if (p.tahun !== tSt || p.bulan !== bSt) {
+          setErr(`Tidak bisa menyimpan: nomor surat bertanggal ${bulanNomor}, tidak sama dengan bulan tanggal surat tugas (${formatTanggal(st)}).`);
+          return false;
+        }
+      }
+      const waktu = kp ? null : waktuNomor(p, now);
       if (waktu === 'depan') { setErr(`Tidak bisa menyimpan: nomor surat bertanggal ${bulanNomor}, melewati bulan ini (${bulanIni}).`); return false; }
       const lain = pemakaiNomorLain(allMahasiswa, p, calon.id);
       if (lain) { setErr(`Tidak bisa menyimpan: nomor surat ini sudah dipakai ${lain.nama} (${lain.nim}).`); return false; }
@@ -224,6 +243,16 @@ export function FormMahasiswa({ awal, allDosen, allMahasiswa = [], periode, peri
         return false;
       }
     }
+    // KP: catat surat balasan mana yang menjadi dasar nomor ini (suratBalasanBerganti).
+    // Hanya saat nomor berganti, atau sekali untuk data lama yang belum punya catatan,
+    // supaya Simpan biasa tidak menghapus pemberitahuan "surat balasan diganti".
+    if (programOf(calon) === 'KP') {
+      const sb = (calon.dokumenKP || {}).suratBalasan;
+      if (!calon.nomorSuratId) calon = { ...calon, suratBalasanNomor: '' };
+      else if (sb && sb.path && (berubah || !calon.suratBalasanNomor)) calon = { ...calon, suratBalasanNomor: sb.path };
+    }
+    // KP: nomor surat pertama tercatat = surat tugas terbit → jendela program 3 bulan mulai berjalan.
+    calon = isiJendelaProgram(calon);
     // Disimpan sebagai Terverifikasi = perubahan data mahasiswa sudah diperiksa:
     // hapus penandanya supaya unduhan dokumen terbuka lagi (bolehUnduhDokumen).
     if (calon.verifikasi === 'terverifikasi' && calon.perubahanData) calon = { ...calon, perubahanData: null };

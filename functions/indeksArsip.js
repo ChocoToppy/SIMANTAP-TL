@@ -33,7 +33,10 @@ function indeksDari(m) {
     angkatan: m.angkatan == null ? '' : String(m.angkatan),
     bidang: m.bidang || '',
     tahap: m.tahap || '',
-    batasAkhir: m.batasAkhir || '',
+    // Tenggat yang dipantau (= tenggat() di src/utils/helpers.js): KP memakai jendela
+    // program (batasProgram, kosong sebelum surat tugas), program lain batasAkhir.
+    // Nama field tetap batasAkhir supaya kueri & indeks komposit tidak berubah.
+    batasAkhir: (programOf(m) === 'KP' ? m.batasProgram : m.batasAkhir) || '',
     nim: String(m.nim || ''),
     nama: String(m.nama || '').trim().toLowerCase(),
     dibuatPada: tanggalDibuat(m),

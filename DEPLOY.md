@@ -221,3 +221,19 @@ Keys list — no need to touch anything on other devices.
 The cPanel server is shared hosting with no root access, and has no
 `rsync` binary and no rsync daemon — installing one isn't an option.
 `scp -r` was used instead since both ends already have OpenSSH.
+
+## Cloud Functions region (asia-southeast2)
+
+User-facing functions (callables, `jadwalRuangPublik`, `verifikasiSuratPublik`) run in `asia-southeast2`, next
+to Firestore (`functions/region.js`, `src/utils/firebase.js`, the `/api/ruang` rewrite in `firebase.json`).
+`onUserCreate`, `jagaIndeksArsip` and `catatPerubahanDataSurat` stay in `us-central1` on purpose: moving the
+two Firestore triggers makes both copies fire during the cutover, and `statistik/lulus` uses
+`FieldValue.increment`, so counts would double.
+
+Moving from `us-central1` (a regional deploy creates NEW functions; the old ones keep running):
+
+1. `npx firebase deploy --only functions`. When asked to delete the old `us-central1` copies, answer **No**.
+2. `npm run build:experimental`, then `npx firebase deploy --only hosting` and `npm run deploy` (cPanel).
+   Until cPanel is redeployed, its old bundle still calls the `us-central1` functions, which is why step 1 keeps them.
+3. After both sites are live, delete the old copies of the 11 moved functions:
+   `npx firebase functions:delete <name> --region us-central1` (never the three triggers above).

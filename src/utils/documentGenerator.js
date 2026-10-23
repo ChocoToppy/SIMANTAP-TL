@@ -2,7 +2,7 @@ import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import { saveAs } from 'file-saver';
 import { formatTanggal, todayISO, bidangLabel, jenisMagangOf, HARI } from './helpers.js';
-import { periodePerpanjangan, periodeSuratPerpanjangan } from './perpanjangan.js';
+import { periodePerpanjangan, periodeSuratPerpanjangan, periodeSuratTugasKP } from './perpanjangan.js';
 import { siapkanQrVerifikasi, pasangQrVerifikasi } from './qrVerifikasi.js';
 
 /**
@@ -328,11 +328,15 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
         }
       };
 
-    case 'ST Pembimbing KP':
+    case 'ST Pembimbing KP': {
+      // Mulai/sampai = jendela program 3 bulan sejak tanggal surat tugas ("Jangka Waktu: 3
+      // (tiga) bulan" di template), bukan periode di perusahaan. Dengan 1 bulan perpanjangan
+      // totalnya 4 bulan, batas di Buku Panduan KP.
+      const st = periodeSuratTugasKP(m);
       return {
         template: 'KP/pembimbing-kp-st.docx',
         filename: `ST_Pembimbing_KP_${m.nama}.docx`,
-        verifikasi: verifikasiSurat('st-pembimbing-kp', m, jEv, m.tanggalMulai, m.batasAkhir),
+        verifikasi: verifikasiSurat('st-pembimbing-kp', m, jEv, st.dari, st.sampai),
         data: {
           no_surat: m.nomorSurat || jEv.nomorST || "___/UN7.../2026",
           nama_pembimbing: d1.nama || m.pembimbing1,
@@ -340,12 +344,15 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
           nama_mhs: m.nama,
           nim: m.nim,
           judul_kp: m.judul,
-          mulai_kp: formatTanggal(m.tanggalMulai) || "-",
-          akhir_kp: formatTanggal(m.batasAkhir) || "-",
-          tgl_cetak,
+          mulai_kp: formatTanggal(st.dari) || "-",
+          akhir_kp: formatTanggal(st.sampai) || "-",
+          // "Semarang, {tgl_cetak}" di surat tugas = tanggal surat tugas (mulaiProgram, yang
+          // juga bulan di nomornya), bukan tanggal unduh; data lama tanpa tanggal itu tetap tanggal cetak.
+          tgl_cetak: m.mulaiProgram ? formatTanggal(m.mulaiProgram) : tgl_cetak,
           ...wali,
         }
       };
+    }
 
     case 'Perpanjangan KP': {
       const pp = periodeSuratPerpanjangan(m);
@@ -358,7 +365,9 @@ export const getTemplateConfig = (docType, m, dosenByKode, jEv = {}) => {
           nama_mhs: m.nama,
           nim: m.nim,
           judul_kp: m.judul,
-          mulai_kp: formatTanggal(m.tanggalMulai) || "-",
+          // Periode yang diperpanjang = jendela program KP (sejak surat tugas), bukan
+          // periode di perusahaan; data lama tanpa mulaiProgram jatuh ke tanggalMulai.
+          mulai_kp: formatTanggal(m.mulaiProgram || m.tanggalMulai) || "-",
           akhir_kp: formatTanggal(pp.dari) || "-",
           mulai_ppkp: formatTanggal(pp.dari) || "-",
           akhir_ppkp: formatTanggal(pp.sampai) || "-",

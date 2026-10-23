@@ -47,13 +47,13 @@ export function SeksiNomorSurat() {
       .filter((r) => (!fProgram || r.program === fProgram)
         && (!fStatus || r.status === fStatus)
         && (!term || `${r.nomor} ${r.nama} ${r.nim}`.toLowerCase().includes(term)))
-      .sort((a, b) => (b.tahun - a.tahun) || (b.urut - a.urut));
+      .sort((a, b) => (b.tahun - a.tahun) || ((b.bulan || 0) - (a.bulan || 0)) || (b.urut - a.urut));
   }, [daftar, q, fProgram, fStatus]);
 
   return (
     <div className="card">
       <p className="hint" style={{ marginTop: 0 }}>
-        Nomor surat yang pernah dipakai, urut per tahun untuk semua program. Nomor di form
+        Nomor surat yang pernah dipakai. Nomor urut mulai lagi dari 001 tiap bulan, satu urutan untuk semua program. Nomor di form
         edit mahasiswa, diketik sendiri atau diisi lewat "Ambil nomor", tercatat di sini saat
         data disimpan. Nomor yang sudah kedaluwarsa tetap tercatat dan tidak bisa dipakai lagi.
         Yang tampil hanya tahun yang dipilih; pilih tahun lain untuk melihat nomor tahun itu.

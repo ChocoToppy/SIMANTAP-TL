@@ -1,4 +1,4 @@
-FROM node:20-slim
+FROM node:22-slim
 
 # libreoffice-writer saja (bukan paket libreoffice penuh) cukup untuk
 # konversi .docx -> pdf dan jauh lebih kecil untuk di-build & di-cold-start.
@@ -19,8 +19,8 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY package.json ./
-RUN npm install --omit=dev
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts
 COPY server.js ./
 
 ENV NODE_ENV=production

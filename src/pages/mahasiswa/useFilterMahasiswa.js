@@ -16,10 +16,11 @@ export function useFilterMahasiswa(params, periode) {
     q: params.q || '', setQ: (v) => filter({ q: v }),
     fAngkatan: params.angkatan || '', setFAngkatan: (v) => filter({ angkatan: v }),
     fBidang: params.bidang || '', setFBidang: (v) => filter({ bidang: v }),
+    fTahap: params.tahap || '', setFTahap: (v) => filter({ tahap: v }),
     fStatus: params.status || 'all', setFStatus: (v) => filter({ status: v === 'all' ? '' : v }),
     fVerif: params.verif || '', setFVerif: (v) => filter({ verif: v }),
     fDosen: params.dosen || '', setFDosen: (v) => filter({ dosen: v }),
-    resetFilter: () => filter({ status: '', angkatan: '', bidang: '', verif: '', dosen: '' }),
+    resetFilter: () => filter({ status: '', angkatan: '', bidang: '', tahap: '', verif: '', dosen: '' }),
     sortBy, sortDir,
     // Aktivitas: klik pertama langsung yang terbaru di atas.
     ubahSort: (key) => (sortBy === key

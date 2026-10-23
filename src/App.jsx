@@ -63,15 +63,18 @@ try { localStorage.removeItem('sistem-ta-v2'); } catch (e) { /* abaikan */ }
 // dosen/akun), bukan per seluruh sekolah.
 const DOC_SAFE_LIMIT = 900_000; // sisakan margin di bawah batas 1 MiB per dokumen Firestore
 
+// Mengembalikan promise<boolean>: true hanya bila server menerima tulisan. Pemanggil
+// yang perlu tindak lanjut (mis. menghapus berkas lama) menunggu nilai ini.
 function writeDoc(collectionName, id, value, label) {
   const perkiraanUkuran = new Blob([JSON.stringify(value)]).size;
   if (perkiraanUkuran > DOC_SAFE_LIMIT) {
     alert(`Gagal menyimpan: data ${label} sudah ${Math.round(perkiraanUkuran / 1024)} KB, mendekati/melebihi batas 1 MiB per dokumen Firestore. Coba unggah berkas dengan ukuran lebih kecil, atau hubungi admin.`);
-    return;
+    return Promise.resolve(false);
   }
-  setDoc(doc(db, collectionName, id), value).catch((e) => {
+  return setDoc(doc(db, collectionName, id), value).then(() => true, (e) => {
     console.error('FB err:', e);
     alert('Gagal menyimpan perubahan ke server: ' + (e.message || e) + '\n\nPerubahan Anda BELUM tersimpan secara permanen. Coba lagi, atau hubungi admin.');
+    return false;
   });
 }
 
@@ -255,7 +258,7 @@ export default function App() {
   }, [isAdmin, tabAdmin, pakaiProgram, progParam, prog]);
   const setDashProg = (p) => ubahParam({ program: p === 'ALL' ? 'semua' : p }, { riwayat: true });
   // Kode bidang KP dan TA/Capstone berbeda, jadi filter bidang dikosongkan saat ganti program.
-  const setMhsProg = (p) => ubahParam({ program: p, bidang: '', hal: '' }, { riwayat: true });
+  const setMhsProg = (p) => ubahParam({ program: p, bidang: '', tahap: '', hal: '' }, { riwayat: true });
   function keluar() {
     if (!konfirmasiKeluar()) return;
     logout();
@@ -429,12 +432,17 @@ export default function App() {
     if (m.verifikasi === 'terverifikasi' || (lama && (lama.verifikasi === 'terverifikasi' || lama.pernahTerverifikasi))) {
       m = { ...m, pernahTerverifikasi: true };
     }
-    if (lama) orphanedUploadPaths(lama, m).forEach((p) => deleteUploadedFile(p));
+    // Berkas lama dihapus SETELAH server menerima record baru. Dulu dihapus lebih dulu,
+    // sehingga simpan yang ditolak aturan (mis. hapus surat balasan yang sudah final)
+    // tetap menghapus berkasnya dan record tersimpan menunjuk ke berkas yang hilang.
+    const yatim = lama ? orphanedUploadPaths(lama, m) : [];
     setMahasiswaList((prev) => {
       const ada = prev.some((x) => x.id === m.id);
       return ada ? prev.map((x) => (x.id === m.id ? m : x)) : [...prev, m];
     });
-    writeDoc('mahasiswa', m.id, m, 'mahasiswa');
+    writeDoc('mahasiswa', m.id, m, 'mahasiswa').then((ok) => {
+      if (ok) yatim.forEach((p) => deleteUploadedFile(p));
+    });
     if (claims?.role === 'admin') {
       if (m.periode && Array.isArray(config.daftarPeriode) && !config.daftarPeriode.includes(m.periode)) {
         catatPeriode(m.periode).catch((e) => console.error('Gagal mencatat periode:', e));

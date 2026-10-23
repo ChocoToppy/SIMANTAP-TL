@@ -29,5 +29,6 @@ export const storage = getStorage(app);
 
 // Ekspor koneksi Firebase Authentication (login mahasiswa/dosen/admin) dan
 // Cloud Functions (pendaftaran mandiri, kelola akun & reset password admin).
+// Wilayah harus sama dengan functions/region.js; tanpa argumen SDK memanggil us-central1.
 export const auth = getAuth(app);
-export const functions = getFunctions(app);
+export const functions = getFunctions(app, 'asia-southeast2');

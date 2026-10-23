@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, punyaKlasifikasi, formatTanggal, formatTanggalSingkat, kondisi, SEMUA, statusVerif, cariBentrok, eventAktif, bidangLabel, tanggalDibuat, aktivitasTerakhir, hitungNomorUrut, jenisMagangOf } from '../utils/helpers.js';
+import { PROGRAMS, PROGRAM_KEYS, programOf, programLabel, punyaKlasifikasi, formatTanggal, formatTanggalSingkat, kondisi, SEMUA, statusVerif, cariBentrok, eventAktif, bidangLabel, tanggalDibuat, aktivitasTerakhir, hitungNomorUrut, jenisMagangOf, tenggat } from '../utils/helpers.js';
 import { semuaTemaBidang } from '../utils/pilihan.js';
 import { Badge, StageBar, ExportMenu, ColumnMenu, ColResizeHandle, Empty, TombolHapusCari } from '../components/ui.jsx';
 import { useColumnWidths } from '../utils/useColumnWidths.js';
@@ -44,7 +44,7 @@ export function Mahasiswa({ params = {}, mahasiswa, allMahasiswa, allDosen, peri
   // Filter bidang dikosongkan saat ganti program oleh setProgramTab (App), karena kode
   // bidang KP/Magang dan TA/Capstone berbeda.
   const {
-    q, setQ, fAngkatan, setFAngkatan, fBidang, setFBidang, fStatus, setFStatus, fVerif, setFVerif,
+    q, setQ, fAngkatan, setFAngkatan, fBidang, setFBidang, fTahap, setFTahap, fStatus, setFStatus, fVerif, setFVerif,
     fDosen, setFDosen, resetFilter, sortBy, sortDir, ubahSort, groupMode, setGroupMode,
     pageSize, setPageSize, page, setPage,
   } = useFilterMahasiswa(params, periode);
@@ -53,8 +53,8 @@ export function Mahasiswa({ params = {}, mahasiswa, allMahasiswa, allDosen, peri
   const arsipAktif = periode === SEMUA && groupMode !== 'angkatan';
   const [versiArsip, setVersiArsip] = useState(0);
   const filterArsip = useMemo(
-    () => ({ program: programTab, q, fAngkatan, fBidang, fStatus, fVerif, fDosen, sortBy, sortDir, groupMode }),
-    [programTab, q, fAngkatan, fBidang, fStatus, fVerif, fDosen, sortBy, sortDir, groupMode]
+    () => ({ program: programTab, q, fAngkatan, fBidang, fTahap, fStatus, fVerif, fDosen, sortBy, sortDir, groupMode }),
+    [programTab, q, fAngkatan, fBidang, fTahap, fStatus, fVerif, fDosen, sortBy, sortDir, groupMode]
   );
   const arsip = useArsipMahasiswa({ aktif: arsipAktif, filter: filterArsip, pageSize, versi: versiArsip });
 
@@ -139,7 +139,9 @@ export function Mahasiswa({ params = {}, mahasiswa, allMahasiswa, allDosen, peri
 
   // Cuma dipakai untuk lencana "Filter (n)" di tombol toggle mobile — angka
   // filter tambahan (di luar pencarian) yang lagi aktif.
-  const filterAktifCount = [fStatus !== 'all', !!fAngkatan, !!fBidang, !!fVerif, !!fDosen].filter(Boolean).length;
+  const filterAktifCount = [fStatus !== 'all', !!fAngkatan, !!fBidang, !!fTahap, !!fVerif, !!fDosen].filter(Boolean).length;
+  // Urutan tahap program ini (Pendaftaran → … → Lulus), untuk filter & urut kolom Tahap.
+  const tahapList = (PROGRAMS[programTab] || {}).stages || [];
 
   // Opsi filter Bidang ikut tab program aktif — KP/Magang pakai daftar tema KP_TEMA,
   // bukan BIDANG (topik TA/CAP), sesuai field `bidang` yang dipakai tiap gaya program
@@ -161,6 +163,7 @@ export function Mahasiswa({ params = {}, mahasiswa, allMahasiswa, allDosen, peri
         if (term && !(`${m.nama} ${m.nim} ${m.judul}`.toLowerCase().includes(term))) return false;
         if (fAngkatan && String(m.angkatan) !== fAngkatan) return false;
         if (fBidang && m.bidang !== fBidang) return false;
+        if (fTahap && m.tahap !== fTahap) return false;
         if (fDosen && ![m.pembimbing1, m.pembimbing2, m.penguji1, m.penguji2].includes(fDosen)) return false;
         if (fVerif && statusVerif(m).key !== fVerif) return false;
         if (fStatus === 'aktif' && (k.key === 'lulus' || k.key === 'batal')) return false;
@@ -180,20 +183,24 @@ export function Mahasiswa({ params = {}, mahasiswa, allMahasiswa, allDosen, peri
           if (!ka || !kb) return (ka ? 0 : 1) - (kb ? 0 : 1);
           return ka.localeCompare(kb, 'id') * arah;
         }
+        // Tahap: urutan alur program, bukan abjad (tahap tak dikenal di akhir).
+        if (sortBy === 'tahap') {
+          const posisi = (m) => { const i = tahapList.indexOf(m.tahap); return i < 0 ? tahapList.length : i; };
+          return (posisi(a.m) - posisi(b.m)) * arah || String(a.m.nama).localeCompare(String(b.m.nama), 'id');
+        }
         const val = (m) => sortBy === 'judul' ? (m.judul || '')
-          : sortBy === 'tahap' ? m.tahap
           : sortBy === 'pembimbing1' ? (m.pembimbing1 || '')
           : sortBy === 'pembimbing2' ? (m.pembimbing2 || '')
           : sortBy === 'penguji1' ? (m.penguji1 || '')
           : sortBy === 'penguji2' ? (m.penguji2 || '')
-          : sortBy === 'deadline' ? (m.batasAkhir || '')
+          : sortBy === 'deadline' ? tenggat(m)
           // Aktivitas: waktu entri log terbaru (sama dengan yang tampil di sel);
           // data lama tanpa log memakai tanggal pendaftaran.
           : sortBy === 'aktivitas' ? ((aktivitasTerakhir(m) || {}).at || tanggalDibuat(m))
           : m.nama;
         return String(val(a.m)).localeCompare(String(val(b.m)), 'id') * arah;
       });
-  }, [arsipAktif, mahasiswa, programTab, q, fAngkatan, fBidang, fStatus, fVerif, fDosen, sortBy, sortDir, nomorUrut, groupMode]);
+  }, [arsipAktif, mahasiswa, programTab, q, fAngkatan, fBidang, fTahap, tahapList, fStatus, fVerif, fDosen, sortBy, sortDir, nomorUrut, groupMode]);
   // Arsip: baris halaman ini dari Firestore. `tampil` = semua baris yang tersedia di layar.
   const rowsArsip = useMemo(() => arsip.rows.map((m) => ({ m, k: kondisi(m) })), [arsip.rows]);
   const tampil = arsipAktif ? rowsArsip : rows;
@@ -276,6 +283,15 @@ export function Mahasiswa({ params = {}, mahasiswa, allMahasiswa, allDosen, peri
   function edit(m) {
     if (arsipAktif && onMuatPeriode && m.periode) onMuatPeriode(m.periode);
     setSudahPindah(false); setUrutanBeku(urutanEdit); setEditing(m); setOpen(true);
+  }
+  // Klik/tap di mana pun pada baris tabel membuka form edit, kecuali pada tombol/
+  // tautan/isian di dalamnya (Edit, Hapus, dst.) atau saat sedang menyeleksi teks
+  // (mis. menyalin NIM atau nomor surat).
+  function klikBaris(e, m) {
+    if (e.target.closest('a, button, input, select, textarea, label')) return;
+    const sel = window.getSelection && window.getSelection();
+    if (sel && sel.toString().trim()) return;
+    edit(m);
   }
   // Simpan menutup modal hanya untuk mahasiswa baru; record lama tetap terbuka
   // supaya admin bisa lanjut ke entri berikutnya dengan ‹ ›.
@@ -369,6 +385,10 @@ export function Mahasiswa({ params = {}, mahasiswa, allMahasiswa, allDosen, peri
                   <option value="">Semua bidang</option>
                   {bidangOpsiFilter.map((b) => <option key={b.kode} value={b.kode}>{b.label}</option>)}
                 </select>
+                <select value={fTahap} onChange={(e) => setFTahap(e.target.value)}>
+                  <option value="">Semua tahap</option>
+                  {tahapList.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
                 <select value={fVerif} onChange={(e) => setFVerif(e.target.value)}>
                   <option value="">Semua verifikasi</option>
                   <option value="baru">Menunggu verifikasi</option>
@@ -432,7 +452,7 @@ export function Mahasiswa({ params = {}, mahasiswa, allMahasiswa, allDosen, peri
           <tbody>
             {(() => {
               const baris = ({ m, k }) => (
-                <tr key={m.id}>
+                <tr key={m.id} className="tbl-row-klik" onClick={(e) => klikBaris(e, m)}>
                   <td className="cell-sub">{noUntuk(m)}</td>
                   <td>
                     <div style={{ marginBottom: 4 }}><Badge tone={statusVerif(m).tone}>{statusVerif(m).label}</Badge></div>
@@ -455,7 +475,7 @@ export function Mahasiswa({ params = {}, mahasiswa, allMahasiswa, allDosen, peri
                   {!hiddenCols.has('deadline') && (
                     <td className="cell-center">
                       <Badge tone={k.tone}>{k.label}</Badge>
-                      <div className="cell-sub">{formatTanggalSingkat(m.batasAkhir)}</div>
+                      <div className="cell-sub">{formatTanggalSingkat(tenggat(m))}</div>
                     </td>
                   )}
                   {!hiddenCols.has('aktivitas') && <td><AktivitasMini m={m} /></td>}
@@ -504,7 +524,7 @@ export function Mahasiswa({ params = {}, mahasiswa, allMahasiswa, allDosen, peri
               <StageBar program={programOf(m)} tahap={m.tahap} />
               <div className="mhs-row-foot">
                 <span>{statusVerif(m).label}</span>
-                <span>Batas: {formatTanggal(m.batasAkhir)}</span>
+                <span>Batas: {formatTanggal(tenggat(m))}</span>
               </div>
               <div className="mhs-row-actions">
                 <button type="button" className="link-btn danger mhs-row-del" onClick={(e) => { e.stopPropagation(); hapus(m); }}>Hapus</button>

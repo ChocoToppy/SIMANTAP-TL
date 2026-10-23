@@ -10,7 +10,7 @@
     {
       "source": "functions",
       "codebase": "default",
-      "runtime": "nodejs20"
+      "runtime": "nodejs22"
     }
   ],
   "hosting": {
@@ -23,7 +23,10 @@
     "rewrites": [
       {
         "source": "/api/ruang",
-        "function": "jadwalRuangPublik"
+        "function": {
+          "functionId": "jadwalRuangPublik",
+          "region": "asia-southeast2"
+        }
       },
       {
         "source": "**",

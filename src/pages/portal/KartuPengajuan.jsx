@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { rolesFor, dokumenStatus, perpanjanganDocType, statusVerif, pernahDiverifikasi, adaSuratBalasan, ditutup, bolehAksesBerkas, bolehUnduhDokumen, alasanUnduhTerkunci, jumlahPerluUlang, pembukuanDisetujui, kondisi, programOf, eventAktifAwal, bolehAjukanJadwal, formatTanggal, jamTampil, bidangLabel, programLabel, programDisplayLabel, jenisMagangOf, normalizeUrl, judulLabelFor } from '../../utils/helpers.js';
+import { rolesFor, dokumenStatus, perpanjanganDocType, statusVerif, pernahDiverifikasi, adaSuratBalasan, ditutup, bolehAksesBerkas, bolehUnduhDokumen, alasanUnduhTerkunci, jumlahPerluUlang, pembukuanDisetujui, kondisi, programOf, eventAktifAwal, bolehAjukanJadwal, formatTanggal, jamTampil, bidangLabel, programLabel, programDisplayLabel, jenisMagangOf, normalizeUrl, judulLabelFor, tenggat } from '../../utils/helpers.js';
 import { Badge, StageBar, StageStepper } from '../../components/ui.jsx';
 import { IkonLanjut, IkonMap } from '../../components/DokIkon.jsx';
 import { generateDocument, getTemplateConfig } from '../../utils/documentGenerator.js';
@@ -100,8 +100,8 @@ export function KartuPengajuan({ m, allDosen = [], konten = {}, panduan = [], on
 
       <div className="stage-desktop"><StageBar program={program} tahap={m.tahap} /></div>
       <div className="stage-mobile"><StageStepper program={program} tahap={m.tahap} /></div>
-      {!aktif && !lulus && (
-        <div className="cell-sub">Batas: {formatTanggal(m.batasAkhir)} · <Badge tone={k.tone}>{k.label}</Badge></div>
+      {!aktif && !lulus && tenggat(m) && (
+        <div className="cell-sub">Batas: {formatTanggal(tenggat(m))} · <Badge tone={k.tone}>{k.label}</Badge></div>
       )}
 
       <StatusTahap

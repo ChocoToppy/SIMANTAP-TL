@@ -1376,6 +1376,8 @@ html[data-theme="dark"] .icon-btn-outline:hover { background: rgba(241, 241, 238
 .mhs-row {
   padding: 12px 2px 14px; border-bottom: 1px solid var(--border); cursor: pointer;
 }
+/* Baris tabel Mahasiswa bisa diklik untuk membuka form edit (klikBaris di Mahasiswa.jsx). */
+.tbl-row-klik { cursor: pointer; }
 .mhs-row-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .mhs-row-name { font-size: 0.95rem; font-weight: 600; }
 .mhs-row-sub { font-size: 0.75rem; color: var(--muted); margin: 3px 0 8px; }
@@ -1656,3 +1658,16 @@ html[data-theme="dark"] .icon-btn-outline.alur-panah.lanjut:not(:disabled):hover
   .vs-data dt { padding-bottom: 0; border-bottom: none; }
   .vs-data dd { padding-top: 2px; }
 }
+
+/* Langkah tanggal surat tugas KP sebelum "Ambil nomor" (LangkahSuratTugas.jsx). */
+.st-langkah { display: flex; flex-direction: column; gap: 8px; margin: 6px 0 10px; font-size: 0.88rem; }
+.st-langkah-baris { display: flex; gap: 10px; align-items: flex-start; }
+.st-langkah-no { flex: none; width: 22px; height: 22px; border: 1px solid var(--border-strong); display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; color: var(--muted); }
+.st-langkah input[type="date"] { max-width: 220px; }
+.st-label { display: block; margin-bottom: 4px; }
+/* Surat balasan sebagai satu baris berkas (nama + aksi), sama bentuknya di langkah 1
+   dan saat nomor terkunci, supaya jelas aksi mana milik berkas yang mana. */
+.st-sb { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 6px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.st-sb-nama { flex: 1 1 160px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.82rem; }
+.st-sb-aksi { display: flex; flex-wrap: wrap; gap: 6px; }
+.st-pdf { display: block; width: 100%; height: 60vh; min-height: 360px; margin-top: 8px; border: 1px solid var(--border-strong); background: var(--bg); }

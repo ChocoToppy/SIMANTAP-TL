@@ -295,6 +295,9 @@ service cloud.firestore {
     function perubahanDataAman(a, b) {
       return !a.diff(b).affectedKeys().hasAny(['perubahanData']) || a.get('verifikasi', 'baru') == 'baru';
     }
+    // Firestore membatasi 1000 ekspresi per permintaan, dan melewatinya ditolak sebagai
+    // "Missing or insufficient permissions". Karena itu tiap pemeriksaan hanya dijalankan
+    // bila field yang diperiksanya ikut berubah; bila tidak, pemeriksaan itu pasti lolos.
     function perubahanMhsAman(a, b, id) {
       let k = a.diff(b).affectedKeys();
       return k.hasOnly(fieldMahasiswa())
@@ -302,15 +305,16 @@ service cloud.firestore {
         && perubahanDataAman(a, b)
         && perbaikanTerkunci(a, b)
         && (!k.hasAny(['id']) || a.id == id)
-        && formMhsAman(a, b)
-        && verifikasiMhsAman(a, b)
-        && tahapMhsAman(a, b)
-        && jadwalMhsAman(a, b)
-        && perpanjanganMhsAman(a, b)
-        && pembukuanMhsAman(a, b)
-        && dokumenMhsAman(a, b, 'dokumenKP', 'KP')
-        && dokumenMhsAman(a, b, 'dokumenMagang', 'MG')
-        && dokumenMhsAman(a, b, 'dokumenTA', 'TA')
+        && (!k.hasAny(fieldForm()) || formMhsAman(a, b))
+        && (!k.hasAny(['dokumenKP', 'dokumenMagang']) || sbFinalAman(a, b))
+        && (!k.hasAny(['verifikasi', 'pernahTerverifikasi']) || verifikasiMhsAman(a, b))
+        && (!k.hasAny(['tahap']) || tahapMhsAman(a, b))
+        && (!k.hasAny(['jadwal']) || jadwalMhsAman(a, b))
+        && (!k.hasAny(['perpanjangan']) || perpanjanganMhsAman(a, b))
+        && (!k.hasAny(['pembukuan']) || pembukuanMhsAman(a, b))
+        && (!k.hasAny(['dokumenKP']) || dokumenMhsAman(a, b, 'dokumenKP', 'KP'))
+        && (!k.hasAny(['dokumenMagang']) || dokumenMhsAman(a, b, 'dokumenMagang', 'MG'))
+        && (!k.hasAny(['dokumenTA']) || dokumenMhsAman(a, b, 'dokumenTA', 'TA'))
         && hanyaTambah(a, b, 'aktivitas')
         && hanyaTambah(a, b, 'riwayatJadwal');
     }

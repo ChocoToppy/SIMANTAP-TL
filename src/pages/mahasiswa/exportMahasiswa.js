@@ -1,10 +1,10 @@
-import { programOf, programDisplayLabel, punyaKlasifikasi, bidangLabel, eventsFor, getJadwal, formatTanggal, jamTampil, kondisi } from '../../utils/helpers.js';
+import { programOf, programDisplayLabel, punyaKlasifikasi, bidangLabel, eventsFor, getJadwal, formatTanggal, jamTampil, kondisi, tenggat } from '../../utils/helpers.js';
 import { downloadCSV, downloadXLSX } from '../../utils/exportUtils.js';
 
 // Ekspor tabel Mahasiswa (CSV/XLSX) — dipisah dari Mahasiswa.jsx karena murni
 // fungsi (tidak ada state/JSX), supaya halaman daftar tidak ikut membengkak.
 
-const CORE_HEADERS = ['No. (Periode)', 'Program', 'Nama', 'NIM', 'Angkatan', 'Judul', 'Periode', 'Klasifikasi', 'Bidang', 'Dosen Wali', 'Pembimbing 1', 'Pembimbing 2', 'Penguji 1', 'Penguji 2', 'Tahap', 'Status', 'Tanggal Mulai', 'Batas Akhir', 'Nomor Surat', 'Nilai Angka', 'Nilai Huruf', 'Catatan'];
+const CORE_HEADERS = ['No. (Periode)', 'Program', 'Nama', 'NIM', 'Angkatan', 'Judul', 'Periode', 'Klasifikasi', 'Bidang', 'Dosen Wali', 'Pembimbing 1', 'Pembimbing 2', 'Penguji 1', 'Penguji 2', 'Tahap', 'Status', 'Tanggal Mulai', 'Batas Akhir', 'Tenggat Program', 'Nomor Surat', 'Nilai Angka', 'Nilai Huruf', 'Catatan'];
 
 function coreRow(m, { nomorUrut, namaLengkapDosen }) {
   const k = kondisi(m);
@@ -12,7 +12,8 @@ function coreRow(m, { nomorUrut, namaLengkapDosen }) {
     (nomorUrut[m.id] || {}).periode ?? '', programDisplayLabel(m), m.nama, m.nim, m.angkatan, m.judul, m.periode,
     punyaKlasifikasi(programOf(m)) ? (m.klasifikasi || '') : '', bidangLabel(m.bidang), namaLengkapDosen(m.dosenWali),
     namaLengkapDosen(m.pembimbing1), namaLengkapDosen(m.pembimbing2), namaLengkapDosen(m.penguji1), namaLengkapDosen(m.penguji2),
-    m.tahap, k.label, m.tanggalMulai || '', m.batasAkhir || '', m.nomorSurat || '',
+    // Tenggat Program: KP = jendela 3 bulan sejak surat tugas (+ perpanjangan) (batasProgram), lainnya = Batas Akhir.
+    m.tahap, k.label, m.tanggalMulai || '', m.batasAkhir || '', tenggat(m), m.nomorSurat || '',
     (m.nilaiAkhir || {}).angka || '', (m.nilaiAkhir || {}).huruf || '', m.catatan || '',
   ];
 }

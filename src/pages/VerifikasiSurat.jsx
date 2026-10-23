@@ -8,7 +8,7 @@ import { formatTanggal, formatWaktu } from '../utils/helpers.js';
 // dipanggil lewat URL fungsinya langsung: situs produksi ada di cPanel, bukan Firebase
 // Hosting, jadi tidak ada rewrite /api di sana. VITE_VERIFIKASI_API: untuk mencoba fungsi
 // versi lokal sebelum di-deploy.
-const API = import.meta.env.VITE_VERIFIKASI_API || 'https://us-central1-simantap-tl.cloudfunctions.net/verifikasiSuratPublik';
+const API = import.meta.env.VITE_VERIFIKASI_API || 'https://asia-southeast2-simantap-tl.cloudfunctions.net/verifikasiSuratPublik';
 
 function teksPeriode(p) {
   return p && p.dari ? `${formatTanggal(p.dari)} s.d. ${formatTanggal(p.sampai)}` : '-';

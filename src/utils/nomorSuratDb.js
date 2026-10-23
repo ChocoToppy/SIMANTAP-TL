@@ -4,7 +4,7 @@ import { programOf, nowStamp } from './helpers.js';
 import { formatNomor, idNomor, bacaNomor } from './nomorSurat.js';
 
 // ===================== Registri nomor surat (Firestore) =====================
-// nomorSurat/{tahun-urut}   satu dokumen per nomor yang pernah dipakai, diketik admin
+// nomorSurat/{tahun-bulan-urut}  satu dokumen per nomor yang pernah dipakai, diketik admin
 //                           atau diisi lewat tombol "Ambil nomor". TIDAK pernah
 //                           dihapus, jadi nomor yang sudah kedaluwarsa tidak mungkin
 //                           dipakai lagi.
@@ -14,19 +14,20 @@ import { formatNomor, idNomor, bacaNomor } from './nomorSurat.js';
 
 const oleh = () => (auth.currentUser && (auth.currentUser.email || auth.currentUser.uid)) || 'admin';
 
-// Saran untuk tombol "Ambil nomor": nomor urut terkecil tahun ini yang belum
-// ada di registri dan belum dipakai record mahasiswa mana pun (`terpakai`: nomor urut
-// dari record yang belum tercatat di registri). Hanya saran; tidak menulis apa pun.
+// Saran untuk tombol "Ambil nomor": nomor urut terkecil di bulan surat yang belum
+// ada di registri dan belum dipakai record mahasiswa mana pun (`terpakai(tahun, bulan)`:
+// nomor urut dari record yang belum tercatat di registri). Hanya saran; tidak menulis apa pun.
 // Nomor yang diketik lebih jauh (mis. 045) dilewati saat urutan sampai ke sana.
-export async function nomorBerikutnya(terpakai = []) {
-  const now = new Date();
-  const tahun = now.getFullYear();
-  const snap = await getDocs(query(collection(db, 'nomorSurat'), where('tahun', '==', tahun)));
-  const dipakai = new Set(terpakai);
+// `tanggal` ('YYYY-MM-DD') = tanggal surat; bawaan hari ini. KP memakai tanggal surat
+// tugas (1 bulan sebelum KP di perusahaan), yang boleh di bulan/tahun depan.
+export async function nomorBerikutnya(terpakai = () => [], tanggal = '') {
+  const [tahun, bulan] = tanggal ? tanggal.split('-').map(Number) : [new Date().getFullYear(), new Date().getMonth() + 1];
+  const snap = await getDocs(query(collection(db, 'nomorSurat'), where('tahun', '==', tahun), where('bulan', '==', bulan)));
+  const dipakai = new Set(typeof terpakai === 'function' ? terpakai(tahun, bulan) : terpakai);
   snap.forEach((d) => dipakai.add(Number(d.data().urut)));
   let urut = 1;
   while (dipakai.has(urut)) urut += 1;
-  return formatNomor(urut, now.getMonth() + 1, tahun);
+  return formatNomor(urut, bulan, tahun);
 }
 
 // Dicatat SEBELUM record mahasiswa disimpan: nomor masuk registri, dan nomor lama
@@ -38,7 +39,7 @@ export async function catatNomorManual(m, lama, opsi = {}) {
   const nomor = (m.nomorSurat || '').trim();
   const p = nomor ? bacaNomor(nomor, opsi) : null;
   if (nomor && !p) throw new Error('Format nomor surat tidak sesuai. Lihat panduan format di samping isian Nomor Surat.');
-  const idBaru = p ? idNomor(p.tahun, p.urut) : '';
+  const idBaru = p ? idNomor(p.tahun, p.bulan, p.urut) : '';
   const idLama = (lama && lama.nomorSuratId) || '';
   if (idBaru === idLama) return idBaru;
   return runTransaction(db, async (tx) => {

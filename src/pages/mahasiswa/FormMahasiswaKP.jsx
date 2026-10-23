@@ -138,8 +138,8 @@ export function FormMahasiswaKP({
               {stages.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </Field>
-          <Field label="Tanggal mulai"><input type="date" value={m.tanggalMulai} onChange={(e) => set('tanggalMulai', e.target.value)} /></Field>
-          <Field label="Batas akhir"><input type="date" value={m.batasAkhir} onChange={(e) => set('batasAkhir', e.target.value)} /></Field>
+          <Field label={m.program === 'KP' ? 'Mulai KP (di perusahaan)' : 'Tanggal mulai'}><input type="date" value={m.tanggalMulai} onChange={(e) => set('tanggalMulai', e.target.value)} /></Field>
+          <Field label={m.program === 'KP' ? 'Berakhir KP (di perusahaan)' : 'Batas akhir'}><input type="date" value={m.batasAkhir} onChange={(e) => set('batasAkhir', e.target.value)} /></Field>
         </div>
       </>
       )}

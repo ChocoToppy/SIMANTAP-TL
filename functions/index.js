@@ -5,6 +5,7 @@
 
 const functions = require('firebase-functions/v1');
 const admin = require('firebase-admin');
+const fn = functions.region(require('./region'));
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -59,7 +60,7 @@ exports.onUserCreate = functions.auth.user().onCreate(async (user) => {
 });
 
 // ----- 2. Pendaftaran mandiri mahasiswa: buat profil akun/loginIndex -----
-exports.completeStudentRegistration = functions.https.onCall(async (data, context) => {
+exports.completeStudentRegistration = fn.https.onCall(async (data, context) => {
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'Anda harus login untuk menyelesaikan pendaftaran.');
   }
@@ -96,7 +97,7 @@ exports.completeStudentRegistration = functions.https.onCall(async (data, contex
 // ----- 3. Admin membuat akun dosen/admin baru -----
 // Membuat admin baru dibatasi super admin saja; membuat dosen tetap boleh
 // admin biasa.
-exports.adminCreateUser = functions.https.onCall(async (data, context) => {
+exports.adminCreateUser = fn.https.onCall(async (data, context) => {
   const role = data.role === 'admin' ? 'admin' : 'lecturer';
   if (role === 'admin') requireSuperAdmin(context); else requireAdmin(context);
   const nama = String(data.nama || '').trim();
@@ -152,7 +153,7 @@ exports.adminCreateUser = functions.https.onCall(async (data, context) => {
 });
 
 // ----- 4. Admin mereset password akun manapun -----
-exports.adminResetPassword = functions.https.onCall(async (data, context) => {
+exports.adminResetPassword = fn.https.onCall(async (data, context) => {
   requireAdmin(context);
 
   const targetUid = String(data.uid || '').trim();
@@ -191,7 +192,7 @@ exports.adminResetPassword = functions.https.onCall(async (data, context) => {
 });
 
 // ----- 5. Super admin menghapus akun admin lain -----
-exports.adminDeleteAdmin = functions.https.onCall(async (data, context) => {
+exports.adminDeleteAdmin = fn.https.onCall(async (data, context) => {
   requireSuperAdmin(context);
 
   const targetUid = String(data.uid || '').trim();
@@ -230,7 +231,7 @@ exports.adminDeleteAdmin = functions.https.onCall(async (data, context) => {
 // lain; super admin berikutnya hanya bisa ditetapkan lewat aksi manual di
 // Firestore/Auth oleh yang sudah jadi super admin (belum ada UI untuk itu
 // karena biasanya cukup satu).
-exports.claimSuperAdmin = functions.https.onCall(async (data, context) => {
+exports.claimSuperAdmin = fn.https.onCall(async (data, context) => {
   requireAdmin(context);
 
   const existing = await db.collection('admin').where('superAdmin', '==', true).limit(1).get();
@@ -251,7 +252,7 @@ exports.claimSuperAdmin = functions.https.onCall(async (data, context) => {
 
 // ----- 7. Admin memperbarui profil sendiri (nama semua admin; email khusus
 // super admin) -----
-exports.adminUpdateSelf = functions.https.onCall(async (data, context) => {
+exports.adminUpdateSelf = fn.https.onCall(async (data, context) => {
   requireAdmin(context);
 
   const uid = context.auth.uid;
@@ -306,7 +307,7 @@ exports.adminUpdateSelf = functions.https.onCall(async (data, context) => {
 // dihapus di sini (Admin SDK Storage tidak dipakai di fungsi ini) — klien
 // membersihkannya sendiri lewat deleteUploadedFolder untuk tiap id yang
 // dikembalikan, sama seperti alur hapusMahasiswa yang sudah ada.
-exports.adminDeleteStudent = functions.https.onCall(async (data, context) => {
+exports.adminDeleteStudent = fn.https.onCall(async (data, context) => {
   requireAdmin(context);
 
   const nim = String(data.nim || '').trim();
@@ -352,7 +353,7 @@ exports.adminDeleteStudent = functions.https.onCall(async (data, context) => {
 // jadi mengubahnya berarti memindahkan (rename) dokumen akun dan menulis
 // ulang owner/nim di semua dokumen 'mahasiswa' terkait, bukan sekadar update
 // field biasa.
-exports.studentUpdateProfile = functions.https.onCall(async (data, context) => {
+exports.studentUpdateProfile = fn.https.onCall(async (data, context) => {
   if (!context.auth || context.auth.token.role !== 'student') {
     throw new functions.https.HttpsError('permission-denied', 'Hanya mahasiswa yang boleh melakukan aksi ini.');
   }
@@ -444,7 +445,7 @@ exports.studentUpdateProfile = functions.https.onCall(async (data, context) => {
 const FIELD_BOOKING_PUBLIK = ['id', 'semesterId', 'ruangId', 'jenis', 'pola', 'hari', 'tanggal', 'dari', 'sampai', 'kecuali', 'mulai', 'selesai'];
 const ambilField = (obj, daftar) => Object.fromEntries(daftar.filter((k) => obj[k] !== undefined).map((k) => [k, obj[k]]));
 
-exports.jadwalRuangPublik = functions.https.onRequest(async (req, res) => {
+exports.jadwalRuangPublik = fn.https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Cache-Control', 'public, max-age=300, s-maxage=300');
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }

@@ -233,9 +233,13 @@ pembimbing-kp-st
 {nama_mhs}
 {nim}
 {judul_kp}
-{mulai_kp}
-{akhir_kp}
-{tgl_cetak}
+{mulai_kp} - since 2026-10-23: the program window start = surat tugas date (mulaiProgram),
+  not the fieldwork start; old records without it fall back to tanggalMulai
+{akhir_kp} - since 2026-10-23: surat tugas date + 3 months (no extensions; those get their
+  own letter); old records fall back to batasAkhir
+{tgl_cetak} - the surat tugas date (mulaiProgram)
+The static text "Jangka Waktu: 3 (tiga) bulan" (twice) matches: window 3 months + 1 month
+extension = the panduan's 4-month limit.
 
 surat pembukuan KP (Surat Keterangan Selesai Pembukuan, tahap Pembukuan) - TEMPLATE
 PENDING. docType 'Surat Pembukuan KP' is already listed in KP_DOKUMEN (key

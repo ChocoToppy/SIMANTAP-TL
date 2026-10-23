@@ -149,10 +149,26 @@ export function formatTanggal(s) {
 }
 
 // ---------- Status / kondisi mahasiswa ----------
+// Tenggat yang dipantau aplikasi. KP: jendela program 3 bulan sejak nomor surat
+// pertama (= surat tugas) terbit, + perpanjangan yang disetujui (m.batasProgram,
+// diisi admin lewat isiJendelaProgram di perpanjangan.js; '' = belum ada surat
+// tugas, jadi belum ada tenggat). tanggalMulai/batasAkhir KP adalah periode KP di
+// perusahaan (dari surat balasan) dan hanya dicetak di surat. Program lain:
+// batasAkhir. Sama dengan indeksDari di functions/indeksArsip.js.
+export function tenggat(m) {
+  return programOf(m) === 'KP' ? (m.batasProgram || '') : (m.batasAkhir || '');
+}
+
 export function kondisi(mhs) {
   if (mhs.dibatalkan) return { key: 'batal', label: 'Ditutup', tone: 'gray', daysLeft: null };
   if (mhs.tahap === 'Lulus') return { key: 'lulus', label: 'Lulus', tone: 'green', daysLeft: null };
-  const daysLeft = daysBetween(todayISO(), mhs.batasAkhir);
+  if (programOf(mhs) === 'KP') {
+    // Jam belum berjalan sebelum surat tugas, dan berhenti begitu lembar pengesahan
+    // (persetujuan pembimbing) membawa mahasiswa ke Pembukuan.
+    if (!mhs.batasProgram) return { key: 'menunggu', label: 'Menunggu surat tugas', tone: 'gray', daysLeft: null };
+    if (mhs.tahap === 'Pembukuan') return { key: 'aman', label: 'Pembukuan', tone: 'blue', daysLeft: null };
+  }
+  const daysLeft = daysBetween(todayISO(), tenggat(mhs));
   if (daysLeft === null) return { key: 'aman', label: 'Aktif', tone: 'blue', daysLeft: null };
   if (daysLeft < 0) return { key: 'lewat', label: `Lewat ${Math.abs(daysLeft)} hari`, tone: 'red', daysLeft };
   if (daysLeft <= 30) return { key: 'mendekati', label: `Sisa ${daysLeft} hari`, tone: 'amber', daysLeft };

@@ -18,6 +18,7 @@
 
 const functions = require('firebase-functions/v1');
 const admin = require('firebase-admin');
+const fn = functions.region(require('./region'));
 const crypto = require('crypto');
 
 // Kunci = config.verifikasi.jenis di documentGenerator.js. Keperluan = teks di halaman.
@@ -59,9 +60,19 @@ async function bolehCetak(context, m, jenis) {
   return false;
 }
 
-// Periode yang tercetak di surat: periode KP, atau periode perpanjangan yang
-// terakhir disetujui (sama dengan periodeSuratPerpanjangan di perpanjangan.js).
+// 'YYYY-MM-DD' + n bulan, tanggal dipotong ke akhir bulan (= tambahBulan di src/utils/nomorSurat.js).
+function tambahBulan(iso, n) {
+  const [t, b, h] = iso.split('-').map(Number);
+  const akhir = new Date(Date.UTC(t, b - 1 + n + 1, 0)).getUTCDate();
+  const d = new Date(Date.UTC(t, b - 1 + n, Math.min(h, akhir)));
+  return d.toISOString().slice(0, 10);
+}
+
+// Periode yang tercetak di surat: surat tugas KP = jendela program 3 bulan sejak tanggal
+// surat tugas (periodeSuratTugasKP di perpanjangan.js), surat lain = periode KP, atau
+// periode perpanjangan yang terakhir disetujui (periodeSuratPerpanjangan).
 function periodeSurat(m, jenis) {
+  if (jenis === 'st-pembimbing-kp' && m.mulaiProgram) return { dari: m.mulaiProgram, sampai: tambahBulan(m.mulaiProgram, 3) };
   if (!JENIS_SURAT[jenis].perpanjangan) return { dari: m.tanggalMulai || '', sampai: m.batasAkhir || '' };
   const riwayat = (m.perpanjangan && m.perpanjangan.riwayat) || [];
   const akhir = riwayat[riwayat.length - 1];
@@ -78,8 +89,9 @@ function dataBerbeda(v, m) {
   return !!p && (p.dari !== lama.dari || p.sampai !== lama.sampai);
 }
 
-// Field mahasiswa yang ikut tercetak di surat ber-QR (periode perpanjangan dari riwayat).
-const FIELD_TERCETAK = ['nama', 'nim', 'judul', 'tanggalMulai', 'batasAkhir'];
+// Field mahasiswa yang ikut tercetak di surat ber-QR (periode perpanjangan dari riwayat;
+// mulaiProgram = tanggal & jangka waktu surat tugas KP).
+const FIELD_TERCETAK = ['nama', 'nim', 'judul', 'tanggalMulai', 'batasAkhir', 'mulaiProgram'];
 const isiTercetak = (m) => JSON.stringify([
   ...FIELD_TERCETAK.map((k) => m[k] || ''),
   (m.perpanjangan && m.perpanjangan.riwayat) || [],
@@ -99,7 +111,7 @@ exports.catatPerubahanDataSurat = functions.firestore.document('mahasiswa/{id}')
 // Dipanggil tepat sebelum surat dibangun. Mengembalikan token (sama selama isi surat
 // yang tercetak tidak berubah) dan data yang tercatat, supaya klien
 // bisa memastikan isi surat sama dengan yang tampil di halaman verifikasi.
-exports.terbitkanVerifikasi = functions.https.onCall(async (data, context) => {
+exports.terbitkanVerifikasi = fn.https.onCall(async (data, context) => {
   const jenis = String((data && data.jenis) || '');
   const mahasiswaId = String((data && data.mahasiswaId) || '');
   if (!JENIS_SURAT[jenis]) throw tolak('invalid-argument', 'Jenis surat tidak dikenal.');
@@ -164,7 +176,7 @@ function sidik(v) {
 // Untuk halaman /verifikasi/{token} (tanpa login), dipanggil langsung lewat URL fungsi
 // karena situs produksi di cPanel. Hanya field yang memang tercetak di surat; tanpa id
 // internal atau kontak.
-exports.verifikasiSuratPublik = functions.https.onRequest(async (req, res) => {
+exports.verifikasiSuratPublik = fn.https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Cache-Control', 'public, max-age=60, s-maxage=60');
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }

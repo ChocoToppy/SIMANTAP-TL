@@ -1,5 +1,66 @@
 # Changelog
 
+## 23-10-2026 (10) — Klik baris untuk membuka form edit
+- Tabel Mahasiswa (desktop & tablet): klik/tap di mana pun pada baris membuka form edit mahasiswa itu (`klikBaris` di `Mahasiswa.jsx`), dengan kursor tangan. Klik pada tombol/tautan di dalam baris (Edit, Hapus) tetap menjalankan aksinya sendiri, dan klik setelah menyeleksi teks (mis. menyalin NIM atau nomor surat) tidak membuka form. Tampilan daftar HP (≤ 640px) sudah bisa diketuk sejak sebelumnya, tombol Hapus-nya tidak ikut membuka form.
+
+## 23-10-2026 (9) — Filter tahap di tabel Mahasiswa
+- Filter baru "Semua tahap" di panel Filter tabel Mahasiswa: pilihan mengikuti tahap program yang sedang dibuka (mis. KP: Pendaftaran, Bimbingan, Pembukuan, Lulus), tersimpan di URL (`?tahap=`), dikosongkan saat ganti program, dan ikut "Reset filter".
+- Urut kolom "Tahap & jadwal" kini mengikuti alur program (Pendaftaran → … → Lulus), bukan abjad. Tabel arsip "Semua periode" masih mengurutkan tahap menurut abjad (urutan dari indeks Firestore).
+- Tabel arsip "Semua periode" juga bisa difilter per tahap: 9 indeks komposit baru di `firestore.indexes.json` (deploy: `npx firebase deploy --only firestore:indexes`).
+
+## 23-10-2026 (8) — Surat tugas KP mencetak jendela program 3 bulan; batas program KP 3 bulan + perpanjangan
+- `{mulai_kp}`/`{akhir_kp}` di surat tugas pembimbing KP kini = tanggal surat tugas (`mulaiProgram`) sampai +3 bulan (`periodeSuratTugasKP` di `utils/perpanjangan.js`), bukan periode KP di perusahaan dari surat balasan. Perpanjangan tidak mengubah surat tugas (punya surat sendiri). Data lama tanpa tanggal surat tugas tetap mencetak periode di perusahaan.
+- QR: `periodeSurat` di `functions/verifikasiSurat.js` dihitung dengan cara yang sama, dan `mulaiProgram` ikut dicatat sebagai data tercetak. Wajib deploy `terbitkanVerifikasi`, `verifikasiSuratPublik`, `catatPerubahanDataSurat`; sebelum itu unduhan surat tugas KP yang punya tanggal surat tugas ditolak ("Data di surat berbeda…").
+- Jendela program KP kini 3 bulan sejak tanggal surat tugas (dulu 4), + 1 bulan per perpanjangan yang disetujui (maks. 1×), jadi totalnya 4 bulan: batas 4 bulan di Buku Panduan KP sudah termasuk perpanjangan (dikonfirmasi departemen; Buku Panduan sendiri tidak menyebut perpanjangan). Cocok dengan teks "Jangka Waktu: 3 (tiga) bulan" di surat tugas. `batasProgram` yang sudah tersimpan dihitung ulang saat data mahasiswa itu disimpan lagi.
+
+## 23-10-2026 (7) — Surat tugas KP diulang bila surat balasan diganti
+- Record KP mencatat surat balasan mana yang menjadi dasar nomor surat tugas (field admin `suratBalasanNomor` = path berkasnya, diisi saat Simpan ketika nomor berganti, atau sekali untuk data lama).
+- Bila mahasiswa menghapus/mengganti surat balasan setelah nomor terbit (`suratBalasanBerganti` di `utils/nomorSurat.js`), panel Nomor Surat di modal admin terbuka lagi dengan pemberitahuan: cocokkan ulang tanggal (tanggal surat tugas bawaan dihitung ulang dari surat balasan baru), lalu ambil nomor baru. Nomor lama kedaluwarsa saat disimpan. Selama surat balasan baru belum masuk, langkah pencocokan tidak bisa dicentang.
+- Dosen pembimbing tidak diubah: pembimbing tidak terikat pada surat balasan perusahaan.
+- Pemberitahuan tetap tampil sampai nomor diganti; Simpan biasa (mis. verifikasi) tidak menghilangkannya.
+
+## 23-10-2026 (6) — Nomor urut surat reset tiap bulan; tampilan surat balasan di panel Nomor Surat
+- Nomor urut kini dimulai lagi dari 001 **setiap bulan** (dulu setiap tahun), tetap satu urutan untuk semua program. Format fakultas tiga digit, dan setelah semua mahasiswa (±800) memakai SIMANTAP jumlah surat setahun bisa mendekati 999; per bulan kapasitasnya 999. Bulan Romawi sudah ada di setiap nomor, jadi 001/…/X/2026 dan 001/…/XI/2026 dua surat berbeda.
+- ID registri berubah dari `{tahun}-{urut}` ke `{tahun}-{bulan}-{urut}` (`idNomor`). "Ambil nomor", cek nomor ganda, dan urutan di tabel ikut per bulan. Mengganti tanggal surat tugas KP ke bulan lain otomatis memakai nomor baru dan mengakhiri nomor lama.
+- Migrasi wajib sebelum menyimpan data bernomor dengan kode baru: `functions/migrate-nomor-bulanan.js` (laporan dulu, lalu `--tulis`) memindah dokumen registri lama ke ID baru dan memperbarui `nomorSuratId` di mahasiswa & verifikasiSurat. Nomor yang tercetak tidak berubah.
+- Simpan kini juga memeriksa KP yang hanya diganti tanggal surat tugasnya: tanggal di bulan yang sama dengan nomor boleh (nomor tetap), tanggal di bulan lain ditolak sampai nomor diganti. Dulu pemeriksaan bulan hanya berjalan saat nomornya berubah, jadi surat bisa tercetak dengan tanggal dan bulan nomor yang tidak cocok.
+- Panel Nomor Surat KP: surat balasan tampil sebagai satu baris berkas (nama berkas + tombol "Lihat surat balasan" dan "Buka di tab baru" dengan gaya tombol yang sama); label "Tanggal surat tugas" di atas isiannya.
+
+## 23-10-2026 (5) — Perbaikan: mahasiswa tidak bisa menghapus surat balasan
+- Menghapus surat balasan (yang sekaligus mengembalikan tahap ke Pendaftaran) ditolak dengan "Missing or insufficient permissions". Penyebabnya bukan isi aturan, tapi batas Firestore: maksimal 1000 ekspresi dievaluasi per permintaan, dan aturan simpan mahasiswa menjalankan semua pemeriksaan di setiap simpan. Ditemukan lewat Rules Playground di Firebase Console.
+- `perubahanMhsAman` (firestore.rules) kini hanya menjalankan pemeriksaan yang field-nya ikut berubah (form, surat balasan final, verifikasi, tahap, jadwal, perpanjangan, pembukuan, tiap field dokumen). Pemeriksaan yang dilewati pasti lolos bila field-nya tidak berubah, jadi aturan tidak melonggar.
+- Deploy: `npx firebase deploy --only firestore:rules`.
+
+## 23-10-2026 (4) — Pratinjau surat balasan di panel Nomor Surat; berkas tidak lagi terhapus saat simpan gagal
+- Panel Nomor Surat KP (modal admin, tab Bimbingan): tombol "Lihat surat balasan" menampilkan PDF surat balasan langsung di panel (iframe), plus "Buka di tab baru" (peramban HP sering tidak bisa menampilkan PDF di iframe). Ada di langkah 1 alur tanggal surat tugas maupun saat nomor sudah terkunci.
+- Perbaikan bug: `simpanMahasiswa` (App.jsx) dulu menghapus berkas lama yang diganti/dihapus dari Storage SEBELUM record dikirim ke server, dan tetap menghapusnya walau simpan ditolak aturan Firestore. Akibatnya record tersimpan menunjuk ke berkas yang sudah hilang (tautannya 403). Kini berkas lama baru dihapus setelah server menerima record; `writeDoc` mengembalikan promise<boolean>.
+
+## 23-10-2026 (3) — Tanggal surat tugas KP ditetapkan sebelum mengambil nomor
+- Panel Nomor Surat KP (modal admin, tab Bimbingan) kini bertahap (`LangkahSuratTugas.jsx`): (1) cocokkan tanggal mulai KP di perusahaan dengan surat balasan, (2) tetapkan **tanggal surat tugas**, bawaan 1 bulan sebelum KP mulai (dosen menerima surat tugas sebelum mahasiswa berangkat), atau hari ini bila tanggal itu sudah lewat, dan bisa diubah, (3) baru "Ambil nomor". Tombol Ambil nomor nonaktif sebelum langkah 1–2 selesai.
+- Nomor yang diambil memakai bulan & tahun tanggal surat tugas (`nomorBerikutnya(terpakai, tanggal)`), jadi nomor boleh diambil jauh lebih awal dan boleh bertanggal bulan/tahun depan; urutannya ikut tahun surat. Saat Simpan, bulan/tahun nomor KP wajib sama dengan tanggal surat tugas (nomor bulan depan hanya diterima dalam kasus ini; program lain tetap tidak boleh melewati bulan ini).
+- Tanggal surat tugas disimpan sebagai `mulaiProgram`: jendela program 4 bulan dihitung dari situ (`batasProgram` dihitung ulang tiap Simpan), dan surat tugas KP mencetak tanggal itu di "Semarang, …" (bukan tanggal unduh). Setelah nomor tersimpan, tanggal terkunci; tombol "Ganti tanggal & ambil nomor baru" membuka alurnya lagi (nomor lama ditandai kedaluwarsa di registri seperti biasa).
+- Isian terpisah "Mulai program" di tab Bimbingan dihapus (digantikan alur ini). Skrip `migrate-jendela-program.js` dihapus: KP lama yang sudah bernomor diatur lewat alur ini.
+
+## 23-10-2026 (2) — Cloud Functions ke Node.js 22
+- Runtime Cloud Functions dinaikkan dari Node.js 20 ke 22 (`firebase.json` `"runtime": "nodejs22"`, `functions/package.json` `engines.node: "22"`). Google mematikan Node.js 20 untuk Cloud Functions pada 30-10-2026; setelah itu fungsi tidak bisa di-deploy lagi tanpa upgrade. `firebase-functions` 6.6 & `firebase-admin` 12.7 yang terpasang sudah mendukung Node 22, jadi tidak ada paket yang diubah (upgrade `firebase-functions` ke versi terbaru, yang punya perubahan besar, ditunda).
+- Deploy: `npx firebase deploy --only functions` (semua fungsi, karena runtime berubah). Bila analisis kode timeout, set `FUNCTIONS_DISCOVERY_TIMEOUT=60` dulu.
+- `converter-service` (Cloud Run) ikut dinaikkan dari `node:20-slim` ke `node:22-slim`, lihat entri 23-10-2026 (3).
+
+## 23-10-2026 (3) — Hardening converter-service (Node 22 + lockfile)
+- Latar belakang: rilis keamanan Node.js 21-10-2026 (CVE-2026-111497, dekoder Brotli; perbaikan hanya untuk 22.x/24.x/26.x, Node 20 tidak diperbaiki) dan rentetan serangan supply-chain npm 2026. Aplikasi tidak memakai Brotli dan tidak memuat paket yang dikompromikan, jadi risikonya rendah, tapi image converter masih Node 20 dan membangun dependensi tanpa lockfile.
+- `converter-service/Dockerfile`: base image `node:22-slim`; `npm install` diganti `npm ci --omit=dev --ignore-scripts` dengan `package-lock.json` baru (versi `express`/`cors` kini terkunci per build, tidak ikut versi terbaru saat deploy).
+- Deploy ulang converter diperlukan agar berlaku. Node lokal (v24.19.0) belum ditambal; perbaikannya 24.22.1.
+
+## 23-10-2026 — Batas waktu KP = jendela program 4 bulan sejak surat tugas
+- KP tidak lagi memakai tanggal KP isian mahasiswa sebagai tenggat. Tenggat KP kini jendela program: 4 bulan sejak nomor surat **pertama** tercatat (surat bernomor pertama KP adalah surat tugas, dan satu nomor dipakai seluruh program; Buku Panduan KP: "maksimal 4 bulan terhitung mulai tanggal surat tugas"), + 1 bulan per perpanjangan yang disetujui. Disimpan di field baru `mulaiProgram` & `batasProgram` (hanya admin; `isiJendelaProgram` & `hitungBatasProgram` di `utils/perpanjangan.js`). Mengganti nomor surat tidak memulai ulang jam.
+- `tanggalMulai`/`batasAkhir` KP tetap periode KP di perusahaan (dari surat balasan) dan hanya dicetak di surat; di modal admin labelnya "Mulai/Berakhir KP (di perusahaan)".
+- Status KP: "Menunggu surat tugas" sebelum ada nomor surat (tanpa hitungan hari), "Sisa/Lewat X hari" selama Bimbingan, dan berhenti ("Pembukuan") begitu lembar pengesahan membawa mahasiswa ke Pembukuan. `tenggat()` di `helpers.js` dipakai badge, urutan & kolom tenggat tabel, kartu mahasiswa, tanda "perlu ditinjau", dasar perpanjangan, dan panel Nomor Surat/Perpanjangan. Program lain tetap memakai `batasAkhir`.
+- Perpanjangan KP memajukan `batasProgram`; surat perpanjangan KP mencetak `{mulai_kp}` = mulai program.
+- Tabel arsip: indeks `indeksMahasiswa` menyimpan tenggat efektif di field `batasAkhir` (KP = `batasProgram`), jadi filter Lewat/Mendekati & urutan deadline mengikuti jendela program tanpa indeks baru (`functions/indeksArsip.js`).
+- Ekspor tabel Mahasiswa punya kolom baru "Tenggat Program".
+- Data lama: KP yang sudah punya nomor surat diatur manual lewat alur tanggal surat tugas (lihat entri 23-10-2026 (3)). Perpanjangan KP yang disetujui sebelumnya sudah memajukan `batasAkhir` (tanggal di perusahaan); tanggal itu tidak dikembalikan otomatis.
+- Deploy: aplikasi, `firebase deploy --only functions:jagaIndeksArsip`, lalu `migrate-indeks-arsip.js --tulis` (supaya indeks KP yang tidak tersentuh migrasi, mis. yang belum punya nomor surat, ikut memakai tenggat baru). `firestore.rules` tidak berubah (field baru tidak ada di daftar yang boleh ditulis mahasiswa).
+
 ## 22-10-2026 (2) — Batas sesi login
 - Satu login berlaku untuk semua tab, dan berakhir bila: semua tab SIMANTAP ditutup (dicek saat tab baru dibuka; reload dan tab yang dipulihkan browser tidak dihitung), tidak ada aktivitas di tab mana pun selama 30 menit (admin), 60 menit (dosen) atau 2 jam (mahasiswa), atau 12 jam sejak login (`utils/sesi.js`).
 - Satu menit sebelum keluar otomatis muncul peringatan dengan hitung mundur: "Tetap masuk" atau aktivitas apa pun memperpanjang batas diam; batas 12 jam tidak bisa diperpanjang. Halaman login menyebut alasannya. Perubahan yang belum disimpan hilang bila waktu habis.

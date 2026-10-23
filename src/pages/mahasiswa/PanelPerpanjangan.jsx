@@ -1,5 +1,5 @@
 import React from 'react';
-import { formatTanggal, normalizeUrl, programDisplayLabel } from '../../utils/helpers.js';
+import { formatTanggal, normalizeUrl, programDisplayLabel, tenggat } from '../../utils/helpers.js';
 import { aturanPerpanjangan, bolehPerpanjang, perpanjanganDisetujui } from '../../utils/nomorSurat.js';
 import { periodePerpanjangan, riwayatPerpanjangan, teksKonfirmasiPerpanjangan, patchSetujuiPerpanjangan } from '../../utils/perpanjangan.js';
 import { Badge, CheckIcon, PrintIcon } from '../../components/ui.jsx';
@@ -23,7 +23,7 @@ export function PanelPerpanjangan({ m, setM, onCetak, cetakBusy }) {
     setM((prev) => ({ ...prev, ...patchSetujuiPerpanjangan(prev) }));
   }
 
-  const berikut = aturan && m.batasAkhir && bolehPerpanjang(m) ? periodePerpanjangan(m, riwayat.length) : null;
+  const berikut = aturan && tenggat(m) && bolehPerpanjang(m) ? periodePerpanjangan(m, riwayat.length) : null;
 
   return (
     <div className="sched pp-panel">
@@ -64,7 +64,7 @@ export function PanelPerpanjangan({ m, setM, onCetak, cetakBusy }) {
         </a>
       )}
 
-      {aturan && !m.batasAkhir && <div className="hint">Isi batas akhir dulu.</div>}
+      {aturan && !tenggat(m) && <div className="hint">{m.program === 'KP' ? 'Batas program belum ada: menunggu nomor surat (surat tugas).' : 'Isi batas akhir dulu.'}</div>}
       <div className="pp-aksi">
         {berikut && (
           <div className="pp-tanggal">
